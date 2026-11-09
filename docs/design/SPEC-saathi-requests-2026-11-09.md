@@ -2,8 +2,8 @@
 id: SPEC-saathi-requests
 kind: contract
 governs: v1; how an elder message becomes a request, which states it can reach, which timers and templates apply
-status: draft, new in the r2 set, round-3 fixes applied, pending owner lock (see docs/LOCKS.md)
-upstream: PRD-saathi-2026-11-09-r2.md sha256 341ecc305674155b388184dd59323faeda447676c01d9d002c188b9aeadfdd8b; RECORD-saathi-decisions-2026-11-09.md sha256 a1ec6109610478a4582467cebe12c11d4bd266b89b35a89fdbe44dbde9f86f45
+status: draft, new in the r2 set, round-3 and TRD review fixes applied, pending owner lock (see docs/LOCKS.md)
+upstream: PRD-saathi-2026-11-09-r2.md sha256 faf5563fa2374f14571010c04a17d4b4da0dc833bc296d55994250ad201f25a1; RECORD-saathi-decisions-2026-11-09.md sha256 62594515dd94e4441da30ab0752cad3867eb2982bf61e0c89156f76400cc540a
 sources: docs/design/RECORD-saathi-decisions-2026-11-09.md (D-nn); RQ-20, RQ-39, RQ-74, RQ-77 and RQ-78 as written in PRD-saathi-2026-11-09-r1.md (sha256 021742ba14e4d154f291d059aaf1add458e2e3b90c36992990d7518ffae1434a); src/saathi/pipeline.py and src/saathi/domain.py on branch phase-0/foundation at 3d46456; DOC-PHILOSOPHY.md
 checked-at: 3d46456, 2026-11-09. Code read with `git show`; nothing in this file was executed.
 ---
@@ -58,6 +58,7 @@ One table covers request states, commit_intent states (safety RQ-80), the meanin
 | `handoff` reason `cancel_after_commit_start` | handoff | The elder asked to cancel after step 1: the card gives the service's cancel path. | `handoff` | yes |
 | `handoff` reason `macro_failed` | handoff | A macro checkpoint failed: the card says which step; repair is a human task (assurance RQ-53). | `handoff` | yes |
 | `handoff` reason `urgent_refresh_limit` | handoff | An urgent ride used its last refresh without a tap: the card and the elder get a prompt to phone the caregiver. This is the expiry of an urgent request. | `handoff` | yes |
+| `handoff` reason `manual_reconcile` | handoff | `find_order` is unsupported or kept failing until the owner timeout (safety RQ-80): the owner is alerted and records the outcome by hand. The intent stays `timeout` or `commit_unknown` and its day-cap hold stays until that record. | `handoff` | yes |
 | `handoff` reason `phone_offline` | handoff | The phone or bridge is offline (safety RQ-34): deep link and summary. | `handoff` | yes |
 | `handoff` reason `summary_only` | handoff | Outcome (c) of RQ-02, or medicine or a bill: summary and no action. | `handoff` | yes |
 | `received` | inbox | The webhook committed the row before its 200, or an expired lease returned it; a worker has not taken it. | none | no |
@@ -70,7 +71,7 @@ One table covers request states, commit_intent states (safety RQ-80), the meanin
 | `acknowledged` | alert_event | An approver acknowledged on any channel; unsent attempts are cancelled; a follow-up at 15 min asks whether it is resolved. | none | yes |
 | `blocked` reason `no_human_reached` | alert_event | Every cap was spent with no acknowledgement; the ops chat got a record and an audit row was written. | none | yes |
 
-A False alarm tap sets a `false_alarm` flag on an alert event and does not change its state. A restart resumes every non-terminal row from Postgres. The day cap counts `committing`, `committed`, `commit_unknown` and `timeout` (safety RQ-26); `aborted_no_call` does not count.
+A False alarm tap sets a `false_alarm` flag on an alert event and does not change its state. A restart resumes every non-terminal row from Postgres. The day cap counts commit_intents in `attempting`, `committed`, `commit_unknown` and `timeout` (safety RQ-26) until a reconcile or a recorded manual resolution; `aborted_no_call` does not count.
 
 ## 4. Timers, templates, windows and channels
 
@@ -88,7 +89,7 @@ Timers (RQ-20):
 | Ride | 2 min | 3 min | 60 min | none | 60 s |
 | Urgent ride | 2 min | 3 min | none; `handoff` after the last refresh | none | 60 s |
 
-The second-confirmation token (safety RQ-26) expires 300 s after the first tap in every class.
+The code window of the second confirmation (safety RQ-26) is 300 s after the first tap. A `confirm2` token never outlives the approval token, so the earlier expiry governs: a cart has 300 s to enter the code, a ride has 60 s.
 
 WhatsApp template inventory (RQ-77). Category is proposed; the platform decides. Lead time is N: the template registry records submission and approval times.
 

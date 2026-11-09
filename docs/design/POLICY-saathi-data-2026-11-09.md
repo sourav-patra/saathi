@@ -2,8 +2,8 @@
 id: POLICY-saathi-data
 kind: contract
 governs: personal data in Saathi: classes, routes out of the server, consent, erasure and the law
-status: draft, new in the r2 set, round-3 fixes applied, pending owner lock (see docs/LOCKS.md)
-upstream: PRD-saathi-2026-11-09-r2.md sha256 341ecc305674155b388184dd59323faeda447676c01d9d002c188b9aeadfdd8b; SPEC-saathi-safety-2026-11-09-r2.md sha256 6b9a198e72f618e26af03ff63e1555abf9c056e7fcf8a3e4cdff7fd078b9c202; SPEC-saathi-assurance-2026-11-09-r2.md sha256 be50717893ed345c507fcc856d7f8694931b520e3bf4110200b922519007137e; RECORD-saathi-decisions-2026-11-09.md sha256 a1ec6109610478a4582467cebe12c11d4bd266b89b35a89fdbe44dbde9f86f45
+status: draft, new in the r2 set, round-3 and TRD review fixes applied, pending owner lock (see docs/LOCKS.md)
+upstream: PRD-saathi-2026-11-09-r2.md sha256 faf5563fa2374f14571010c04a17d4b4da0dc833bc296d55994250ad201f25a1; SPEC-saathi-safety-2026-11-09-r2.md sha256 5a1fdcfeef1f4d78480fd36cec3757dda7d2023e672d90cc8ad13b078589ef5f; SPEC-saathi-assurance-2026-11-09-r2.md sha256 ec44a491c809e537ad7e28f4bd0d3dcfb6bcbc1b99e2b223fdf1d8663b3cdf89; RECORD-saathi-decisions-2026-11-09.md sha256 62594515dd94e4441da30ab0752cad3867eb2982bf61e0c89156f76400cc540a
 sources: docs/design/RECORD-saathi-decisions-2026-11-09.md (D-nn); sections 2, 3 and 6 of POLICY-saathi-2026-11-09-r1.md (sha256 72906ab9911d42af0645f9c72a9f01b2998209ab3184cf333ac47310fe26e35b), revised here; src/saathi/channels/telegram.py and src/saathi/channels/whatsapp.py on branch phase-0/foundation at 3d46456; the Digital Personal Data Protection Act, 2023 as recalled, text not re-read (R); DOC-PHILOSOPHY.md
 checked-at: 3d46456, 2026-11-09. Files read with `git show`. No leak scan, network capture or legal review was run; no platform terms were read.
 ---
@@ -25,7 +25,7 @@ Goal: personal data leaves the server only by a listed route, only after a recor
 | PL-05 | No real elder data (voice notes, transcripts, address) is stored or used until the elder's consent is recorded. The pilot consent record is made first. It holds date, scope (voice, images, video, profile, ordering, alerts to approvers), language, how it was given, the consent text version and who recorded it, and holds no content. The elder can withdraw by saying so (requests RQ-74); withdrawal stops processing and starts erasure (PL-06). Until the record exists, only synthetic data is used. | reader checks the record exists before the first real message; a test that refuses a real-data path without a consent row; manual receipt (evidence RQ-100) for the recording | N |
 | PL-06 | Erasure follows assurance RQ-42 and RQ-98, with the unreachable stores listed. | assurance RQ-42 test | N |
 | PL-07 | Logs, run records and the audit trail hold ids and keyed hashes, not content. Raw text lives only in `raw_text` (assurance RQ-97). Debug traces are not the audit trail. | assurance RQ-56a, RQ-57, RQ-97 | N |
-| PL-20 | Provider receipts. Before a hosted model tier, Telegram, WhatsApp, a commerce service or the telephony provider receives personal data, a receipt records the provider's terms on use, training and retention, the data and media classes covered, the date and who read them. Until a receipt exists a hosted model tier gets public or synthetic data only. For Telegram, WhatsApp and the commerce services, whose use is the product, reading their terms is an owner task listed in PRD section 7, recorded as a manual receipt (evidence RQ-100). | roster loader test (assurance RQ-50, RQ-96); manual receipts | R: no terms were read; hosted terms and model-card licences are unverified (D-37) |
+| PL-20 | Provider receipts. Before a hosted model tier, Telegram, WhatsApp, a commerce service, the telephony provider or the uptime monitor receives personal data, a receipt records the provider's terms on use, training and retention, the data and media classes covered, the date and who read them. Until a receipt exists a hosted model tier gets public or synthetic data only. For Telegram, WhatsApp and the commerce services, whose use is the product, reading their terms is an owner task listed in PRD section 7, recorded as a manual receipt (evidence RQ-100). | roster loader test (assurance RQ-50, RQ-96); manual receipts | R: no terms were read; hosted terms and model-card licences are unverified (D-37) |
 | PL-29 | Law: DPDP Act 2023 handling (section 3): notice, consent, withdrawal, erasure, security safeguards and breach steps. | section 3 checks | R: law not re-read; legal review N |
 | PL-30 | A data-principal request has one path (section 3) with a target of 30 days. | request drill | N |
 
@@ -49,10 +49,11 @@ This table is the single source for outbound data (PL-04). The code sends nothin
 | Hosted speech output, if used | reply text without address or phone number | personal | the local engine is the default until a receipt exists | owner |
 | Private mesh network to the bridge board | debug bridge commands and phone screenshots | personal | the bridge accepts the VPS only (POLICY RQ-90); N | owner |
 | Off-site object storage | nightly encrypted database dump; nightly audit chain head | personal (dump), none (head) | encryption checked with `file` on the dump (assurance RQ-37); N | owner |
+| External uptime monitor | a request to the health URL every minute; the approvers' contact points for paging; no elder data | personal (contact points) | the URL answers `ok` and nothing else (POLICY RQ-104); receipt before first use (PL-20); N | owner |
 | GitHub | code, documents, CI logs | none | POLICY PL-08, PL-12, PL-15 | owner |
 | Package, image and model registries | package, image and model names | none | pulled by the operator | owner |
 
-Self-hosted trace and storage services (Langfuse, ClickHouse, Valkey, SeaweedFS, Postgres) run on the server and send nothing out. N: no network capture has confirmed this; command `strace -f -e trace=connect` on each container host process. Valkey, ClickHouse and SeaweedFS run only because Langfuse requires them (D-40).
+Self-hosted trace and storage services (Postgres, and Langfuse, ClickHouse, Valkey and SeaweedFS once the trace stack runs, D-74) run on the server and send nothing out. Until then traces are JSON-lines files on the server disk. N: no network capture has confirmed this; command `strace -f -e trace=connect` on each container host process. Valkey, ClickHouse and SeaweedFS run only because Langfuse requires them (D-40).
 
 ## 3. Law: DPDP Act 2023 (PL-29, PL-30)
 

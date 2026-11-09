@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1310 660" width="1310" height="660" role="img" aria-labelledby="t1 d1" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif">
   <title id="t1">Saathi target architecture and trust zones</title>
-  <desc id="d1">Planned end state of Phase 4. A WhatsApp message from the elder (A1) reaches the inbox and webhook (C01) in the public edge zone Z1, which inserts a row into Postgres (X1) before answering. The worker (C02) in the core zone Z2 leases the row, scans it with the radar (C04) and redacts text (C05). A radar flag opens an alert event in escalation (C14), which notifies the caregiver on Telegram (A2) and the approver phones (A3). Job rows go to the model worker zone Z3, where perception (C03), router (C06) and planners (C08) call hosted models only through the gateway (C16) and the egress proxy (X2). Planners pass slots to the adapters (C09) in the exception zone Z4, which reach commerce services through X2 and the home device (D1) in zone Z5 over a private mesh. Adapters return typed facts to the quote builder (C10), then the policy engine (C11), then the approval service and bot (C12), which shows a card to the caregiver. The commit executor (C13) writes audit rows (C17) and is the only caller that places an order or taps the final button through the adapters.</desc>
+  <desc id="d1">Planned end state of Phase 4. A WhatsApp message from the elder (A1) reaches the inbox and webhook (C01) in the public edge zone Z1, which inserts a row into Postgres (X1) before answering. C01 also runs the keyword radar (C04) on the text or caption before the commit, and a hit adds the alert event to the same transaction (E26). The worker (C02) in the core zone Z2 leases the oldest row of each elder, scans ASR text with the radar and redacts text (C05). A radar flag opens an alert event in escalation (C14), which notifies the caregiver on Telegram (A2) and the approver phones (A3). Job rows go to the model worker zone Z3, where perception (C03), router (C06) and planners (C08) call hosted models only through the gateway (C16) and the egress reverse proxy (X2), which has one route per provider and does not intercept TLS. Planners pass slots to the adapters (C09) in the exception zone Z4, which reach commerce services through X2 and the home device (D1) in zone Z5 over a private mesh. Adapters return typed facts to the quote builder (C10), then the policy engine (C11), then the approval service and bot (C12), which shows a card to the caregiver. The commit executor (C13) writes audit rows (C17) and is the only caller that places an order or taps the final button through the adapters.</desc>
   <style>
     .t { font-size: 12px; font-weight: bold; fill: #111827; }
     .s { font-size: 11px; fill: #111827; }
@@ -34,7 +34,7 @@
   <g id="A5"><rect x="1125" y="450" width="170" height="60" rx="5" class="ext"/><text x="1135" y="468" class="t">A5 Commerce (Z6)</text><text x="1135" y="484" class="s">MCP servers, apps,</text><text x="1135" y="498" class="s">deep links</text></g>
 
   <!-- Z1 -->
-  <g id="C01"><rect x="195" y="69" width="130" height="60" rx="5" fill="#ecfccb" class="b"/><text x="203" y="86" class="t">C01 inbox, webhook</text><text x="203" y="102" class="s">signature, insert row,</text><text x="203" y="116" class="s">commit, then 200</text></g>
+  <g id="C01"><rect x="195" y="69" width="130" height="60" rx="5" fill="#ecfccb" class="b"/><text x="203" y="86" class="t">C01 inbox, webhook</text><text x="203" y="102" class="s">signature, keywords,</text><text x="203" y="116" class="s">insert, commit, 200</text></g>
 
   <!-- X1 -->
   <g id="X1"><rect x="358" y="84" width="448" height="32" rx="4" fill="#e5e7eb" class="b"/><text x="582" y="104" class="s" text-anchor="middle">X1 Postgres: inbox, requests, tokens, commit_intent, alerts, audit_log</text></g>
@@ -65,7 +65,7 @@
   <text x="845" y="500" class="s">after code verifies the final screen.</text>
 
   <!-- right column -->
-  <g id="X2"><rect x="1125" y="140" width="170" height="290" rx="5" fill="#ede9fe" class="b" stroke-width="2.5"/><text x="1135" y="162" class="t">X2 egress proxy</text><text x="1135" y="182" class="s">host allowlist per</text><text x="1135" y="196" class="s">container; DNS only</text><text x="1135" y="210" class="s">through the proxy;</text><text x="1135" y="224" class="s">credential injection</text><text x="1135" y="238" class="s">from the register</text><text x="1135" y="268" class="s">Z3 and Z4 reach the</text><text x="1135" y="282" class="s">internet only here</text></g>
+  <g id="X2"><rect x="1125" y="140" width="170" height="290" rx="5" fill="#ede9fe" class="b" stroke-width="2.5"/><text x="1135" y="162" class="t">X2 egress (Caddy)</text><text x="1135" y="182" class="s">reverse proxy, one</text><text x="1135" y="196" class="s">route per provider;</text><text x="1135" y="210" class="s">route set = allowlist;</text><text x="1135" y="224" class="s">no TLS interception;</text><text x="1135" y="238" class="s">keys from env file</text><text x="1135" y="268" class="s">Z3 and Z4 reach the</text><text x="1135" y="282" class="s">internet only here</text></g>
   <g id="D1"><rect x="1125" y="562" width="170" height="70" rx="5" fill="#ede9fe" class="b"/><text x="1133" y="580" class="t">D1 bridge board, phone</text><text x="1133" y="596" class="s">private mesh, VPS node</text><text x="1133" y="610" class="s">only; dedicated phone,</text><text x="1133" y="624" class="s">no banking app</text></g>
 
   <!-- edges -->
@@ -95,10 +95,12 @@
   <g id="E24" data-from="C09" data-to="D1"><path d="M1020 460 L1020 597 L1125 597" class="e" marker-end="url(#a)"/><rect x="1024" y="540" width="20" height="13" rx="3" class="nb"/><text x="1034" y="550" class="n">E24</text></g>
   <g id="E25" data-from="C09" data-to="C16"><path d="M1075 360 L1075 202" class="e" marker-end="url(#a)"/><rect x="1080" y="270" width="20" height="13" rx="3" class="nb"/><text x="1090" y="280" class="n">E25</text></g>
 
+  <g id="E26" data-from="C01" data-to="C04"><path d="M260 129 L260 215 L582 215 L582 208" class="e" marker-end="url(#a)"/><rect x="300" y="208" width="20" height="13" rx="3" class="nb"/><text x="310" y="218" class="n">E26</text></g>
+
   <!-- legend -->
   <rect x="10" y="460" width="330" height="190" rx="6" fill="#ffffff" stroke="#111827" stroke-width="1"/>
   <text x="20" y="480" class="z">Legend</text>
-  <path d="M20 498 L60 498" class="e" marker-end="url(#a)"/><text x="70" y="502" class="s">data flow; the id E1 to E25 is in the edge table</text>
+  <path d="M20 498 L60 498" class="e" marker-end="url(#a)"/><text x="70" y="502" class="s">data flow; the id E1 to E26 is in the edge table</text>
   <path d="M20 518 L60 518" class="e" marker-start="url(#a)" marker-end="url(#a)"/><text x="70" y="522" class="s">flow in both directions (E9)</text>
   <rect x="20" y="534" width="40" height="14" fill="#f8fafc" stroke="#111827" stroke-width="2" stroke-dasharray="7 4"/><text x="70" y="545" class="s">trust zone, labelled Z1 to Z5</text>
   <rect x="20" y="556" width="40" height="14" fill="#fffbeb" stroke="#111827" stroke-width="4" stroke-dasharray="12 5"/><text x="70" y="567" class="s">exception zone Z4 (E-1), thick border</text>

@@ -2,8 +2,8 @@
 id: SPEC-saathi-alternatives
 kind: contract
 governs: v1; the alternatives considered before any custom component is built, and the state of each comparison
-status: draft, new in the r2 set, round-3 fixes applied, rows added for the TRD choices, pending owner lock (see docs/LOCKS.md)
-upstream: PRD-saathi-2026-11-09-r2.md sha256 341ecc305674155b388184dd59323faeda447676c01d9d002c188b9aeadfdd8b; SPEC-saathi-evidence-2026-11-09-r2.md sha256 482a276cd9216e76d527619579f554abad7f89d4c8ea13c6159d8a56b338eabf; RECORD-saathi-decisions-2026-11-09.md sha256 a1ec6109610478a4582467cebe12c11d4bd266b89b35a89fdbe44dbde9f86f45
+status: draft, new in the r2 set, round-3 and TRD review fixes applied, rows added for the TRD choices, pending owner lock (see docs/LOCKS.md)
+upstream: PRD-saathi-2026-11-09-r2.md sha256 faf5563fa2374f14571010c04a17d4b4da0dc833bc296d55994250ad201f25a1; SPEC-saathi-evidence-2026-11-09-r2.md sha256 ff254b984e39cd04bdb60cfe127ec3f556646bfaa915f2b36b55b841259387e6; RECORD-saathi-decisions-2026-11-09.md sha256 62594515dd94e4441da30ab0752cad3867eb2982bf61e0c89156f76400cc540a
 sources: section 4 of SPEC-saathi-evidence-2026-11-09.md (sha256 955dd4d2129090bdc3114a819282f26c777e815a54ff8cdfc797663143e6a4c1), expanded here; version and licence fields read from the Python package index JSON API (`https://pypi.org/pypi/<name>/json`) on 2026-11-09; DOC-PHILOSOPHY.md
 checked-at: 2026-11-09. Package metadata was read for every Python row below (E for the read; licence texts were not read). The aarch64 wheel file lists of sherpa-onnx and onnxruntime were read in the TRD pass. The source hosting service answered 403 in this pass, so non-Python rows are N.
 ---
@@ -14,7 +14,7 @@ Read section 2 for the alternatives per component, section 3 for the state of ea
 
 ## 1. Goal, scope and marks
 
-Goal: no custom component exists without at least three alternatives (or a recorded search), each with version, licence, cost, data handling, a source link and a choice. This file holds RQ-70. Marks: PRD section 2. A licence marked N has no declared value in package metadata or was not read; the command that settles it is in the row. Cost is effort to install and maintain (low, medium, high; P) plus money (none for every row).
+Goal: no custom component exists without at least three alternatives (or a recorded search), each with version, licence, cost, data handling, a source link and a choice. This file holds RQ-70. Marks: PRD section 2. A licence marked N has no declared value in package metadata or was not read; the command that settles it is in the row. Cost is effort to install and maintain (low, medium, high; P) plus money (none for every row). Dependency licence closure: an alternative's licence is that of everything it pulls in. Follow `requires_dist` from the index for a Python package; read the image audit (evidence RQ-71) for a container program. A banned licence anywhere in the closure retires the row (PL-09). A use or adapt row has its closure read before its code merges; a Licence cell naming only the package leaves the closure N.
 
 | ID | Requirement | Check | Evidence and state |
 |---|---|---|---|
@@ -37,8 +37,9 @@ Components. Every owner is `owner` because there is one maintainer.
 | Second factor (TOTP) | none | owner | Replay window, lockout and encrypted secret storage per approver (POLICY PL-27) |
 | Redaction | regex rules in code (current) | owner | Hindi-context ID formats and checksums for Aadhaar, PAN, voter and passport (assurance RQ-41) |
 | Scheduler (reminders, timers) | Postgres table `timers` polled with `FOR UPDATE SKIP LOCKED` | owner | Due times come from persisted events and run under a fake clock (requests RQ-20, PRD RQ-14) |
-| Final-screen verify | standard-library XML parser with a size cap and no DOCTYPE | owner | The per-macro selector rules and the compare with the approved quote (safety RQ-87) |
-| Egress proxy | Docker internal networks and a host firewall, no proxy | owner | A per-container host allowlist and credential injection (POLICY RQ-102, RQ-93) |
+| Final-screen verify | standard-library expat parser with a size cap, a UTF-8 check and handlers that reject DOCTYPE and entities | owner | The per-macro selector rules and the compare with the approved quote (safety RQ-87) |
+| Egress proxy | Docker internal networks and a host firewall, no proxy | owner | A per-container route allowlist and credential injection with no TLS interception (POLICY RQ-102, RQ-93) |
+| Voice-note codec | none: no audio decoded or encoded | owner | Decode of inbound voice notes and encode of stored clips, no GPL or LGPL program in an image (RQ-82, D-69) |
 | Local speech output | none: the reply goes as Hindi text | owner | A runtime for a local open-weight model with no GPL front end (RECORD D-69) |
 | Secret encryption (TOTP) | none | owner | AEAD encryption of each TOTP secret with the key of POLICY PL-14 (PL-27) |
 
@@ -86,14 +87,18 @@ Alternatives. Data handling says what leaves the process. Source is a package in
 | Scheduler | procrastinate | 3.10.0 | MIT (E, classifier only) | medium | library on Postgres, nothing leaves | https://pypi.org/project/procrastinate/3.10.0/ | adapt candidate: scheduled tasks, same package as the inbox row |
 | Scheduler | pgqueuer | 2.0.0 | MIT (E) | medium | library on Postgres, nothing leaves | https://pypi.org/project/pgqueuer/2.0.0/ | adapt candidate: schedules, same package as the inbox row |
 | Final-screen verify | lxml | 6.1.3 | BSD-3-Clause (E) | low | library, nothing leaves the process | https://pypi.org/project/lxml/6.1.3/ | adapt candidate: full XPath, only if the standard-library path syntax cannot express a macro selector |
-| Final-screen verify | defusedxml | 0.7.1 | PSFL (E) | low | library, nothing leaves the process | https://pypi.org/project/defusedxml/0.7.1/ | retire: PSF is allowed by `scripts/license_audit.py` (line 23) and absent from the PL-09 list; the size cap and DOCTYPE rejection cover the same threat |
-| Egress proxy | mitmproxy | 12.3.1 | MIT (E; N: licences of its dependencies, run the audit in its image) | medium | sees plaintext of listed hosts on the private network | https://pypi.org/project/mitmproxy/12.3.1/ | adapt: allowlist addon and credential injection |
-| Egress proxy | nginx with a stream SNI allowlist | N | N. Check: `gh api repos/nginx/nginx/license --jq .license.spdx_id` | low | sees host names only | https://github.com/nginx/nginx | adapt candidate: enforcement without injection |
-| Egress proxy | envoy | N | N. Check: `gh api repos/envoyproxy/envoy/license --jq .license.spdx_id` | high | sees host names only (N) | https://github.com/envoyproxy/envoy | retire unless the two rows above fail the reach test |
+| Final-screen verify | defusedxml | 0.7.1 | PSFL (E); PSF-2.0 is allowed since D-72; no requirements (E) | low | library, nothing leaves the process | https://pypi.org/project/defusedxml/0.7.1/ | adapt: parse with it after the UTF-8 check; a byte search for DOCTYPE misses UTF-16 input |
+| Egress proxy | mitmproxy | 12.3.1 | MIT for the package (E). Closure fails: it requires `ldap3` (LGPL v3, E: metadata of 2.9.1) and `urwid` (LGPL-2.1, E: metadata of 5.1.0, requirement range 2.6.14 to 4.0.13 not read) | medium | sees plaintext and holds a certificate authority | https://pypi.org/project/mitmproxy/12.3.1/ | retire: a banned transitive package (PL-09, D-46) |
+| Egress proxy | Caddy as a reverse proxy, one `reverse_proxy` route per provider with `header_up` from the environment | 2 (compose tag) | Apache-2.0 (E: compose comment; text not read); closure N: compiled-in Go modules, read by the RQ-71 image audit | low | sees plaintext on the private network; no TLS interception or certificate authority; clients call `http://egress/<provider>/...` and need a configurable base URL (RQ-102 reach test) | https://github.com/caddyserver/caddy | adapt: route set is the allowlist; already in the stack for the public route |
+| Egress proxy | nginx with a stream SNI allowlist | N | N. Check: `gh api repos/nginx/nginx/license --jq .license.spdx_id` | low | sees host names only | https://github.com/nginx/nginx | retire: enforces but cannot inject, and Caddy does both |
+| Egress proxy | envoy | N | N. Check: `gh api repos/envoyproxy/envoy/license --jq .license.spdx_id` | high | sees host names only (N) | https://github.com/envoyproxy/envoy | retire unless Caddy fails the reach test |
 | Local speech output | onnxruntime | 1.31.1 | MIT (E); the aarch64 wheel holds no bundled system library (E, file list read); ThirdPartyNotices not read (N) | medium | local, nothing leaves | https://pypi.org/project/onnxruntime/1.31.1/ | adapt: runtime for an ONNX export of the model named in private config |
 | Local speech output | transformers with torch | 5.22.2 and 2.15.0 | Apache-2.0 (E) and Apache-2.0 AND BSD (E) | high: large image on an Arm CPU (N) | local, nothing leaves | https://pypi.org/project/transformers/5.22.2/ | adapt candidate, only when the chosen model has no ONNX export |
-| Local speech output | sherpa-onnx | 2.0.1 | Apache-2.0 (E); its aarch64 wheel bundles `libasound` (E, file list), an ALSA library under LGPL (R: recalled, read the wheel notices); the shared library holds the string "espeak" 12 times (E, `grep -c -a`), and whether it embeds GPL code is N | medium | local, nothing leaves | https://pypi.org/project/sherpa-onnx/2.0.1/ | retire: a bundled LGPL library breaks PL-09 |
+| Local speech output | sherpa-onnx | 2.0.1 | Apache-2.0 (E); its aarch64 wheel bundles `libasound` (E, file list), an ALSA library under LGPL (R: recalled, read the wheel notices); "espeak" appears 12 times in its shared library (E, `grep -c -a`), GPL embedding N | medium | local, nothing leaves | https://pypi.org/project/sherpa-onnx/2.0.1/ | retire: a bundled LGPL library breaks PL-09 |
 | Local speech output | phonemizer | 3.6.0 | GPL-3.0-or-later (E) | n/a | n/a | https://pypi.org/project/phonemizer/3.6.0/ | retire: banned licence (PL-09) |
+| Voice-note codec | ffmpeg | N | N: build dependent; distribution builds include LGPL or GPL parts (R) | medium | local | https://ffmpeg.org | retire: banned licence risk (D-46) |
+| Voice-note codec | PyAV | N | N: BSD wrapper (R); its wheels bundle ffmpeg libraries (R) | medium | local | https://pypi.org/project/av/ | retire until the bundled libraries are read |
+| Voice-note codec | opus-tools built from source: `opusdec`, `opusenc` only | N | BSD-2 except `opusinfo`, never shipped; libopus, libogg, opusfile BSD-3 (R: read the licence files in the build stage) | low | local | https://gitlab.xiph.org/xiph/opus-tools | adapt: multi-stage image, copy two binaries |
 | State checkpointer | langgraph-checkpoint-postgres | 3.2.0 | MIT (E); requires psycopg 3.3.8, LGPL-3.0-only (E) | n/a | n/a | https://pypi.org/project/langgraph-checkpoint-postgres/3.2.0/ | retire: a banned transitive package (PL-09) |
 | State checkpointer | langgraph-checkpoint-sqlite | 3.1.3 | MIT (E) | medium | a second store file beside Postgres, no row lock | https://pypi.org/project/langgraph-checkpoint-sqlite/3.1.3/ | retire: a second source of truth |
 | Secret encryption | cryptography | 50.0.2 | Apache-2.0 OR BSD-3-Clause (E) | low | library, nothing leaves the process | https://pypi.org/project/cryptography/50.0.2/ | use: AEAD for `secret_enc` |
@@ -106,7 +111,6 @@ Other baselines kept (RQ-70):
 |---|---|---|---|
 | Tier cascade | one G2 tier | cost and accuracy on the intent suite | keep the cascade only if cost falls at equal accuracy |
 | Macro replay | the agent drives the app every time | cost, time and success per flow | keep macros if cost falls with equal success |
-| State graph with a custom checkpointer | state machine in `requests.state` that resumes from Postgres | pending approvals surviving a restart; code size | keep only if resume is correct and the baseline is not |
 | Document RAG (Phase 5) | pgvector plus plain loaders | answer accuracy on held-out questions | decide when documents exist |
 
 ## 3. State of each comparison
@@ -125,10 +129,11 @@ No comparison has run. A comparison is BLOCKED until its prerequisite exists, be
 | Second factor | BLOCKED | The wrong, expired and replayed code tests exist (rule PE-29) |
 | Redaction | BLOCKED | The `redaction` suite with canaries per ID type exists, including Hindi-context fixtures |
 | Scheduler | BLOCKED | The timer tests of requests RQ-20 and PRD RQ-14 run under a fake clock against the baseline |
-| Final-screen verify | BLOCKED | The fixture dumps of safety RQ-87 and RQ-88 exist |
-| Egress proxy | BLOCKED | The per-container reach test of POLICY RQ-102 exists |
+| Final-screen verify | BLOCKED | The fixture dumps of safety RQ-87 and RQ-88 exist, with a UTF-16 dump and a DOCTYPE dump that must be rejected |
+| Egress proxy | BLOCKED | The per-container reach test of POLICY RQ-102 exists, including each client's base URL setting |
+| Voice-note codec | BLOCKED | A real voice-note fixture decodes to 16 kHz WAV; the image audit (RQ-71) passes |
 | Local speech output | BLOCKED | The D-69 cases exist (stored clip with every model service down, dynamic audio, fallback to text) and a model named in private config has a licence and terms receipt |
-| State checkpointer | BLOCKED | A restart test over a request in each non-terminal state (safety RQ-79, RQ-80) exists |
+| State checkpointer | decided (D-70) | none built; a restart test over a request in each non-terminal state (safety RQ-79, RQ-80) checks the rows |
 | Secret encryption | BLOCKED | The canary test that a TOTP secret appears in no log, trace or message (POLICY PL-27) exists |
 
 ## 4. Out of scope and order of work

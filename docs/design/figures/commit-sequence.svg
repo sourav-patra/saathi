@@ -58,9 +58,9 @@
   <!-- notes -->
   <rect x="10" y="610" width="1110" height="130" rx="6" fill="#ffffff" stroke="#111827" stroke-width="1"/>
   <text x="20" y="630" class="h">Crash points and rules</text>
-  <text x="20" y="650" class="s">A: a crash after step 1 means no external call has happened. The reaper sets commit_unknown after the call timeout and the caregiver is alerted.</text>
-  <text x="20" y="668" class="s">B: a crash after the call and before step 3 means an order may exist. find_order sets reconciled_placed or reconciled_not_placed; nothing retries by itself.</text>
+  <text x="20" y="650" class="s">A: a crash after step 1 means no external call has happened. The reaper sets commit_unknown after a longer timeout and the caregiver is alerted.</text>
+  <text x="20" y="668" class="s">B: a crash after the call and before step 3 means an order may exist. find_order sets reconciled_placed or _not_placed, or the owner does by hand; nothing retries by itself.</text>
   <text x="20" y="686" class="s">Messages 5 and 6 change no state. A failed check in step 8 ends aborted_no_call: no call, no tap, the token stays spent, a new quote and a new tap are needed.</text>
-  <text x="20" y="704" class="s">Over a cap, a time-based code typed within 300 s of the tap adds a confirm2 token before message 4. A second tap gets "already decided" (message 3 compare fails).</text>
+  <text x="20" y="704" class="s">Over a cap, a code typed before the approval token expires (cart 300 s, ride 60 s) adds a confirm2 token before message 4. A second tap gets "already decided" (message 3 compare fails).</text>
   <text x="20" y="722" class="s">Dashed rounded boxes group the three steps; a diamond marks a crash point; the orange dashed boxes are outside Saathi's control; shape and label carry the meaning.</text>
 </svg>
