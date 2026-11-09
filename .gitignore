@@ -1,0 +1,26 @@
+# Personal planning notes, profiles, secrets: NEVER commit (public repo)
+private/
+.env
+.env.*
+!.env.example
+profiles/
+*.local.*
+
+# Data
+media/
+data/
+evals/datasets/private/
+*.ogg
+*.opus
+*.mp4
+*.wav
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+*.egg-info/
