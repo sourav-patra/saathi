@@ -1,0 +1,11 @@
+# Public surface = the WhatsApp webhook only. Everything else returns 404.
+{$SAATHI_DOMAIN} {
+	encode gzip
+	@webhook path /webhooks/whatsapp
+	handle @webhook {
+		reverse_proxy saathi:8000
+	}
+	handle {
+		respond 404
+	}
+}

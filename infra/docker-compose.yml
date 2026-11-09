@@ -1,0 +1,232 @@
+# Saathi stack for a single always-on ARM64 (or x86_64) VPS.
+#
+#   caddy ─► saathi (FastAPI webhook + Telegram bot) ─► ollama (T1 models)
+#                         │                           └─► whisper (T1 ASR)
+#                         └─► langfuse-web/worker ─► postgres · clickhouse · valkey · seaweedfs
+#
+# Licensing: every image here is MIT/Apache, or permissive for infrastructure
+# (PostgreSQL License, BSD-3). Deliberate swaps from Langfuse's reference
+# compose file:
+#   MinIO (AGPL) → SeaweedFS (Apache-2.0)
+#   Redis 7.4+ (RSAL/SSPL) → Valkey (BSD-3)
+#
+# Exposure: only Caddy (80/443) is public, and only for the WhatsApp webhook.
+# Langfuse's UI is bound to localhost; reach it over Tailscale or an SSH tunnel.
+#
+# Secrets come from ../.env (copy .env.example). Never commit .env.
+
+name: saathi
+
+x-langfuse-env: &langfuse-env
+  NEXTAUTH_URL: ${LANGFUSE_NEXTAUTH_URL:-http://localhost:3000}
+  DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/langfuse
+  SALT: ${LANGFUSE_SALT:?set LANGFUSE_SALT}
+  ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:?set LANGFUSE_ENCRYPTION_KEY}
+  TELEMETRY_ENABLED: "false"
+  CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
+  CLICKHOUSE_URL: http://clickhouse:8123
+  CLICKHOUSE_USER: ${CLICKHOUSE_USER:-clickhouse}
+  CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?set CLICKHOUSE_PASSWORD}
+  CLICKHOUSE_CLUSTER_ENABLED: "false"
+  LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+  LANGFUSE_S3_EVENT_UPLOAD_REGION: us-east-1
+  LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${S3_ACCESS_KEY:?set S3_ACCESS_KEY}
+  LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:?set S3_SECRET_KEY}
+  LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://seaweedfs:8333
+  LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+  LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+  LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+  LANGFUSE_S3_MEDIA_UPLOAD_REGION: us-east-1
+  LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: ${S3_ACCESS_KEY}
+  LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${S3_SECRET_KEY}
+  LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://seaweedfs:8333
+  LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+  LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
+  REDIS_HOST: valkey
+  REDIS_PORT: "6379"
+  REDIS_AUTH: ${VALKEY_PASSWORD:?set VALKEY_PASSWORD}
+
+x-langfuse-depends: &langfuse-depends
+  postgres: { condition: service_healthy }
+  clickhouse: { condition: service_healthy }
+  valkey: { condition: service_healthy }
+  seaweedfs-init: { condition: service_completed_successfully }
+
+services:
+  # ------------------------------------------------------------ data layer
+  postgres:
+    image: pgvector/pgvector:pg17          # PostgreSQL License + pgvector (PostgreSQL License)
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: postgres
+      SAATHI_DB_PASSWORD: ${SAATHI_DB_PASSWORD:?set SAATHI_DB_PASSWORD}
+      TZ: UTC
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./sql:/docker-entrypoint-initdb.d:ro
+    ports: ["127.0.0.1:5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  valkey:
+    image: valkey/valkey:8-alpine          # BSD-3
+    restart: unless-stopped
+    command: ["valkey-server", "--requirepass", "${VALKEY_PASSWORD}", "--maxmemory-policy", "noeviction"]
+    volumes: [valkey_data:/data]
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli -a \"$${VALKEY_PASSWORD}\" ping | grep PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    environment:
+      VALKEY_PASSWORD: ${VALKEY_PASSWORD}
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.3.62.3   # Apache-2.0 (tag from Langfuse's reference compose)
+    restart: unless-stopped
+    user: "101:101"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-clickhouse}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+    volumes:
+      - ch_data:/var/lib/clickhouse
+      - ch_logs:/var/log/clickhouse-server
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:latest      # Apache-2.0. Pin a digest once deployed.
+    restart: unless-stopped
+    environment:
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+    # s3.json is generated from env at start, so no credentials live in the repo.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        printf '{"identities":[{"name":"langfuse","credentials":[{"accessKey":"%s","secretKey":"%s"}],"actions":["Admin","Read","Write","List","Tagging"]}]}'
+        "$$S3_ACCESS_KEY" "$$S3_SECRET_KEY" > /tmp/s3.json &&
+        exec weed server -dir=/data -ip.bind=0.0.0.0 -master.volumeSizeLimitMB=1024
+        -s3 -s3.port=8333 -s3.config=/tmp/s3.json
+    volumes:
+      - seaweed_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9333/cluster/status > /dev/null || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  seaweedfs-init:                          # creates the 'langfuse' bucket (idempotent)
+    image: chrislusf/seaweedfs:latest
+    depends_on: { seaweedfs: { condition: service_healthy } }
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["echo 's3.bucket.create -name langfuse' | weed shell -master=seaweedfs:9333 || true"]
+    restart: "no"
+
+  # ------------------------------------------------------------ observability
+  langfuse-worker:
+    image: docker.langfuse.com/langfuse/langfuse-worker:${LANGFUSE_IMAGE_TAG:-4}
+    restart: unless-stopped
+    depends_on: *langfuse-depends
+    environment: *langfuse-env
+
+  langfuse-web:
+    image: docker.langfuse.com/langfuse/langfuse:${LANGFUSE_IMAGE_TAG:-4}
+    restart: unless-stopped
+    depends_on: *langfuse-depends
+    ports: ["127.0.0.1:3000:3000"]         # private: Tailscale / SSH tunnel only
+    environment:
+      <<: *langfuse-env
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:?set LANGFUSE_NEXTAUTH_SECRET}
+      LANGFUSE_INIT_ORG_ID: saathi
+      LANGFUSE_INIT_ORG_NAME: Saathi
+      LANGFUSE_INIT_PROJECT_ID: saathi
+      LANGFUSE_INIT_PROJECT_NAME: saathi
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${SAATHI_LANGFUSE_PUBLIC_KEY:?set SAATHI_LANGFUSE_PUBLIC_KEY}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${SAATHI_LANGFUSE_SECRET_KEY:?set SAATHI_LANGFUSE_SECRET_KEY}
+      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_ADMIN_EMAIL:?set LANGFUSE_ADMIN_EMAIL}
+      LANGFUSE_INIT_USER_NAME: admin
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_ADMIN_PASSWORD:?set LANGFUSE_ADMIN_PASSWORD}
+      AUTH_DISABLE_SIGNUP: "true"
+
+  # ------------------------------------------------------------ T1 models
+  ollama:
+    image: ollama/ollama:latest            # MIT. Pin a version once deployed.
+    restart: unless-stopped
+    environment:
+      OLLAMA_NO_CLOUD: "1"                 # this instance is LOCAL ONLY (T1)
+      OLLAMA_KEEP_ALIVE: "30m"
+    volumes: [ollama_data:/root/.ollama]
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  ollama-pull:                             # pulls the T1 models once
+    image: ollama/ollama:latest
+    depends_on: { ollama: { condition: service_healthy } }
+    environment: { OLLAMA_HOST: "ollama:11434" }
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["ollama pull ${SAATHI_T1_MODEL:?set in private .env}"]
+    restart: "no"
+
+  whisper:
+    build:
+      context: ./whisper
+      args:
+        WHISPER_CPP_REF: ${WHISPER_CPP_REF:-v1.7.6}
+        WHISPER_MODEL: ${WHISPER_MODEL:?set in private .env}
+        WHISPER_MODEL_URL: ${WHISPER_MODEL_URL:?set in private .env}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/ > /dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+
+  # ------------------------------------------------------------ app
+  saathi:
+    build: { context: .., dockerfile: infra/Dockerfile }
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      SAATHI_DATABASE_URL: postgresql://saathi:${SAATHI_DB_PASSWORD}@postgres:5432/saathi
+      SAATHI_T1_BASE_URL: http://ollama:11434/v1
+      SAATHI_WHISPERCPP_URL: http://whisper:8080
+      SAATHI_LANGFUSE_HOST: http://langfuse-web:3000
+      SAATHI_LANGFUSE_PUBLIC_KEY: ${SAATHI_LANGFUSE_PUBLIC_KEY}
+      SAATHI_LANGFUSE_SECRET_KEY: ${SAATHI_LANGFUSE_SECRET_KEY}
+    depends_on:
+      postgres: { condition: service_healthy }
+      ollama: { condition: service_healthy }
+    ports: ["127.0.0.1:8000:8000"]
+
+  caddy:
+    image: caddy:2-alpine                  # Apache-2.0; automatic HTTPS
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      SAATHI_DOMAIN: ${SAATHI_DOMAIN:?set SAATHI_DOMAIN (public DNS name pointing at this VPS)}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on: [saathi]
+
+volumes:
+  pg_data:
+  valkey_data:
+  ch_data:
+  ch_logs:
+  seaweed_data:
+  ollama_data:
+  caddy_data:
