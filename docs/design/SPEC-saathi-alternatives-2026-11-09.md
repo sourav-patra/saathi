@@ -2,10 +2,10 @@
 id: SPEC-saathi-alternatives
 kind: contract
 governs: v1; the alternatives considered before any custom component is built, and the state of each comparison
-status: draft, new in the r2 set, round-3 fixes applied, pending owner lock (see docs/LOCKS.md)
-upstream: PRD-saathi-2026-11-09-r2.md sha256 87553c14141fab50cd042306116f0a99e004e6f210318e05f9ba2c59893f87b5; SPEC-saathi-evidence-2026-11-09-r2.md sha256 6a1686d8da58e2025343dbf5b3af6bd7dd78d30ee0882253ecfab5a2975c962f; RECORD-saathi-decisions-2026-11-09.md sha256 628326ee8e20f5eb7b706954b689d4d4245041abcc6f50066884d75c0cbf37cb
+status: draft, new in the r2 set, round-3 fixes applied, rows added for the TRD choices, pending owner lock (see docs/LOCKS.md)
+upstream: PRD-saathi-2026-11-09-r2.md sha256 341ecc305674155b388184dd59323faeda447676c01d9d002c188b9aeadfdd8b; SPEC-saathi-evidence-2026-11-09-r2.md sha256 482a276cd9216e76d527619579f554abad7f89d4c8ea13c6159d8a56b338eabf; RECORD-saathi-decisions-2026-11-09.md sha256 a1ec6109610478a4582467cebe12c11d4bd266b89b35a89fdbe44dbde9f86f45
 sources: section 4 of SPEC-saathi-evidence-2026-11-09.md (sha256 955dd4d2129090bdc3114a819282f26c777e815a54ff8cdfc797663143e6a4c1), expanded here; version and licence fields read from the Python package index JSON API (`https://pypi.org/pypi/<name>/json`) on 2026-11-09; DOC-PHILOSOPHY.md
-checked-at: 2026-11-09. Package metadata was read for every Python row below (E for the read; licence texts were not read). The source hosting service answered 403 in this pass, so non-Python rows are N.
+checked-at: 2026-11-09. Package metadata was read for every Python row below (E for the read; licence texts were not read). The aarch64 wheel file lists of sherpa-onnx and onnxruntime were read in the TRD pass. The source hosting service answered 403 in this pass, so non-Python rows are N.
 ---
 
 Read section 2 for the alternatives per component, section 3 for the state of each comparison, and section 1 for the rule each comparison follows.
@@ -36,6 +36,11 @@ Components. Every owner is `owner` because there is one maintainer.
 | Inbox queue | one Postgres table drained with `FOR UPDATE SKIP LOCKED` | owner | The insert that dedupes and persists before the 200, in one transaction (safety RQ-79) |
 | Second factor (TOTP) | none | owner | Replay window, lockout and encrypted secret storage per approver (POLICY PL-27) |
 | Redaction | regex rules in code (current) | owner | Hindi-context ID formats and checksums for Aadhaar, PAN, voter and passport (assurance RQ-41) |
+| Scheduler (reminders, timers) | Postgres table `timers` polled with `FOR UPDATE SKIP LOCKED` | owner | Due times come from persisted events and run under a fake clock (requests RQ-20, PRD RQ-14) |
+| Final-screen verify | standard-library XML parser with a size cap and no DOCTYPE | owner | The per-macro selector rules and the compare with the approved quote (safety RQ-87) |
+| Egress proxy | Docker internal networks and a host firewall, no proxy | owner | A per-container host allowlist and credential injection (POLICY RQ-102, RQ-93) |
+| Local speech output | none: the reply goes as Hindi text | owner | A runtime for a local open-weight model with no GPL front end (RECORD D-69) |
+| Secret encryption (TOTP) | none | owner | AEAD encryption of each TOTP secret with the key of POLICY PL-14 (PL-27) |
 
 Alternatives. Data handling says what leaves the process. Source is a package index page for read rows and a repository page for N rows.
 
@@ -77,6 +82,23 @@ Alternatives. Data handling says what leaves the process. Source is a package in
 | Redaction | scrubadub | 2.0.1 | N: metadata says MIT and the classifier says Apache. Check: read the file named LICENSE in the source distribution | medium | library, nothing leaves the process | https://pypi.org/project/scrubadub/2.0.1/ | retire until the licence is read |
 | Redaction | python-stdnum | 2.2 | LGPL (E) | n/a | n/a | https://pypi.org/project/python-stdnum/2.2/ | retire: banned licence (PL-09); the Verhoeff checksum is written in our code |
 | Redaction | phonenumbers | 9.0.43 | Apache-2.0 (E) | low | library, nothing leaves the process | https://pypi.org/project/phonenumbers/9.0.43/ | adapt: phone number detection |
+| Scheduler | apscheduler | 3.11.3 | MIT (E) | low | library, nothing leaves the process | https://pypi.org/project/apscheduler/3.11.3/ | retire: job state would sit outside the `requests` rows; due times must come from Postgres |
+| Scheduler | procrastinate | 3.10.0 | MIT (E, classifier only) | medium | library on Postgres, nothing leaves | https://pypi.org/project/procrastinate/3.10.0/ | adapt candidate: scheduled tasks, same package as the inbox row |
+| Scheduler | pgqueuer | 2.0.0 | MIT (E) | medium | library on Postgres, nothing leaves | https://pypi.org/project/pgqueuer/2.0.0/ | adapt candidate: schedules, same package as the inbox row |
+| Final-screen verify | lxml | 6.1.3 | BSD-3-Clause (E) | low | library, nothing leaves the process | https://pypi.org/project/lxml/6.1.3/ | adapt candidate: full XPath, only if the standard-library path syntax cannot express a macro selector |
+| Final-screen verify | defusedxml | 0.7.1 | PSFL (E) | low | library, nothing leaves the process | https://pypi.org/project/defusedxml/0.7.1/ | retire: PSF is allowed by `scripts/license_audit.py` (line 23) and absent from the PL-09 list; the size cap and DOCTYPE rejection cover the same threat |
+| Egress proxy | mitmproxy | 12.3.1 | MIT (E; N: licences of its dependencies, run the audit in its image) | medium | sees plaintext of listed hosts on the private network | https://pypi.org/project/mitmproxy/12.3.1/ | adapt: allowlist addon and credential injection |
+| Egress proxy | nginx with a stream SNI allowlist | N | N. Check: `gh api repos/nginx/nginx/license --jq .license.spdx_id` | low | sees host names only | https://github.com/nginx/nginx | adapt candidate: enforcement without injection |
+| Egress proxy | envoy | N | N. Check: `gh api repos/envoyproxy/envoy/license --jq .license.spdx_id` | high | sees host names only (N) | https://github.com/envoyproxy/envoy | retire unless the two rows above fail the reach test |
+| Local speech output | onnxruntime | 1.31.1 | MIT (E); the aarch64 wheel holds no bundled system library (E, file list read); ThirdPartyNotices not read (N) | medium | local, nothing leaves | https://pypi.org/project/onnxruntime/1.31.1/ | adapt: runtime for an ONNX export of the model named in private config |
+| Local speech output | transformers with torch | 5.22.2 and 2.15.0 | Apache-2.0 (E) and Apache-2.0 AND BSD (E) | high: large image on an Arm CPU (N) | local, nothing leaves | https://pypi.org/project/transformers/5.22.2/ | adapt candidate, only when the chosen model has no ONNX export |
+| Local speech output | sherpa-onnx | 2.0.1 | Apache-2.0 (E); its aarch64 wheel bundles `libasound` (E, file list), an ALSA library under LGPL (R: recalled, read the wheel notices); the shared library holds the string "espeak" 12 times (E, `grep -c -a`), and whether it embeds GPL code is N | medium | local, nothing leaves | https://pypi.org/project/sherpa-onnx/2.0.1/ | retire: a bundled LGPL library breaks PL-09 |
+| Local speech output | phonemizer | 3.6.0 | GPL-3.0-or-later (E) | n/a | n/a | https://pypi.org/project/phonemizer/3.6.0/ | retire: banned licence (PL-09) |
+| State checkpointer | langgraph-checkpoint-postgres | 3.2.0 | MIT (E); requires psycopg 3.3.8, LGPL-3.0-only (E) | n/a | n/a | https://pypi.org/project/langgraph-checkpoint-postgres/3.2.0/ | retire: a banned transitive package (PL-09) |
+| State checkpointer | langgraph-checkpoint-sqlite | 3.1.3 | MIT (E) | medium | a second store file beside Postgres, no row lock | https://pypi.org/project/langgraph-checkpoint-sqlite/3.1.3/ | retire: a second source of truth |
+| Secret encryption | cryptography | 50.0.2 | Apache-2.0 OR BSD-3-Clause (E) | low | library, nothing leaves the process | https://pypi.org/project/cryptography/50.0.2/ | use: AEAD for `secret_enc` |
+| Secret encryption | pynacl | 1.6.2 | Apache-2.0 (E) | low | library, nothing leaves the process | https://pypi.org/project/pynacl/1.6.2/ | adapt candidate, same use |
+| Secret encryption | pycryptodome | 4.4.0 | BSD-2-Clause AND Unlicense AND MIT (E) | low | library, nothing leaves the process | https://pypi.org/project/pycryptodome/4.4.0/ | adapt candidate, larger than needed |
 
 Other baselines kept (RQ-70):
 
@@ -102,6 +124,12 @@ No comparison has run. A comparison is BLOCKED until its prerequisite exists, be
 | Inbox queue | BLOCKED | The kill test (safety RQ-79) runs against the baseline |
 | Second factor | BLOCKED | The wrong, expired and replayed code tests exist (rule PE-29) |
 | Redaction | BLOCKED | The `redaction` suite with canaries per ID type exists, including Hindi-context fixtures |
+| Scheduler | BLOCKED | The timer tests of requests RQ-20 and PRD RQ-14 run under a fake clock against the baseline |
+| Final-screen verify | BLOCKED | The fixture dumps of safety RQ-87 and RQ-88 exist |
+| Egress proxy | BLOCKED | The per-container reach test of POLICY RQ-102 exists |
+| Local speech output | BLOCKED | The D-69 cases exist (stored clip with every model service down, dynamic audio, fallback to text) and a model named in private config has a licence and terms receipt |
+| State checkpointer | BLOCKED | A restart test over a request in each non-terminal state (safety RQ-79, RQ-80) exists |
+| Secret encryption | BLOCKED | The canary test that a TOTP secret appears in no log, trace or message (POLICY PL-27) exists |
 
 ## 4. Out of scope and order of work
 
