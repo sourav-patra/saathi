@@ -2,8 +2,8 @@
 id: SPEC-saathi-alternatives
 kind: contract
 governs: v1; the alternatives considered before any custom component is built, and the state of each comparison
-status: draft, new in the r2 set, pending review (see docs/LOCKS.md)
-upstream: PRD-saathi-2026-11-09-r2.md sha256 42304c21717b9f1cac205bf447aebbadfeb930e30e4a15aca818db4359380a20; SPEC-saathi-evidence-2026-11-09-r2.md sha256 adf2ec99f2231a89de6c7209fffb72189f176f6fac90b0cc98a484348c3549cc; RECORD-saathi-decisions-2026-11-09.md sha256 2477aaa1613ac11185b8cab98444568033d541f6c45f27d3156db31ef4b27116
+status: draft, new in the r2 set, round-3 fixes applied, pending owner lock (see docs/LOCKS.md)
+upstream: PRD-saathi-2026-11-09-r2.md sha256 87553c14141fab50cd042306116f0a99e004e6f210318e05f9ba2c59893f87b5; SPEC-saathi-evidence-2026-11-09-r2.md sha256 6a1686d8da58e2025343dbf5b3af6bd7dd78d30ee0882253ecfab5a2975c962f; RECORD-saathi-decisions-2026-11-09.md sha256 628326ee8e20f5eb7b706954b689d4d4245041abcc6f50066884d75c0cbf37cb
 sources: section 4 of SPEC-saathi-evidence-2026-11-09.md (sha256 955dd4d2129090bdc3114a819282f26c777e815a54ff8cdfc797663143e6a4c1), expanded here; version and licence fields read from the Python package index JSON API (`https://pypi.org/pypi/<name>/json`) on 2026-11-09; DOC-PHILOSOPHY.md
 checked-at: 2026-11-09. Package metadata was read for every Python row below (E for the read; licence texts were not read). The source hosting service answered 403 in this pass, so non-Python rows are N.
 ---
@@ -32,7 +32,7 @@ Components. Every owner is `owner` because there is one maintainer.
 | Phone agent | deep link and handoff only | owner | The app allowlist and the code-only final verification (safety RQ-87) |
 | Macros | the agent drives the app every time | owner | Versioned store, shadow replay, human sign-off (assurance RQ-53) |
 | Approval token | HMAC over canonical JSON with the standard library (current) | owner | Single use, request binding and expiry checked against database rows (safety RQ-22) |
-| Audit hash chain | none | owner | A chain in the same Postgres with keyed hashes, a serialized writer and an exported head (assurance RQ-56) |
+| Audit hash chain | none | owner | A chain in the same Postgres with keyed hashes, a serialized writer and an exported head (assurance RQ-56b) |
 | Inbox queue | one Postgres table drained with `FOR UPDATE SKIP LOCKED` | owner | The insert that dedupes and persists before the 200, in one transaction (safety RQ-79) |
 | Second factor (TOTP) | none | owner | Replay window, lockout and encrypted secret storage per approver (POLICY PL-27) |
 | Redaction | regex rules in code (current) | owner | Hindi-context ID formats and checksums for Aadhaar, PAN, voter and passport (assurance RQ-41) |
@@ -93,7 +93,7 @@ No comparison has run. A comparison is BLOCKED until its prerequisite exists, be
 
 | Component | State | Prerequisite |
 |---|---|---|
-| Policy engine | BLOCKED | The 32 policy test functions at fecdfe4 run against each candidate through an adapter, and a candidate adapter for token spend exists (not written) |
+| Policy engine | BLOCKED | The 32 policy test functions at 3d46456 run against each candidate through an adapter, and a candidate adapter for token spend exists (not written) |
 | Radar | BLOCKED | The radar eval set exists, authored by someone other than the keyword author (assurance and safety RQ-16) |
 | Gateway | BLOCKED | The privacy-gate and cascade tests ported to each candidate; hosted terms read (POLICY-data PL-20) |
 | Phone agent, macros | BLOCKED | The bridge board and a dedicated phone exist (POLICY RQ-90) |

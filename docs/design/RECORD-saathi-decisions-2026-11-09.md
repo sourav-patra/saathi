@@ -5,7 +5,7 @@ status: current
 sources: the owner's requirements interview of 2026-11-09 and the owner's instructions of the same day, in sanitized form; personal values, names and places are left out on purpose and live in private config
 ---
 
-Cite a decision here by its D number. Each line is one fact with its date and mark. The marks R, P and N have the meaning given in PRD-saathi-2026-11-09-r2.md section 2; here R means reported by the owner, P a default proposed and open to veto, and decided an owner decision accepted on the date shown.
+Cite a decision here by its D number. Each line is one fact with its date and mark. The marks E, R, P, N and decided are defined once, in PRD-saathi-2026-11-09-r2.md section 2. In this file the source of every R line is the owner, named in the sources line above.
 
 ## Interview decisions (scope, channels, money, safety)
 
@@ -59,7 +59,7 @@ Cite a decision here by its D number. Each line is one fact with its date and ma
 - 2026-11-09 D-46 decision: the LGPL carve-out is deleted and the ban on LGPL stands without exception. @mark=R
 - 2026-11-09 D-47 decision: emergency escalation runs in order: Telegram alerts to both approvers; after 2 minutes without an acknowledgement a WhatsApp alert template to the approvers' personal numbers; then an automated voice call through a telephony API whose provider is named only in private config. @mark=R
 - 2026-11-09 D-48 decision: audio that fails ASR is forwarded to the caregiver as audio flagged "could not understand" and is never dropped silently. @mark=R
-- 2026-11-09 D-49 decision: public files may name commerce integration targets (Swiggy, Instamart, Zepto, Zomato, Blinkit, Amazon, Flipkart, Uber, Rapido) and open-source infrastructure. They never name AI models or providers, cities, or languages tied to the family. The ban covers model and provider names only. @mark=R
+- 2026-11-09 D-49 decision: public files may name commerce integration targets (Swiggy, Instamart, Zepto, Zomato, Blinkit, Amazon, Flipkart, Uber, Rapido) and open-source infrastructure. They never name cities or languages tied to the family. The rule on model and provider names is POLICY PL-12. @mark=R
 - 2026-11-09 D-50 decision: the owner accepts, pending lock, the reviewers' recommendations on PRD questions 2, 4, 5, 7, 8, 9, 10, 12, 14, 15, 16 and 17 and POLICY questions 2, 3, 4 and 5. @mark=R
 - 2026-11-09 D-51 decision: PRD question 11 is resolved by D-47, question 13 by D-42, and POLICY question 1 by D-46. @mark=R
 - 2026-11-09 D-52 decision: PRD questions 1, 3 and 6 stay open for the owner, with new questions only where the review fixes create a real choice. @mark=R
@@ -73,12 +73,17 @@ Cite a decision here by its D number. Each line is one fact with its date and ma
 - 2026-11-09 D-57 decision: the words Hindi and Hinglish may be named in public files because they are the product's language. An additional regional language stays generic. This narrows D-49. @mark=R
 - 2026-11-09 D-58 decision: commit messages and pull request text carry no AI attribution lines, no co-author trailer and no session link. The rule sits in the contribution part of POLICY. @mark=R
 - 2026-11-09 D-59 decision: bugs in the Phase 0 code are listed in the PRD and are not fixed in the design work. @mark=R
-- 2026-11-09 D-60 decision: the automatic voice call (stage c) and the template alert to approvers' personal numbers (T-01, stage b) are a standing sign-off by the owner, with scope and expiry (PRD section 6, SPEC assurance RQ-95). The expiry of 90 days is accepted (D-65). @mark=decided
+- 2026-11-09 D-60 decision: the automatic voice call (stage c) and the template alert to approvers' personal numbers (T-01, stage b) are a standing sign-off by the owner, with scope and expiry (PRD section 6, SPEC assurance RQ-95a). The expiry of 90 days is accepted (D-65). @mark=decided
 - 2026-11-09 D-61 decision: the issue taxonomy moves to Phase 5, which changes the "from day one" part of D-11. The facts table and the elder-reaction classifier wait for Phase 3 or later. The semantic claim cache (part of D-27), automated macro repair and sentinels for roles not in use are deferred. Each has a re-entry condition in SPEC evidence section 5. Reminders move earlier, to Phase 1. @mark=R
 - 2026-11-09 D-62 decision: if no food or grocery MCP access is granted by 2026-12-21, the owner chooses a fallback (PRD section 8). The date is accepted (D-66). @mark=decided
 - 2026-11-09 D-63 decision: superseded drafts are not kept in the public tree. They are held privately, and each file that replaces one records the old sha256 in its `supersedes:` line. @mark=R
 - 2026-11-09 D-64 decision: the pilot consent record (POLICY-data PL-05) is required in Phase 0, and the Phase 0 gate shrinks to arrival, radar, the emergency path with fake providers for stages b and c, redaction, the gateway with a durable ledger, and the eval harness on synthetic data. @mark=R
 - 2026-11-09 D-65 decision: standing sign-off SO-1 (the automatic emergency voice call and the WhatsApp alert T-01) is accepted. It expires after 90 days, with a renewal reminder to the owner 14 days ahead. After expiry stages b and c send nothing, stage a continues and the owner is alerted. This settles the expiry in D-60. @mark=decided
 - 2026-11-09 D-66 decision: the MCP access decision date is 2026-12-21. If Swiggy or Zomato MCP access is not granted by then, Phase 1 falls back to a deep link plus human handoff only. This settles D-62 and replaces its choice between two fallbacks. @mark=decided
+
+## Revision decisions of round 3 (review E)
+
+- 2026-11-09 D-67 decision: Phase 0 gains the minimal audit write path (RQ-56a: append-only table, insert-only role), the SO-1 sign-off row (RQ-95a) and the secret scan (PL-15), because the Phase 0 emergency stages, the show-raw action and the leak scan need them. RQ-56 and RQ-95 are split into a and b parts; the hash chain, off-site head export and verify script (RQ-56b) and the other sign-off classes (RQ-95b) stay in Phase 1. @mark=P
+- 2026-11-09 D-68 decision: the history of the code repository was rewritten on 2026-11-09 for privacy. Commit ids from before the rewrite are retired and are not cited; every file in this set cites 3d46456 on branch phase-0/foundation, a tree that differs from the retired one only in removed personal and model-name values. @mark=R
 
 Skipped or not checked: no decision here was checked against a live service, price list or licence text. The interview details that name people, places, amounts or providers were left out by design.
