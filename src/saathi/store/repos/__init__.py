@@ -9,9 +9,12 @@ from saathi.store.repos.inbox import InboxRepo
 from saathi.store.repos.requests import RequestRepo
 from saathi.store.repos.signoffs import SignoffRepo, SignoffState
 from saathi.store.repos.updates import UpdateRepo
+from saathi.store.repos.voice import VOICE_SCOPE, ClipRow, VoiceRepo
 
 __all__ = [
+    "VOICE_SCOPE",
     "AlertRepo",
+    "ClipRow",
     "ConfigRepo",
     "ConsentEvent",
     "ConsentRepo",
@@ -22,4 +25,5 @@ __all__ = [
     "SignoffRepo",
     "SignoffState",
     "UpdateRepo",
+    "VoiceRepo",
 ]
