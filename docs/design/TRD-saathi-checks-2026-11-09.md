@@ -3,7 +3,7 @@ id: TRD-saathi-checks
 kind: contract
 governs: the design rules (TQ) that tie every RQ and PL id to a design element and a check, and the known limits of this design; part of TRD-saathi-2026-11-09.md
 status: draft, review F fixes applied, pending owner lock (see docs/LOCKS.md)
-upstream: PRD-saathi-2026-11-09-r2.md sha256 d5f23838159bf7e481bb3f5650dd9e7047e579f20e219a7b6c944416953d8466; SPEC-saathi-requests-2026-11-09.md sha256 b3124736dbdb5527c9b4e1cd8c13b53f4fb62fcd2ef76c4cb7aaa42e02d43154; SPEC-saathi-safety-2026-11-09-r2.md sha256 cef42d1851c3bbc6d13af7386151c07fc4c2efa83a917622ae11d6665b2cd659; SPEC-saathi-assurance-2026-11-09-r2.md sha256 8bbb8f00e17c11f76799b64bbefc95801d248d690185aead5bd13063ad4d90c2; SPEC-saathi-evidence-2026-11-09-r2.md sha256 5b2764fcf3f592d98dd455268458c8423a3316b81bf39d60ce69a71cceaf009d; SPEC-saathi-alternatives-2026-11-09.md sha256 b617e5e4b11139b8d7d5db94ea88e79c63955e895ce48fc096eb5854dd35c100; POLICY-saathi-2026-11-09-r2.md sha256 14e25c3e892ca189728c304c40c05f9e95539ae25ed6ba5c2dce8218f76c43dd; POLICY-saathi-data-2026-11-09.md sha256 95a69ebd2ee261341cc37ed7d57ea9a20704f598c26a9359e334dc58f3952bdb; RECORD-saathi-decisions-2026-11-09.md sha256 c04a9cf5bcf98fc95fe4715ef8ed40b800522aac020463262e88ccc307e5fce4
+upstream: PRD-saathi-2026-11-09-r2.md sha256 6fec2edf126fb45918af05e81e44ff177beb96ae376cb1cba34ab979073f2e29; SPEC-saathi-requests-2026-11-09.md sha256 1df11fbbf1d3360656e326232b33ba54a9f0a3439fa009f8ab0904c9e00cc63f; SPEC-saathi-safety-2026-11-09-r2.md sha256 48a9ed8e7f581bdb18422f3474eb1c11b693e778884470e179ade38d72266e0f; SPEC-saathi-assurance-2026-11-09-r2.md sha256 d00fd79913c6a1fdb3c3a542f940adc7d1a71bb4540505c8baf61e5fbff0bbae; SPEC-saathi-evidence-2026-11-09-r2.md sha256 8041fc8279a240c0b252c0078669793594ff960a7e68f3477b436007b6b8ae96; SPEC-saathi-alternatives-2026-11-09.md sha256 301567dcfe03a8d3bfc1aa5367281ce6e3f7a56e72bcb525de53ac2953ff7833; POLICY-saathi-2026-11-09-r2.md sha256 b9dc7525931d3f867a5f2623e89e0ebf7121d9631e917bde4e411629fdd51f5b; POLICY-saathi-data-2026-11-09.md sha256 1dd650a7e3b7a14f874017dacebb20c176d0751ca068508bb915484e83d2877d; RECORD-saathi-decisions-2026-11-09.md sha256 41bbe3270e83e1a23535f8903d7e5b60edeea9dae846b0b6feb4c3b152ff82d9
 sources: the contracts in upstream; src/, tests/, infra/ and .github/workflows/ci.yml on branch phase-0/foundation at 3d46456; scripts/design_check.py in this repository
 checked-at: 3d46456, 2026-11-09. Code read with `git show`; the coverage script ran on this design set after the review F edits (section 3).
 ---
@@ -91,18 +91,18 @@ Each row is a design rule (TQ), the RQ and PL ids it serves, the check that show
 
 `python3 scripts/design_check.py` from the repository root fails on any RQ or PL id of the PRD, SPEC and POLICY requirement tables that no Serves cell above names. It also checks every `upstream:` pin against `sha256sum`, every index prefix, every size limit, the closing line of each file, the absence of long dashes, and each edge of the architecture figure against the edge and components tables.
 
-Result on this design set, run 2026-11-09 after the last edit and the final hashes:
+Result on this design set, run 2026-11-10 after the strategy fold and the final hashes (the TQ rows of the fold are in TRD-saathi-checks-product-2026-11-10.md, which the script also reads):
 
 ```
-coverage: 101 RQ ids and 31 PL ids in the contracts; 66 TQ rows; 132 mapped, 0 unmapped, 0 unknown
-pins: 85 upstream pins checked
-index: 19 rows checked
+coverage: 117 RQ ids and 37 PL ids in the contracts; 83 TQ rows; 154 mapped, 0 unmapped, 0 unknown
+pins: 112 upstream pins checked
+index: 23 rows checked
 sizes, closing lines, dashes: checked
 figure: 26 edges match the edge table; 20 of 22 components drawn; not drawn: C19, C20
 result: OK
 ```
 
-C19 and C20 are build-time and are omitted from figure 1 on purpose. Four deliberate faults, each applied to a scratch copy and then discarded, made the check exit 1: deleting the TQ-28 row printed `unmapped ids: RQ-25, RQ-27, RQ-28`; deleting the TQ-59 row printed `unmapped ids: PL-19, RQ-101, RQ-103`; changing one hex digit of a pin printed `pin of ... is stale`; renaming edge E7 in the figure printed `figure edges differ from the edge table`.
+C19 and C20 are build-time and are omitted from figure 1 on purpose. Four deliberate faults, each applied to a scratch copy and then discarded, made the check exit 1: deleting the TQ-28 row printed `unmapped ids: RQ-25, RQ-27, RQ-28`; deleting the TQ-59 row printed `unmapped ids: PL-19, RQ-101, RQ-103`; changing one hex digit of a pin printed `pin of ... is stale`; renaming edge E7 in the figure printed `figure edges differ from the edge table`. After the strategy fold, deleting the TQ-71 row of the product checks part printed `unmapped ids: RQ-109`.
 
 ## 4. Known limits
 

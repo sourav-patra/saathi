@@ -3,7 +3,7 @@ id: SPEC-saathi-alternatives
 kind: contract
 governs: v1; the alternatives considered before any custom component is built, and the state of each comparison
 status: draft, new in the r2 set, round-3 and TRD review fixes applied, rows added for the TRD choices, pending owner lock (see docs/LOCKS.md)
-upstream: PRD-saathi-2026-11-09-r2.md sha256 d5f23838159bf7e481bb3f5650dd9e7047e579f20e219a7b6c944416953d8466; SPEC-saathi-evidence-2026-11-09-r2.md sha256 5b2764fcf3f592d98dd455268458c8423a3316b81bf39d60ce69a71cceaf009d; RECORD-saathi-decisions-2026-11-09.md sha256 c04a9cf5bcf98fc95fe4715ef8ed40b800522aac020463262e88ccc307e5fce4
+upstream: PRD-saathi-2026-11-09-r2.md sha256 6fec2edf126fb45918af05e81e44ff177beb96ae376cb1cba34ab979073f2e29; SPEC-saathi-evidence-2026-11-09-r2.md sha256 8041fc8279a240c0b252c0078669793594ff960a7e68f3477b436007b6b8ae96; RECORD-saathi-decisions-2026-11-09.md sha256 41bbe3270e83e1a23535f8903d7e5b60edeea9dae846b0b6feb4c3b152ff82d9
 sources: section 4 of SPEC-saathi-evidence-2026-11-09.md (sha256 955dd4d2129090bdc3114a819282f26c777e815a54ff8cdfc797663143e6a4c1), expanded here; version and licence fields read from the Python package index JSON API (`https://pypi.org/pypi/<name>/json`) on 2026-11-09; DOC-PHILOSOPHY.md
 checked-at: 2026-11-09. Package metadata was read for every Python row below (E for the read; licence texts were not read). The aarch64 wheel file lists of sherpa-onnx and onnxruntime were read in the TRD pass. The source hosting service answered 403 in this pass, so non-Python rows are N.
 ---

@@ -6,10 +6,10 @@ Status: design phase, not usable yet. This repository holds design documents, th
 
 ## What it will do
 
-- Take a WhatsApp voice note, photo or text in Hindi or Hinglish from the elder.
+- Take a voice note, photo or text in Hindi or Hinglish from the elder on WhatsApp, or on a separate Telegram bot as the backup channel.
 - Prepare a ride, a grocery or food order, a fact check of a forwarded message, a reminder or a short answer.
 - Send the prepared action to the caregiver on Telegram, where one tap approves, edits or rejects it.
-- Send emergencies and scam messages to the caregiver and a backup, never handle them alone.
+- Send emergencies and scam messages to the caregiver and a backup, never handle them alone. Saathi is not an emergency service; it alerts your family; call 112 or 108.
 
 ## Read next
 

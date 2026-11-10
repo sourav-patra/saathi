@@ -2,8 +2,8 @@
 id: TRD-saathi-ports
 kind: contract
 governs: the Protocol ports, the data model migration plan and the database roles; part of TRD-saathi-2026-11-09.md
-status: draft, review F fixes applied, pending owner lock (see docs/LOCKS.md)
-upstream: PRD-saathi-2026-11-09-r2.md sha256 d5f23838159bf7e481bb3f5650dd9e7047e579f20e219a7b6c944416953d8466; SPEC-saathi-requests-2026-11-09.md sha256 b3124736dbdb5527c9b4e1cd8c13b53f4fb62fcd2ef76c4cb7aaa42e02d43154; SPEC-saathi-safety-2026-11-09-r2.md sha256 cef42d1851c3bbc6d13af7386151c07fc4c2efa83a917622ae11d6665b2cd659; SPEC-saathi-assurance-2026-11-09-r2.md sha256 8bbb8f00e17c11f76799b64bbefc95801d248d690185aead5bd13063ad4d90c2; POLICY-saathi-2026-11-09-r2.md sha256 14e25c3e892ca189728c304c40c05f9e95539ae25ed6ba5c2dce8218f76c43dd; POLICY-saathi-data-2026-11-09.md sha256 95a69ebd2ee261341cc37ed7d57ea9a20704f598c26a9359e334dc58f3952bdb; RECORD-saathi-decisions-2026-11-09.md sha256 c04a9cf5bcf98fc95fe4715ef8ed40b800522aac020463262e88ccc307e5fce4
+status: draft, review F fixes and strategy fold applied, pending owner lock (see docs/LOCKS.md)
+upstream: PRD-saathi-2026-11-09-r2.md sha256 6fec2edf126fb45918af05e81e44ff177beb96ae376cb1cba34ab979073f2e29; SPEC-saathi-requests-2026-11-09.md sha256 1df11fbbf1d3360656e326232b33ba54a9f0a3439fa009f8ab0904c9e00cc63f; SPEC-saathi-safety-2026-11-09-r2.md sha256 48a9ed8e7f581bdb18422f3474eb1c11b693e778884470e179ade38d72266e0f; SPEC-saathi-assurance-2026-11-09-r2.md sha256 d00fd79913c6a1fdb3c3a542f940adc7d1a71bb4540505c8baf61e5fbff0bbae; POLICY-saathi-2026-11-09-r2.md sha256 b9dc7525931d3f867a5f2623e89e0ebf7121d9631e917bde4e411629fdd51f5b; POLICY-saathi-data-2026-11-09.md sha256 1dd650a7e3b7a14f874017dacebb20c176d0751ca068508bb915484e83d2877d; RECORD-saathi-decisions-2026-11-09.md sha256 41bbe3270e83e1a23535f8903d7e5b60edeea9dae846b0b6feb4c3b152ff82d9; SPEC-saathi-platform-2026-11-10.md sha256 e874fac34ac50c865c93b5b0633cb2a8381501671b055667433c90d185116717; SPEC-saathi-product-2026-11-10.md sha256 6e864a6cfce94ca9edafe734e6f984d8b266eb715dd3d16faf32cea14534ecff
 sources: the contracts in upstream; infra/sql/schema/001_init.sql, infra/sql/00-create-databases.sh, src/saathi/pipeline.py (ports at lines 33-44), channels/*.py, perception/asr.py, llm/gateway.py and policy/*.py on branch phase-0/foundation at 3d46456
 checked-at: 3d46456, 2026-11-09. Code read with `git show`; nothing was executed. Signatures are P. Revised after review F.
 ---
@@ -23,15 +23,21 @@ A port is a `typing.Protocol` in the core package; each side effect in the compo
 ## 2. Ports
 
 ```python
-class ElderChannel(Protocol):                       # WhatsApp; used by C02, C15
-    async def send_text(self, to: ElderId, text: str, *, key: IdemKey) -> SendReceipt: ...
-    async def send_audio(self, to: ElderId, clip: VoiceClip, *, key: IdemKey) -> SendReceipt: ...
+class ElderChannel(Protocol):                       # WhatsApp primary, Telegram elder bot backup; C02, C15
+    kind: Literal["whatsapp", "telegram_elder"]     # a reserved "voice_call" has no body (D-80)
+    capabilities: frozenset[ChannelCap]             # voice_in, voice_out, image_in, image_out, video_in,
+                                                    # text, proactive_free, templates (platform RQ-105)
+    async def send_text(self, to: PersonRef, text: str, *, key: IdemKey) -> SendReceipt: ...
+    async def send_audio(self, to: PersonRef, clip: VoiceClip, *, key: IdemKey) -> SendReceipt: ...
+    async def send_image(self, to: PersonRef, image: ImageBlob, caption: str,
+                         *, key: IdemKey) -> SendReceipt: ...      # the FACT CHECK card
     async def send_template(self, to: PersonRef, template: TemplateId,
                             params: Mapping[str, str], *, key: IdemKey) -> SendReceipt: ...
+    # core code holds PersonRef, never a phone number or chat id; the implementation resolves it
     async def fetch_media(self, ref: MediaRef) -> MediaBlob: ...
     async def health(self) -> ChannelHealth: ...    # up | degraded | down, from the daily probe
 
-class CaregiverChannel(Protocol):                   # Telegram; used by C12, C14
+class CaregiverChannel(Protocol):                   # Telegram caregiver bot, a different bot from the elder's; C12, C14
     async def send_card(self, to: ApproverId, card: Card, *, key: IdemKey) -> CardRef: ...
     async def edit_card(self, ref: CardRef, card: Card) -> None: ...
     async def send_text(self, to: ApproverId, text: str, *, key: IdemKey) -> SendReceipt: ...
@@ -72,6 +78,8 @@ class Gateway(Protocol):                            # C16, the only model client
 
 class CommerceAdapter(Protocol):                    # C09
     service: ServiceId
+    manifest: AdapterManifest                       # access_basis, data_classes, hosts, payment_methods,
+                                                    # terms_receipt (product RQ-115); the loader refuses a gap
     capabilities: frozenset[Capability]             # QUOTE, PLACE, FIND_ORDER
     async def quote(self, req: QuoteRequest) -> QuoteFacts: ...
     async def place_order(self, approved: ApprovedCommit, *, key: IdemKey,
@@ -95,8 +103,14 @@ class Clock(Protocol):                              # fake in every machine test
     async def sleep_until(self, when: datetime) -> None: ...
 
 class Store(Protocol):                              # X1; repos below take a Tx
-    def tx(self, *, household: HouseholdId | None = None,
-           lock_household: bool = False) -> AsyncContextManager[Tx]: ...
+    def tx(self, *, household: HouseholdId,
+           lock_household: bool = False) -> AsyncContextManager[Tx]: ...  # required, no default; the first
+                                                    # statement is SET LOCAL app.household_id (platform RQ-109)
+    scan: ScanFns             # security-definer functions that return ids only: resolve_sender, lease_next,
+                              # due_timers, due_alerts, stuck_commits; all later work uses tx(household=...)
+    config: ConfigRepo        # household_config: load(household) -> HouseholdConfig with .version (RQ-110)
+    consents: ConsentRepo     # append(event); allowed(subject, use, recipient) -> bool, fails closed (PL-33)
+    keys: KeyRing             # seal(household, purpose, data) with the public half; open(...) in the core (RQ-111a)
     inbox: InboxRepo          # insert_if_new, lease (oldest per elder), renew, settle
     requests: RequestRepo     # create, get, transition(id, from_, event, to, reason) -> bool,
                               # step(tx, id, plan_step, slots) loads and writes the one row
@@ -116,7 +130,7 @@ class Store(Protocol):                              # X1; repos below take a Tx
 
 | Port | Errors | Caller behaviour |
 |---|---|---|
-| ElderChannel | `WindowClosed`, `TemplateMissing`, `ChannelDown`, `MediaExpired`, `RateLimited(retry_after)`, `SendRejected(code)` | `WindowClosed` with no template ends the request `blocked`, reason `window_closed` (RQ-77); `MediaExpired` sets `media_lost` (RQ-79) |
+| ElderChannel | `ProactiveNotAllowed(reason)`, `TemplateMissing`, `ChannelDown`, `MediaExpired`, `RateLimited(retry_after)`, `SendRejected(code)` | `ProactiveNotAllowed` with no template ends the request `blocked`, reason `window_closed` (RQ-77); `ChannelDown` feeds the Switch alert (RQ-78); `MediaExpired` sets `media_lost` (RQ-79) |
 | CaregiverChannel | `ChannelDown`, `RateLimited`, `SendRejected` | the alert path switches to stages b and c at once (RQ-78) |
 | Escalator | `SignoffMissing` (stages b, c; raised before any send), `ChannelDown`, `ProviderRejected`, `CallbackRejected` (bad signature, unknown call id, repeat) | `SignoffMissing` alerts the owner and sends nothing (RQ-95a); `CallbackRejected` changes no state and writes an audit row `deny` |
 | ASR, AudioCodec | `AsrUnavailable`, `AudioUndecodable`, `DecodeTimeout` | audio forward to the caregiver (RQ-82); a decode error never drops the row |
@@ -126,23 +140,23 @@ class Store(Protocol):                              # X1; repos below take a Tx
 | CommerceAdapter | `AdapterUnavailable` (no access, expired token, changed schema hash), `UnsupportedCapability`, `ServiceRejected`, `CallTimeout` (outcome unknown), `LookupFailed`, `StaleQuote` | `CallTimeout` sets intent `timeout` and queues `find_order`; `UnsupportedCapability` for `FIND_ORDER` means handoff only (RQ-06, 94) and, for an intent already in `timeout`, handoff `manual_reconcile` (states R39); `LookupFailed` retries with backoff until the owner timeout, then the same |
 | PhoneDevice | `DeviceOffline`, `StaleDump` (target not in the dump, or more than 2 s old), `AmbiguousSelector`, `GrantRequired`, `PackageDrift` | `DeviceOffline` gives handoff `phone_offline`; the others abort with `verify_failed` (RQ-34, 87, 90) |
 | AuditSink | `AuditUnavailable` | callers fail closed: no token minted, no step 1 (RQ-56a) |
-| Store | `StoreUnavailable`, `ConflictLost`, `FlagUnreadable` | `ConflictLost` means a lost race and no effect; `FlagUnreadable` denies (RQ-32) |
+| Store, KeyRing | `StoreUnavailable`, `ConflictLost`, `FlagUnreadable`, `TenantNotSet`, `KeyMissing` | `ConflictLost` means a lost race and no effect; `FlagUnreadable` denies (RQ-32); `TenantNotSet` and `KeyMissing` fail closed with no read or write (RQ-109, 111a) |
 
 ## 4. Data model: migrations from 001_init.sql
 
-E at 3d46456: `001_init.sql` creates 11 tables (`households`, `elders`, `approvers`, `addresses`, `profile_facts`, `requests`, `quotes`, `approvals`, `commits`, `llm_spend`, `runtime_flags`). No application code reads or writes Postgres: `asyncpg` is a dependency and `store/__init__.py` is empty. Every new table carries `household_id` (RQ-38). Migrations are numbered files applied in order by the migrator role; a migration is forward only.
+E at 3d46456: `001_init.sql` creates 11 tables (`households`, `elders`, `approvers`, `addresses`, `profile_facts`, `requests`, `quotes`, `approvals`, `commits`, `llm_spend`, `runtime_flags`). No application code reads or writes Postgres: `asyncpg` is a dependency and `store/__init__.py` is empty. Every new table carries `household_id` and, in its own migration, forced row-level security with the policy of RQ-109; a schema test fails otherwise (RQ-38). Migrations are numbered files applied in order by the migrator role; a migration is forward only.
 
 | Phase | Migration | New or changed tables and key columns | Serves |
 |---|---|---|---|
 | 0 | 002 inbox and raw text | `inbox` (id, household_id, `provider_message_id` unique, source, sender_ref, elder_id, kind, payload_sha256, media_ref, state, attempts, lease_until, lease_token, not_before, acked_at, radar_at, received_at); `rejected_inbound` (sender_hmac, reason, at); `raw_text` (inbox_id, part, text, expires_at; primary key inbox_id and part). `requests`: drop `provider_message_id` unique (`:60`) and `transcript_redacted` (`:62`); add inbox_id, state, state_reason, questions_asked, urgent, expires_at, superseded_by and the resume columns `intent`, `slots` jsonb, `quote_id` and `plan_step` (states part, rule 5); `radar` keeps rule ids and flags only; `outcome` is replaced by `state` | RQ-79, 81, 97, 39, 35 |
 | 0 | 003 alerts | `alert_events` (kind, state, stage, t0, next_due_at, acked_by, acked_at, false_alarm, audio_ref); `alert_attempts` (event_id, stage, approver_id, channel, idem_key unique, status, due_at); `tg_updates` (update_id primary key, household_id, kind, received_at) | RQ-18, 23 |
-| 0 | 004 audit, sign-offs, consent | `audit_log` (seq identity, ts, run_id, actor, event, subject, payload_hmac, prev_hash null, row_hash null); schema `control`: `signoffs` (scope, granter, granted_at, expires_at, revoked_at), `consents` (scope[], language, how, text_version, recorded_by, recorded_at, withdrawn_at); roles (section 5) | RQ-56a, 95a; PL-05 |
+| 0 | 004 audit, sign-offs, consent, config, keys | `audit_log` (seq identity, household_id, hseq null, ts, run_id, actor, event, subject, payload_hmac, key_id, prev_hash null, row_hash null); schema `control`: `signoffs` (scope, granter, granted_at, expires_at, revoked_at), `consent_events` (subject, use, recipient, event, capacity, guardian_ref, language, how, notice_text_sha256, recorded_by, recorded_at; insert only); `household_config` (household_id, version, values, created_by, created_at); `household_keys` (purpose, key_id, public_key, wrapped_key, created_at, retired_at); roles (section 5) | RQ-56a, 95a, 110, 111a; PL-05, 33, 34 |
 | 0 | 005 ledger, voice, flags | `llm_reservations` (run_id, tier, reserved_inr, state, settled_inr); `llm_spend` gains household_id (`:107-114` lacks it) and reservation_id; `runtime_flags` gains paused_by and reason; `voice_clips` (reply_key, version, language, text, sha256, path, reviewed_by, reviewed_at, receipt_ref; a row without the review fields is not loadable, D-71); `approvals` gains household_id (`:83-92` lacks it) | RQ-48, 32, 38; D-69, D-71 |
 | 1 | 010 tokens and intents | `approval_tokens` (token_id, request_id, quote_id, quote_hash, approver_id, action, expires_at, spent_at, voided_at); `commits` becomes `commit_intents` (idempotency_key unique, request_id, quote_hash, state, started_at, finished_at, provider_ref_hmac); `cards` (request_id, approver_id, message_ref, quote_hash, nonce); `control.manual_resolutions` (commit_intent_id, outcome, owner, at, note) | RQ-21, 22, 80 |
 | 1 | 011 second factor, config | `approver_totp` (approver_id, secret_enc, enrolled_at, last_step, failures, locked_until); `signoffs` gains the other classes; `config_changes` (who, what, at) | PL-27; RQ-95b |
-| 1 | 012 timers, reminders, channels | `timers` (kind, request_id, due_at, fired_at); `reminders` (elder_id, schedule, created_by, state; times only, never doses); `templates` (template_id, language, category, submitted_at, approved_at); `channel_state` (channel, state, since, last_probe_at) | RQ-14, 20, 77, 78 |
-| 1 | 013 audit chain | `audit_heads` (seq, row_hash, ts, exported_at); genesis row; chain columns filled by one advisory-locked writer | RQ-56b |
-| 1 | 014 profile, credentials, shadow, privacy | `profile_facts` gains version and supersedes_id; `profile_rules` (kind, params, urgent); `credentials` (owner, scope, issued_at, expires_at, rotation_due; no value); `mcp_pins` (server, version, schema_sha256, reviewed_at); `shadow_quotes`, `blind_labels`; `dsr_requests`; `erasure_log` (ids only); `model_cache` (key, redacted content, prompt_version) | RQ-05, 51, 54, 93, 94; PL-30 |
+| 1 | 012 timers, reminders, channels | `timers` (kind, request_id, due_at, fired_at); `reminders` (elder_id, schedule, created_by, state; times only, never doses); `templates` (template_id, language, category, submitted_at, approved_at); `channel_state` (household_id, channel, state, since, last_probe_at); `elder_identities` (elder_id, channel, person_ref_enc, registered_at); `start_codes` (elder_id, code_hash, expires_at, spent_at) | RQ-14, 20, 77, 78, 106, 107 |
+| 1 | 013 audit chain | `audit_heads` (household_id, hseq, row_hash, ts, exported_at); a genesis row per household; chain columns filled by one writer per household under an advisory lock keyed by the household | RQ-56b |
+| 1 | 014 profile, credentials, shadow, privacy; media and TOTP keys | `household_keys` rows for `totp`; `approver_totp.secret_enc` names its `key_id` (RQ-111b); `profile_facts` gains version and supersedes_id; `profile_rules` (kind, params, urgent); `credentials` (owner, scope, issued_at, expires_at, rotation_due; no value); `mcp_pins` (server, version, schema_sha256, reviewed_at); `shadow_quotes`, `blind_labels`; `dsr_requests`; `erasure_log` (ids only); `model_cache` (key, redacted content, prompt_version) | RQ-05, 51, 54, 93, 94, 111b; PL-30 |
 | 1 | 015 run records and model jobs | `run_records` (run_id, request_id, inbox_id, intent, prompt_versions, started_at, ended_at, state, reason, steps, checks, decisions, refs); `model_jobs` (request_id, step, input_ref, state, result), once the model worker is its own service | RQ-55, 33, 96 |
 | 2 | 020 device and macros | `devices` (heartbeat_at, package_hash); `macros` (app, version, selectors, state, signed_by, signed_at) | RQ-34, 53, 90 |
 | 3 | 030 claims | `claims` (request_id, category, verdict); `fetch_records` (claim_id, url, fetched_at, content_sha256, publisher) | RQ-09, 11 |
@@ -150,17 +164,17 @@ E at 3d46456: `001_init.sql` creates 11 tables (`households`, `elders`, `approve
 
 ## 5. Database roles
 
-E: one role `saathi` owns the database and runs the application (`00-create-databases.sh:6-7`); Langfuse has its own database (`:5`). Until the Phase 1 split the edge, core and model modules run in one service and use one connection pool per role below.
+E: one role `saathi` owns the database and runs the application (`00-create-databases.sh:6-7`); Langfuse has its own database (`:5`). Until the Phase 1 split the edge, core and model modules run in one service and use one connection pool per role below. No runtime role owns a table or has `BYPASSRLS`, and each pool sets `app.household_id` through `Store.tx(household=...)` (RQ-109).
 
 | Role | Used by | May | May not |
 |---|---|---|---|
 | `saathi_migrator` | the migration job | DDL; owns tables | run at runtime |
-| `saathi_edge` | C01 | insert `inbox`, `raw_text`, `rejected_inbound`, `alert_events`; read sender registration | read `raw_text`; any other table; update or delete |
+| `saathi_edge` | C01 | insert `inbox`, `raw_text`, `rejected_inbound`, `alert_events`; call `resolve_sender()`, which returns a household id; hold the public content key | read `raw_text`; hold a private or secret key; any other table; update or delete |
 | `saathi_core` | C02, C07, C11 to C15, C18 | read and write the request-path tables; execute `audit_append()` | update or delete `audit_log`; write `control.*` |
 | `saathi_audit` | owns `audit_append()` (a security-definer function) | insert `audit_log`; use its sequence | update, delete, truncate |
 | `saathi_model` | C03, C06, C08, C16 | read and write its own `model_jobs` rows (from the split); reserve and settle `llm_reservations`; insert `llm_spend` | write approvals, tokens, flags, `control.*` or audit |
 | `saathi_adapter` | C09 | read and write its own job rows | everything else |
 | `saathi_owner` | the owner's admin commands | insert `control.*`, enrol TOTP, write `config_changes` | be reachable from any container environment |
-| `saathi_readonly` | verify scripts, backup | select | write |
+| `saathi_readonly` | verify scripts, backup | select, with `BYPASSRLS`; the only role that has it | write; be reachable from a container with a model client |
 
 Skipped or not checked: no port, migration or role exists in code; no migration was applied to a database in this pass; field lists are examples for the LLD; the technology behind each port is chosen in the ops part.

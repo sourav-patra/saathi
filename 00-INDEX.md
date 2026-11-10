@@ -1,29 +1,33 @@
 # Index
 
-Start here. A file not listed is not current. Compare the first 12 characters of `sha256sum <path>`.
+A file not listed is not current. Compare 12 characters of `sha256sum <path>`.
 
 | Kind | Path | sha256 prefix |
 |---|---|---|
 | rules | DOC-PHILOSOPHY.md | d5c0a8736638 |
-| record | docs/design/RECORD-saathi-decisions-2026-11-09.md | c04a9cf5bcf9 |
-| contract | docs/design/PRD-saathi-2026-11-09-r2.md | d5f23838159b |
-| contract | docs/design/SPEC-saathi-requests-2026-11-09.md | b3124736dbdb |
-| contract | docs/design/SPEC-saathi-safety-2026-11-09-r2.md | cef42d1851c3 |
-| contract | docs/design/SPEC-saathi-assurance-2026-11-09-r2.md | 8bbb8f00e17c |
-| contract | docs/design/SPEC-saathi-evidence-2026-11-09-r2.md | 5b2764fcf3f5 |
-| contract | docs/design/SPEC-saathi-alternatives-2026-11-09.md | b617e5e4b111 |
-| contract | docs/design/POLICY-saathi-2026-11-09-r2.md | 14e25c3e892c |
-| contract | docs/design/POLICY-saathi-data-2026-11-09.md | 95a69ebd2ee2 |
-| contract | docs/design/TRD-saathi-2026-11-09.md | b520b67dc6fb |
-| contract | docs/design/TRD-saathi-checks-2026-11-09.md | 1cdbbfb62f84 |
-| contract | docs/design/TRD-saathi-states-2026-11-09.md | efd9c5a95a09 |
-| contract | docs/design/TRD-saathi-threats-2026-11-09.md | 0fa61419098a |
-| contract | docs/design/TRD-saathi-ports-2026-11-09.md | 80bcfa9ca84c |
-| contract | docs/design/TRD-saathi-ops-2026-11-09.md | e51006674e27 |
-| contract | docs/design/TRD-saathi-build-2026-11-09.md | 39b36abb1d6c |
-| receipt | docs/evidence/reviews/RECEIPT-design-reviews-2026-11-09.md | 866ded9982fb |
-| record | docs/LOCKS.md | e550bddca935 |
+| record | docs/design/RECORD-saathi-decisions-2026-11-09.md | 41bbe3270e83 |
+| record | docs/design/RECORD-saathi-decisions-strategy-2026-11-10.md | 183c28fa2840 |
+| contract | docs/design/PRD-saathi-2026-11-09-r2.md | 6fec2edf126f |
+| contract | docs/design/SPEC-saathi-alternatives-2026-11-09.md | 301567dcfe03 |
+| contract | docs/design/SPEC-saathi-assurance-2026-11-09-r2.md | d00fd79913c6 |
+| contract | docs/design/SPEC-saathi-evidence-2026-11-09-r2.md | 8041fc8279a2 |
+| contract | docs/design/SPEC-saathi-platform-2026-11-10.md | e874fac34ac5 |
+| contract | docs/design/SPEC-saathi-product-2026-11-10.md | 6e864a6cfce9 |
+| contract | docs/design/SPEC-saathi-requests-2026-11-09.md | 1df11fbbf1d3 |
+| contract | docs/design/SPEC-saathi-safety-2026-11-09-r2.md | 48a9ed8e7f58 |
+| contract | docs/design/POLICY-saathi-2026-11-09-r2.md | b9dc7525931d |
+| contract | docs/design/POLICY-saathi-data-2026-11-09.md | 1dd650a7e3b7 |
+| contract | docs/design/TRD-saathi-2026-11-09.md | ac4137f7d4aa |
+| contract | docs/design/TRD-saathi-build-2026-11-09.md | ceeef9409174 |
+| contract | docs/design/TRD-saathi-checks-2026-11-09.md | af083b8484cf |
+| contract | docs/design/TRD-saathi-checks-product-2026-11-10.md | f59b1a6240f7 |
+| contract | docs/design/TRD-saathi-ops-2026-11-09.md | 13598f780da7 |
+| contract | docs/design/TRD-saathi-ports-2026-11-09.md | df4144480f10 |
+| contract | docs/design/TRD-saathi-states-2026-11-09.md | 0a6fc033af20 |
+| contract | docs/design/TRD-saathi-threats-2026-11-09.md | c85cc6001125 |
+| receipt | docs/evidence/reviews/RECEIPT-design-reviews-2026-11-09.md | b62bf2eb482a |
+| record | docs/LOCKS.md | 45c1e5705ab2 |
 
-Status: r2 set and TRD set with review F and G fixes (D-76, D-77), pending owner lock, not locked. Read README.md, then the PRD, then the TRD. DOC-PHILOSOPHY.md.sha256 is the sidecar of the rules file.
+Status: pending owner lock. Read README.md, the PRD, then the TRD.
 
-Skipped or not checked: documents on other branches are not listed; superseded files are held privately.
+Skipped or not checked: files on other branches; superseded files are held privately.

@@ -5,7 +5,7 @@ status: current
 sources: the owner's requirements interview of 2026-11-09 and the owner's instructions of the same day, in sanitized form; personal values, names and places are left out on purpose and live in private config
 ---
 
-Cite a decision here by its D number. Each line is one fact with its date and mark. The marks are defined once, in PRD-saathi-2026-11-09-r2.md section 2. The source of every R line is the owner.
+Cite a decision here by its D number; D-78 on are in RECORD-saathi-decisions-strategy-2026-11-10.md. Each line is one fact with its date and mark. The marks are defined once, in PRD-saathi-2026-11-09-r2.md section 2. The source of every R line is the owner.
 
 ## Interview decisions (scope, channels, money, safety)
 
@@ -62,7 +62,7 @@ Cite a decision here by its D number. Each line is one fact with its date and ma
 - 2026-11-09 D-49 decision: public files may name commerce integration targets (Swiggy, Instamart, Zepto, Zomato, Blinkit, Amazon, Flipkart, Uber, Rapido) and open-source infrastructure. They never name cities or languages tied to the family. Model and provider names: POLICY PL-12. @mark=R
 - 2026-11-09 D-50 decision: the owner accepts, pending lock, the reviewers' recommendations on PRD questions 2, 4, 5, 7, 8, 9, 10, 12, 14, 15, 16 and 17 and POLICY questions 2, 3, 4 and 5. @mark=R
 - 2026-11-09 D-51 decision: PRD question 11 is resolved by D-47, question 13 by D-42, and POLICY question 1 by D-46. @mark=R
-- 2026-11-09 D-52 decision: PRD questions 1, 3 and 6 stay open for the owner, with new questions only where the review fixes create a real choice. @mark=R
+- 2026-11-09 D-52 decision: PRD questions 1, 3 and 6 stay open; new questions only where a fix creates a real choice. @mark=R
 
 ## Revision decisions of round 2 (review findings C and D, owner decisions of the same day)
 
@@ -73,7 +73,7 @@ Cite a decision here by its D number. Each line is one fact with its date and ma
 - 2026-11-09 D-57 decision: the words Hindi and Hinglish may be named in public files because they are the product's language. An additional regional language stays generic. This narrows D-49. @mark=R
 - 2026-11-09 D-58 decision: commit messages and pull request text carry no AI attribution lines, no co-author trailer and no session link. The rule sits in the contribution part of POLICY. @mark=R
 - 2026-11-09 D-59 decision: bugs in the Phase 0 code are listed in the PRD and are not fixed in the design work. @mark=R
-- 2026-11-09 D-60 decision: the automatic voice call (stage c) and the template alert to approvers' personal numbers (T-01, stage b) are a standing sign-off by the owner, with scope and expiry (PRD section 6, SPEC assurance RQ-95a). The expiry of 90 days is accepted (D-65). @mark=decided
+- 2026-11-09 D-60 decision: the automatic voice call (stage c) and the template alert to approvers' personal numbers (T-01, stage b) are a standing sign-off by the owner, with scope and expiry (PRD section 6, SPEC assurance RQ-95a). Settled by D-65. @mark=decided
 - 2026-11-09 D-61 decision: the issue taxonomy moves to Phase 5, which changes the "from day one" part of D-11. The facts table, elder-reaction classifier, semantic claim cache (part of D-27), automated macro repair and unused-role sentinels are deferred (re-entry: SPEC evidence section 5). Reminders move to Phase 1. @mark=R
 - 2026-11-09 D-62 decision: if no food or grocery MCP access is granted by 2026-12-21, the owner chooses a fallback (PRD section 8). The date is accepted (D-66). @mark=decided
 - 2026-11-09 D-63 decision: superseded drafts are not kept in the public tree. They are held privately, and each file that replaces one records the old sha256 in its `supersedes:` line. @mark=R
@@ -101,4 +101,4 @@ Cite a decision here by its D number. Each line is one fact with its date and ma
 - 2026-11-10 D-76 decision: the stage c call is acknowledged by pressing 1 (DTMF). It plays, in Hindi or English: "Saathi emergency for <elder label>. Press 1 to acknowledge." The label is a configured alias. A press writes an audit row naming the approver and stops escalation. No key press or voicemail is not an acknowledgement and escalation continues. The provider stays private. @mark=decided
 - 2026-11-10 D-77 decision: a ride over a cap has 180 s from the first tap to enter the second-confirmation code, so its approval token lasts 180 s. The live re-read at commit step 1 still guards the price. Other rides keep 60 s, carts 300 s. @mark=decided
 
-Skipped or not checked: no decision here was checked against a live service, price list or licence text. The interview details that name people, places, amounts or providers were left out by design.
+Skipped or not checked: no decision was checked against a live service, price list or licence text; interview details that name people, places, amounts or providers are left out by design.
