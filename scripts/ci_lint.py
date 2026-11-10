@@ -4,7 +4,8 @@
 PATH is a workflow file or a directory searched for *.yml and *.yaml. Fails (exit 1) on:
 - no workflow file found at all (a check on nothing proves nothing);
 - a `uses:` value (block form or flow form such as `- {uses: x@v4}`) that does not end in a
-  40 hex commit digest (`owner/repo[/path]@<40 hex>`); a local action (`./path`) is exempt, and a `docker://` reference must end in `@sha256:<64 hex>`;
+  40 hex commit digest (`owner/repo[/path]@<40 hex>`); a local action (`./path`) is exempt, and a `docker://`
+  reference must end in `@sha256:<64 hex>`;
 - an `image:` value with no `@sha256:<64 hex>` digest (service containers, TQ-61 b).
 A trailing `# <tag>` comment on a `uses:` line is expected (build part section 2); a missing one is a warning.
 The scan is line based so that it needs no YAML library.

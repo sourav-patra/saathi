@@ -1,4 +1,8 @@
-# Decision records
+# Decision records (superseded)
+
+Superseded by the RECORD files in `docs/design/` (D-01 onward, starting with [RECORD-saathi-decisions-2026-11-09.md](design/RECORD-saathi-decisions-2026-11-09.md)). This page is kept for history only.
+
+Where an ADR conflicts with a RECORD decision, the RECORD wins. ADR-003 (a custom asyncpg checkpointer in Phase 1) conflicts with D-70: there is no LangGraph checkpointer, and request state lives in the `requests` row.
 
 ## ADR-001: Langfuse for observability, evals and prompts
 
@@ -38,3 +42,5 @@
 - Status: accepted
 - Order of preference: official MCP or API, then a documented deep link, then the Android phone agent (minitap mobile-use + uiautomator2, both Apache/MIT) through a Raspberry Pi ADB bridge.
 - Note: DroidRun's Portal APK is AGPL, so it is not used.
+
+Skipped or not checked: the ADRs below were not compared with every RECORD decision, only ADR-003 against D-70.
