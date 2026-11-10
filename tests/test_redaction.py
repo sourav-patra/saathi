@@ -136,3 +136,49 @@ def test_media_not_claimed_clean():
         with pytest.raises(RestrictedDataLeft):
             assert_clean(media)  # type: ignore[arg-type]
     assert "media" in pii.assert_clean.__doc__
+
+
+# ------------------------------------------------------------------ fix pass: F9, F10, errors home
+def test_restricted_data_left_lives_in_errors_and_is_not_a_port_error():
+    from saathi import errors
+
+    assert RestrictedDataLeft is errors.RestrictedDataLeft
+    assert issubclass(errors.RestrictedDataLeft, errors.SaathiError)
+    assert all(errors.RestrictedDataLeft not in v for v in errors.PORT_ERRORS.values())
+
+
+def _to_devanagari_digits(s: str) -> str:
+    return "".join(chr(ord(c) - ord("0") + 0x0966) if c.isdigit() else c for c in s)
+
+
+def test_devanagari_digit_phone_is_redacted():
+    text = "call " + _to_devanagari_digits("98765 43210")
+    r = redact(text)
+    assert "PHONE" in r.entities and "<PHONE>" in r.text
+    with pytest.raises(RestrictedDataLeft):
+        assert_clean(text)
+
+
+def test_devanagari_digit_aadhaar_is_redacted():
+    text = "aadhaar " + _to_devanagari_digits("2341 2341 2346")
+    r = redact(text)
+    assert "IN_AADHAAR" in r.entities and "<AADHAAR>" in r.text
+    with pytest.raises(RestrictedDataLeft):
+        assert_clean(text)
+
+
+def test_fullwidth_digit_phone_is_redacted():
+    text = "call " + "".join(chr(ord(c) - ord("0") + 0xFF10) if c.isdigit() else c for c in "98765 43210")
+    assert "PHONE" in redact(text).entities
+
+
+def test_pincode_is_not_an_otp():
+    r = redact("pincode 110001")
+    assert "OTP" not in r.entities and "110001" in r.text
+    assert "OTP" not in redact("Pincode: 110001").entities
+
+
+@pytest.mark.parametrize("text", ["your code is 482913", "verification code 123456", "OTP 4821", "ओटीपी 482913"])
+def test_real_otp_phrases_still_redact(text):
+    r = redact(text)
+    assert "OTP" in r.entities and "<OTP>" in r.text

@@ -13,13 +13,12 @@ functionality.
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass, field
 
-from saathi.errors import SaathiError
+from saathi.errors import RestrictedDataLeft
 
-
-class RestrictedDataLeft(SaathiError):  # noqa: N818  (name fixed by the LLD, M11)
-    """Text still matches a restricted pattern, or the input is not text."""
+__all__ = ["RedactionResult", "RestrictedDataLeft", "assert_clean", "redact"]
 
 # Verhoeff tables, used to validate Aadhaar numbers.
 _D = (
@@ -66,7 +65,7 @@ PASSPORT_RE = re.compile(r"(?<![A-Za-z0-9])[A-Za-z]\d{7}(?![A-Za-z0-9])")
 _EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 _UPI_RE = re.compile(r"(?<![\w.])[\w.-]{2,}@[A-Za-z]{2,}(?![\w.])")
 _OTP_RE = re.compile(
-    r"(?i)(?:otp|one[\s-]time[\s-]password|code|ओटीपी)\D{0,15}(\d{4,8})(?!\d)"
+    r"(?i)(?:otp|one[\s-]time[\s-]password|(?<![a-z])code|ओटीपी)\D{0,15}(\d{4,8})(?!\d)"
 )
 
 
@@ -80,9 +79,19 @@ class RedactionResult:
         return bool(self.entities)
 
 
+def _fold_digits(text: str) -> str:
+    """Map every Unicode decimal digit (Devanagari, fullwidth, ...) to its ASCII digit."""
+    if text.isascii():
+        return text
+    return "".join(
+        str(d) if (d := unicodedata.decimal(c, None)) is not None else c for c in text
+    )
+
+
 def redact(text: str | None) -> RedactionResult:
     if not text:
         return RedactionResult(text or "")
+    text = _fold_digits(text)
     found: list[str] = []
     out = text
 
