@@ -25,13 +25,27 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CI: "true"
-    # WU-04 adds here: services.postgres (image pinned by @sha256 digest, postgres:16 family), SAATHI_TEST_DSN,
-    # and `sudo apt-get install -y strace`. Placeholder only: no service is started at this stage.
+      # Superuser DSN of the throwaway service container below; tests/conftest.py creates every role itself.
+      SAATHI_TEST_DSN: postgresql://postgres:ci-throwaway@localhost:5432/postgres
+    services:
+      postgres:
+        # postgres:16 index digest, resolved with `docker buildx imagetools inspect postgres:16` (RQ-72a).
+        image: postgres:16@sha256:f9a7b9ebf6f56201f949db745e47bc423c0f0f8294bafe991cc10bf74b029657
+        env:
+          POSTGRES_PASSWORD: ci-throwaway
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
       - run: uv python install 3.12
       - run: uv sync --frozen
+      - run: sudo apt-get update -q && sudo apt-get install -y --no-install-recommends strace
       - run: uv run pytest -q
 
   license-audit:
