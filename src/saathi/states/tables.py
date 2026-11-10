@@ -1,8 +1,9 @@
 """Transition tables of TRD states sections 2 to 6, one `Row` per (id, from state) pair (M21).
 
 A TRD row with several from states (R20, R32, R34, ...) becomes several `Row`s with the same id.
-`to` is the state name; "unchanged" rows repeat the from state. `reason` carries the reason or stage
-text of the TRD's To cell (`blocked` reasons, `handoff` reasons, `stage b`). `event` is a stable
+`to` is the state name; "unchanged" rows repeat the from state. `reasons` holds the reason codes the TRD's
+To cell allows (`blocked`, `handoff`, `failed` reasons), one code per entry, and nothing else. `stage` is the
+alert stage a row sets and `from_stage` the stage it needs (A12, A13 need stage c). `event` is a stable
 snake_case name for the TRD's Event cell, unique per from state. Phase 0 runs N01 to N10, A01 to
 A13, R01, R05 and R06; every other row is phase 1 and is not callable in Phase 0.
 tests/test_states.py compares these rows with the TRD tables, so a drift fails the test.
@@ -21,18 +22,34 @@ class Row:
     to: str
     guard: str
     phase: int
-    reason: str = ""
+    reasons: tuple[str, ...] = ()
+    stage: str | None = None
+    from_stage: str | None = None
 
 
 def _rows(
-    id_: str, froms: str, event: str, to: str, guard: str, phase: int, reason: str = ""
+    id_: str,
+    froms: str,
+    event: str,
+    to: str,
+    guard: str,
+    phase: int,
+    reasons: str = "",
+    *,
+    stage: str | None = None,
+    from_stage: str | None = None,
 ) -> tuple[Row, ...]:
-    """`froms` is a comma separated list of from states."""
-    return tuple(Row(id_, f.strip(), event, to, guard, phase, reason) for f in froms.split(","))
+    """`froms` is a comma separated list of from states; `reasons` a `|` separated list of reason codes."""
+    codes = tuple(r for r in reasons.split("|") if r)
+    return tuple(Row(id_, f.strip(), event, to, guard, phase, codes, stage, from_stage) for f in froms.split(","))
 
 
-def _loop(id_: str, froms: str, event: str, guard: str, phase: int) -> tuple[Row, ...]:
-    return tuple(Row(id_, f.strip(), event, f.strip(), guard, phase) for f in froms.split(","))
+def _loop(
+    id_: str, froms: str, event: str, guard: str, phase: int, *, stage: str | None = None, from_stage: str | None = None
+) -> tuple[Row, ...]:
+    return tuple(
+        Row(id_, f.strip(), event, f.strip(), guard, phase, (), stage, from_stage) for f in froms.split(",")
+    )
 
 
 _BEFORE_STEP1 = "received, clarifying, quoting, awaiting_approval, approved"
@@ -107,19 +124,19 @@ INTENT: tuple[Row, ...] = (
 # Alert event machine (section 4, RQ-18). `stage` is a field, not a state.
 # --------------------------------------------------------------------------- #
 ALERT: tuple[Row, ...] = (
-    *_rows("A01", "new", "radar_flag_persisted", "open", "emergency or scam", 0, "stage a"),
+    *_rows("A01", "new", "radar_flag_persisted", "open", "emergency or scam", 0, stage="a"),
     *_loop("A02", "open", "cadence_due", "no acknowledgement; stage a under 20 sends per approver", 0),
-    *_rows("A03", "open", "t0_plus_2_min", "open", "emergency; no acknowledgement; SO-1 valid; WhatsApp not down", 0, "stage b"),
-    *_rows("A04", "open", "t0_plus_4_min", "open", "emergency; no acknowledgement; SO-1 valid", 0, "stage c"),
+    *_rows("A03", "open", "t0_plus_2_min", "open", "emergency; no acknowledgement; SO-1 valid; WhatsApp not down", 0, stage="b"),
+    *_rows("A04", "open", "t0_plus_4_min", "open", "emergency; no acknowledgement; SO-1 valid", 0, stage="c"),
     *_loop("A05", "open", "stage_bc_signoff_missing", "none", 0),
     *_rows("A06", "open", "acknowledge_tap", "acknowledged", "registered approver; update id not seen before", 0),
     *_rows("A07", "open", "every_cap_spent", "blocked", "none", 0, "no_human_reached"),
     *_loop("A08", "acknowledged", "false_alarm_tap", "registered approver", 0),
     *_loop("A09", "open", "t0_plus_10_min", "emergency", 0),
     *_loop("A10", "open", "restart", "none", 0),
-    *_rows("A11", "new", "audio_row_unscanned", "open", "audio rows only", 0, "unscanned, stage a"),
-    *_rows("A12", "open", "key_press_1", "acknowledged", "signature valid; call id matches an attempt row of this event; callback not seen before; the digit is 1", 0),
-    *_loop("A13", "open", "call_no_ack", "none", 0),
+    *_rows("A11", "new", "audio_row_unscanned", "open", "audio rows only; the event kind is unscanned", 0, stage="a"),
+    *_rows("A12", "open", "key_press_1", "acknowledged", "signature valid; call id matches an attempt row of this event; callback not seen before; the digit is 1", 0, from_stage="c"),
+    *_loop("A13", "open", "call_no_ack", "none", 0, stage="c", from_stage="c"),
 )
 
 # --------------------------------------------------------------------------- #
@@ -143,7 +160,7 @@ INBOX: tuple[Row, ...] = (
 # --------------------------------------------------------------------------- #
 TOKEN: tuple[Row, ...] = (
     *_rows("K01", "new", "approve_tap", "issued", "registered approver; request in awaiting_approval", 1),
-    *_rows("K02", "new", "valid_second_code", "issued", "approve token unspent", 1, "confirm2"),
+    *_rows("K02", "new", "valid_second_code", "issued", "approve token unspent; the token action is confirm2", 1),
     *_rows("K03", "issued", "commit_step1", "spent", "request id, quote hash, approver and action match; unexpired; not voided; one UPDATE ... WHERE spent_at IS NULL changes one row", 1),
     *_rows("K04", "issued", "void", "voided", "none", 1),
     *_rows("K05", "issued", "clock_passes_expires_at", "expired", "none", 1),

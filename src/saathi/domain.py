@@ -9,11 +9,12 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from enum import StrEnum
-from typing import Literal
+from collections.abc import Mapping
+from enum import IntEnum, StrEnum
+from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from saathi.clock import SystemClock
 from saathi.ids import (
@@ -50,6 +51,23 @@ class DataClass(StrEnum):
     PERSONAL = "personal"
     PUBLIC = "public"
     SYNTHETIC = "synthetic"
+
+
+class Sensitivity(StrEnum):
+    """M19: what a gateway request carries. Elder content is PERSONAL; only PUBLIC work may use a free tier."""
+
+    PERSONAL = "personal"
+    PUBLIC = "public"
+
+
+class Grade(IntEnum):
+    """M19: the model grade that served a request."""
+
+    G0 = 0
+    G1 = 1
+    G2 = 2
+    G3 = 3
+    G4 = 4
 
 
 class Source(StrEnum):
@@ -159,11 +177,17 @@ class SendReceipt(_Frozen):
     key: IdemKey
 
 
-class Card(_Frozen):
-    """A caregiver card built from slots (enums and counts), never from model prose."""
+class Button(_Frozen):
+    text: str
+    data: str
 
-    kind: str
-    slots: dict[str, str | int] = Field(default_factory=dict)
+
+class Card(_Frozen):
+    """A caregiver card built from slots (enums and counts), never from model prose (M15)."""
+
+    title: str
+    lines: list[str] = Field(default_factory=list)
+    buttons: list[Button] = Field(default_factory=list)
 
 
 class CardRef(_Frozen):
@@ -210,14 +234,14 @@ class Message(_Frozen):
 
 
 class ModelRequest[T: BaseModel](BaseModel):
-    """What the gateway takes (TRD ports section 2). Elder content is personal by default (PL-02)."""
+    """What the gateway takes (M19). Elder content is personal by default (PL-02)."""
 
-    model_config = ConfigDict(arbitrary_types_allowed=True, populate_by_name=True)
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     step: str
     messages: list[Message]
-    output_schema: type[T] = Field(alias="schema")
-    sensitivity: DataClass = DataClass.PERSONAL
+    schema_: type[T]
     run: RunId
+    sensitivity: Sensitivity = Sensitivity.PERSONAL
     intent: str | None = None
     media: tuple[MediaRef, ...] = ()
 
@@ -226,18 +250,26 @@ class ModelResult[T: BaseModel](BaseModel):
     value: T | None = None
     refusal: bool = False
     refusal_reason: str | None = None
-    tier_grade: str = ""
+    grade: Grade
     tokens: int = 0
     cost_inr: Decimal = Decimal(0)
     cached: bool = False
 
 
+Actor = Annotated[str, StringConstraints(pattern=r"^(elder|approver:[\w-]+|system:[\w-]+|agent:[\w-]+)$")]
+SafeValue = int | bool | Annotated[str, StringConstraints(pattern=r"^[\w:.-]{0,64}$")]
+
+
 class AuditEvent(_Frozen):
-    household_id: HouseholdId
-    kind: str
-    actor: str
-    subject: str = ""
-    detail: dict[str, str | int | bool] = Field(default_factory=dict)
+    """M17. `detail` holds only safe values; `sensitive` holds raw values of which only a keyed hash is stored."""
+
+    household: HouseholdId
+    run_id: RunId
+    actor: Actor
+    event: str
+    subject: str | None = None
+    detail: Mapping[str, SafeValue] = Field(default_factory=dict)
+    sensitive: Mapping[str, str] = Field(default_factory=dict)
 
 
 class AuditRef(_Frozen):
@@ -264,7 +296,7 @@ class InboundMessage(BaseModel):
     kind: MediaKind
     text: str | None = None
     media: MediaRef | None = None
-    received_at: datetime = Field(default_factory=utcnow)
+    received_at: datetime
 
 
 class RawPart(BaseModel):

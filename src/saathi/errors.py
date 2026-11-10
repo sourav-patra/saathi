@@ -74,6 +74,10 @@ class ClipMissing(SaathiError): ...
 class ClipHashMismatch(SaathiError): ...
 
 
+class ClipUnreviewed(ClipMissing):
+    """M16: a clip whose review columns are null is not usable; callers that handle ClipMissing handle this too."""
+
+
 # Vision
 class VisionUnavailable(SaathiError): ...
 
@@ -167,3 +171,36 @@ PORT_ERRORS: dict[str, tuple[type[SaathiError], ...]] = {
     "AuditSink": (AuditUnavailable,),
     "Store, KeyRing": (StoreUnavailable, ConflictLost, FlagUnreadable, TenantNotSet, KeyMissing),
 }
+
+
+def _errors_of() -> dict[type, tuple[type[SaathiError], ...]]:
+    from saathi import ports  # late: ports imports the domain, never this module
+
+    store = PORT_ERRORS["Store, KeyRing"]
+    voice = PORT_ERRORS["TTS, VoiceStore"]
+    asr = PORT_ERRORS["ASR, AudioCodec"]
+    return {
+        ports.ElderChannel: PORT_ERRORS["ElderChannel"],
+        ports.CaregiverChannel: PORT_ERRORS["CaregiverChannel"],
+        ports.Escalator: PORT_ERRORS["Escalator"],
+        ports.ASR: asr,
+        ports.AudioCodec: asr,
+        ports.TTS: voice,
+        ports.VoiceStore: voice,
+        ports.Vision: PORT_ERRORS["Vision"],
+        ports.Gateway: PORT_ERRORS["Gateway"],
+        ports.AuditSink: PORT_ERRORS["AuditSink"],
+        ports.Store: store,
+        ports.Tx: store,
+        ports.Sealer: store,
+        ports.Opener: store,
+        # no listed errors: a clock, a classifier, a trace exporter and the media store raise none of the TRD's
+        ports.Clock: (),
+        ports.Classifier: (),
+        ports.TraceExporter: (),
+        ports.MediaStore: (),
+    }
+
+
+# The same table keyed by Protocol class (a shared TRD row lists several ports). Built on first use.
+ERRORS_OF: dict[type, tuple[type[SaathiError], ...]] = _errors_of()

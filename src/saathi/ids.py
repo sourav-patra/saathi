@@ -6,7 +6,6 @@ Every identifier is a `NewType` so a household id cannot be passed where an elde
 
 from __future__ import annotations
 
-import hashlib
 from typing import NewType
 from uuid import uuid4
 
@@ -30,11 +29,10 @@ def new_id() -> str:
 
 
 def derive_id(prefix: str, parent: str) -> str:
-    """A stable child id: the same prefix and parent always give the same id (idempotent effects)."""
+    """A stable child id, `<prefix>_<parent>`: the request of inbox `x` is `r_x` (idempotent effects)."""
     if not prefix.strip() or not parent.strip():
         raise ValueError("derive_id needs a non-empty prefix and parent")
-    digest = hashlib.sha256(f"{prefix}:{parent}".encode()).hexdigest()[:32]
-    return f"{prefix}_{digest}"
+    return f"{prefix}_{parent}"
 
 
 def idem_key(*parts: str) -> IdemKey:

@@ -1,9 +1,16 @@
 """Phase 0 era message types, kept only until the units that rewrite their callers land.
 
 The hub's disposition table removes `Channel` and the phone-number fields from `domain.py`. The
-old WhatsApp parser, Telegram forwarder, app and pipeline still use them, so they live here until
-WU-08, WU-14, WU-15 and WU-18 replace those callers. Nothing new may import this module, and the
-last of those units deletes it.
+old callers still use them, so they live here until the units that rewrite those callers land.
+Nothing new may import this module (tests/test_foundation.py pins the importer set; it may only shrink).
+
+Removal plan, one importer per unit:
+- WU-08 replaces `channels/whatsapp.py`
+- WU-14 replaces `app.py`
+- WU-15 replaces `pipeline.py`
+- WU-18 replaces `channels/telegram.py`
+- WU-20 replaces `tests/test_channels_llm_pipeline.py`
+The last of these to land deletes this module.
 """
 
 from __future__ import annotations
