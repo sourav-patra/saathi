@@ -2386,6 +2386,7 @@ source = { editable = "." }
 dependencies = [
     { name = "aiogram" },
     { name = "asyncpg" },
+    { name = "cryptography" },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "langfuse" },
@@ -2412,6 +2413,7 @@ dev = [
 requires-dist = [
     { name = "aiogram", specifier = ">=3.13" },
     { name = "asyncpg", specifier = ">=0.29" },
+    { name = "cryptography", specifier = ">=43" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "langfuse", specifier = ">=3.0" },

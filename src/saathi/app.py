@@ -24,7 +24,7 @@ from saathi.channels.telegram import (
 )
 from saathi.channels.whatsapp import WhatsAppClient, parse_webhook, verify_signature
 from saathi.config import Settings, get_settings
-from saathi.legacy import Channel, InboundMessage
+from saathi.legacy import Channel, InboundMessage, LegacyHouseholdEnv
 from saathi.llm.gateway import Gateway
 from saathi.llm.roster import Roster, load_roster_file
 from saathi.observability import flush as flush_traces
@@ -78,6 +78,7 @@ class _ElderReplier:
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     s = settings or get_settings()
+    lg = LegacyHouseholdEnv()
     dedupe = _Dedupe()
     flags = RuntimeFlags()
     state: dict = {}
@@ -95,20 +96,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             access_token=s.wa_access_token.get_secret_value(),
             graph_version=s.wa_graph_version,
         )
-        bot = Bot(s.tg_bot_token.get_secret_value())
-        notifier = TelegramNotifier(bot, s.tg_primary_approver_id, s.tg_backup_approver_ids)
+        bot = Bot(s.tg_caregiver_token.get_secret_value())
+        notifier = TelegramNotifier(bot, lg.tg_primary_approver_id, lg.tg_backup_approver_ids)
         media = _Media(wa)
         deps = Deps(
             gateway=Gateway(
                 load_roster_file(s.roster_path) if s.roster_path else Roster.load([]),
-                cap_inr=Decimal(str(s.paid_monthly_cap_inr)) if s.paid_monthly_cap_inr > 0 else None,
+                cap_inr=Decimal(str(lg.paid_monthly_cap_inr)) if lg.paid_monthly_cap_inr > 0 else None,
                 usd_to_inr=Decimal(str(s.usd_to_inr)),
             ),
             asr=build_asr(s.asr_provider, whispercpp_url=s.whispercpp_url),
             media=media,
-            elder=_ElderReplier(wa, s.elder_phones[0] if s.elder_phones else None),
+            elder=_ElderReplier(wa, lg.elder_phones[0] if lg.elder_phones else None),
             caregiver=notifier,
-            caregiver_name=s.caregiver_name,
+            caregiver_name=lg.caregiver_name,
         )
         graph = build_graph(deps)
 
@@ -153,7 +154,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             s.wa_app_secret.get_secret_value(), body, request.headers.get("X-Hub-Signature-256")
         ):
             raise HTTPException(status_code=401, detail="bad signature")
-        allowed = set(s.elder_phones)
+        allowed = set(lg.elder_phones)
         for msg in parse_webhook(await request.json()):
             if msg.sender_phone_e164 not in allowed:
                 log.warning("ignoring message from unregistered number")

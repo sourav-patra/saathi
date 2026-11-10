@@ -205,7 +205,7 @@ services:
     restart: unless-stopped
     env_file: ../.env
     environment:
-      SAATHI_DATABASE_URL: postgresql://saathi_core:${SAATHI_DB_PASSWORD_CORE}@postgres:5432/saathi
+      SAATHI_DB_URL_CORE: postgresql://saathi_core:${SAATHI_DB_PASSWORD_CORE}@postgres:5432/saathi
       SAATHI_T1_BASE_URL: http://ollama:11434/v1
       SAATHI_WHISPERCPP_URL: http://whisper:8080
       SAATHI_LANGFUSE_HOST: http://langfuse-web:3000

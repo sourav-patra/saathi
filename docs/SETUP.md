@@ -43,8 +43,8 @@ docker compose --env-file .env -f infra/docker-compose.yml logs -f saathi
 
 ## 2. Telegram bot (caregiver side)
 
-1. Create a bot with @BotFather and put its token in `SAATHI_TG_BOT_TOKEN`.
-2. Start the stack, send `/start` to the bot, and it replies with your Telegram id. Put that in `SAATHI_TG_PRIMARY_APPROVER_ID`. Do the same for the backup approver (`SAATHI_TG_BACKUP_APPROVER_IDS=[id]`).
+1. Create a bot with @BotFather and put its token in `SAATHI_TG_CAREGIVER_TOKEN`.
+2. Start the stack, send `/start` to the bot, and it replies with your Telegram id. Put that in `SAATHI_TG_PRIMARY_APPROVER_ID`. Do the same for the backup approver (`SAATHI_TG_BACKUP_APPROVER_IDS=[id]`). These approver variables are interim `LegacyHouseholdEnv` values that WU-14 removes; the household record will hold them.
 3. Restart the `saathi` service.
 
 ## 3. WhatsApp Business Cloud API (elder side)
@@ -52,7 +52,7 @@ docker compose --env-file .env -f infra/docker-compose.yml logs -f saathi
 1. Create a Meta developer app with the WhatsApp product, and add the helper number. A new SIM works; once registered, that number can't run the normal WhatsApp app.
 2. Copy the **Phone number ID**, a **permanent access token** (System User) and the **App secret** into `.env`. Choose any string for `SAATHI_WA_VERIFY_TOKEN`.
 3. Set the webhook URL to `https://<SAATHI_DOMAIN>/webhooks/whatsapp` with your verify token, and subscribe to the `messages` field.
-4. Add the elder's number to `SAATHI_ELDER_PHONES` (E.164). Messages from other numbers are ignored.
+4. Add the elder's number to `SAATHI_ELDER_PHONES` (E.164). Messages from other numbers are ignored. This is an interim `LegacyHouseholdEnv` value that WU-14 removes.
 
 ## 4. Smoke test
 

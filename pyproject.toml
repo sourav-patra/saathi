@@ -15,6 +15,7 @@ dependencies = [
   "asyncpg>=0.29",           # Apache-2.0  (NOT psycopg: LGPL)
   "langgraph>=0.2",          # MIT  (library only; never langgraph-api: ELv2)
   "langfuse>=3.0",           # MIT  (SDK)
+  "cryptography>=43",        # Apache-2.0 OR BSD-3-Clause (envelope keys, AES-GCM, X25519)
 ]
 
 [project.optional-dependencies]

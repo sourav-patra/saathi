@@ -3,9 +3,18 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from saathi.errors import SaathiError
+
+MIN_APPROVAL_SECRET_BYTES = 32
+
+
+class ConfigError(SaathiError):
+    """A deployment value is missing or unsafe. The message names the setting, never its value."""
 
 
 class Settings(BaseSettings):
@@ -13,9 +22,20 @@ class Settings(BaseSettings):
 
     env: str = "dev"
     public_base_url: str = "http://localhost:8000"
-    database_url: str = "postgresql://saathi:saathi@localhost:5432/saathi"
+    # One URL per runtime role (grants part, section 1). Passwords arrive in the URL from the environment; the defaults
+    # name the role and carry none.
+    db_url_edge: str = "postgresql://saathi_edge@localhost:5432/saathi"
+    db_url_core: str = "postgresql://saathi_core@localhost:5432/saathi"
+    db_url_model: str = "postgresql://saathi_model@localhost:5432/saathi"
+    db_url_owner: str = "postgresql://saathi_owner@localhost:5432/saathi"
     media_dir: str = "/var/lib/saathi/media"
+    trace_dir: str = "/var/lib/saathi/traces"
+    health_path: str = "/health"
+    # Secrets: a value or a file, never a default. Each is its own secret (PL-14). A file wins over the value.
     approval_secret: SecretStr = Field(default=SecretStr(""))
+    approval_secret_file: str = ""
+    kek_file: str = ""                  # key-encryption key; mounted into the worker only
+    sender_hmac_key_file: str = ""      # deployment key of the edge's sender hash
 
     # --- WhatsApp Cloud API -------------------------------------------------
     wa_phone_number_id: str = ""
@@ -24,15 +44,12 @@ class Settings(BaseSettings):
     wa_verify_token: SecretStr = SecretStr("")    # webhook verification handshake
     wa_graph_version: str = "v23.0"
 
-    # --- People (kept in .env only; never committed) ---------------------
-    caregiver_name: str = "your family member"   # used in replies to the elder
-    persona_name: str = "Saathi"
-    elder_phones: list[str] = []                  # E.164 numbers allowed to use the helper
+    # Household values (people, approvers, caps, names) are versioned `household_config` rows, never settings (RQ-110).
 
     # --- Telegram -----------------------------------------------------------
-    tg_bot_token: SecretStr = SecretStr("")
-    tg_primary_approver_id: int = 0
-    tg_backup_approver_ids: list[int] = []
+    tg_caregiver_token: SecretStr = SecretStr("")
+    tg_elder_token: SecretStr = SecretStr("")
+    tg_elder_secret: SecretStr = SecretStr("")    # verifies the elder bot's webhook
     tg_ops_chat_id: int = 0
 
     # --- Model tiers (all chat-completions-compatible HTTP endpoints) ----
@@ -53,7 +70,6 @@ class Settings(BaseSettings):
     t4_model: str = ""
 
     roster_path: str = ""           # private TOML roster (schema: infra/roster.example.toml); empty = no model tier
-    paid_monthly_cap_inr: float = 0.0   # 0 = paid tiers disabled until set privately
     usd_to_inr: float = 88.0
 
     # --- ASR ----------------------------------------------------------------
@@ -64,6 +80,27 @@ class Settings(BaseSettings):
     langfuse_host: str = "http://langfuse-web:3000"
     langfuse_public_key: str = ""
     langfuse_secret_key: SecretStr = SecretStr("")
+
+
+def read_secret_file(path: str) -> bytes:
+    """The bytes of a secret file with trailing newlines removed. `ConfigError` names the setting, never the content."""
+    try:
+        return Path(path).read_bytes().rstrip(b"\r\n")
+    except OSError as exc:
+        raise ConfigError("a secret file cannot be read") from exc
+
+
+def approval_secret_bytes(s: Settings) -> bytes:
+    """The approval signing secret from its file when one is set, else from the environment value."""
+    if s.approval_secret_file:
+        return read_secret_file(s.approval_secret_file)
+    return s.approval_secret.get_secret_value().encode()
+
+
+def require_secrets(s: Settings) -> None:
+    """Raise `ConfigError` on an empty or under 32 byte approval secret (change 20, PL-14). There is no default."""
+    if len(approval_secret_bytes(s)) < MIN_APPROVAL_SECRET_BYTES:
+        raise ConfigError(f"the approval secret is empty or shorter than {MIN_APPROVAL_SECRET_BYTES} bytes")
 
 
 @lru_cache
