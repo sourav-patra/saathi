@@ -35,13 +35,13 @@ def test_signature_roundtrip():
 
 
 def test_parse_text_and_voice():
-    t = parse_webhook(_wa_payload({"from": "919800000000", "id": "w1", "type": "text", "text": {"body": "hi"}}))
-    assert t[0].kind == MediaKind.TEXT and t[0].text == "hi" and t[0].sender_phone_e164 == "+919800000000"
+    t = parse_webhook(_wa_payload({"from": "910000000000", "id": "w1", "type": "text", "text": {"body": "hi"}}))
+    assert t[0].kind == MediaKind.TEXT and t[0].text == "hi" and t[0].sender_ref == "+910000000000"
     v = parse_webhook(
-        _wa_payload({"from": "919800000000", "id": "w2", "type": "audio",
+        _wa_payload({"from": "910000000000", "id": "w2", "type": "audio",
                      "audio": {"id": "m1", "mime_type": "audio/ogg; codecs=opus"}})
     )
-    assert v[0].kind == MediaKind.AUDIO and v[0].media_id == "m1"
+    assert v[0].kind == MediaKind.AUDIO and v[0].media is not None and v[0].media.handle == "m1"
 
 
 def test_status_updates_ignored():

@@ -40,3 +40,21 @@ def idem_key(*parts: str) -> IdemKey:
     if not parts or any(not p.strip() for p in parts):
         raise ValueError("idempotency key parts must be non-empty")
     return IdemKey(":".join(parts))
+
+
+_E164_JUNK = " \t-.()"
+
+
+def normalize_e164(raw: str) -> str:
+    """The one phone form used by registration, the edge and the channels: ``+`` and ASCII digits only.
+
+    Spaces, dashes, dots and brackets are dropped and a leading ``00`` counts as ``+``. Anything else, or a
+    length outside 7 to 15 digits, raises `ValueError`.
+    """
+    text = "".join(c for c in raw if c not in _E164_JUNK)
+    if text.startswith("00"):
+        text = "+" + text[2:]
+    digits = text.removeprefix("+")
+    if not (digits.isascii() and digits.isdigit() and 7 <= len(digits) <= 15):
+        raise ValueError("not an E.164 number")
+    return "+" + digits

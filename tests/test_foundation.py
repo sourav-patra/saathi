@@ -677,7 +677,6 @@ def test_errors_of_is_keyed_by_protocol_class() -> None:
 LEGACY_IMPORTERS = {
     "src/saathi/app.py",  # WU-14
     "src/saathi/channels/telegram.py",  # WU-18
-    "src/saathi/channels/whatsapp.py",  # WU-08
     "src/saathi/pipeline.py",  # WU-15
     "tests/test_channels_llm_pipeline.py",  # WU-20; the last to go also deletes legacy.py
 }

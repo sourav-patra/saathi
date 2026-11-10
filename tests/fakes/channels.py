@@ -77,6 +77,8 @@ class FakeElderChannel(Failable):
 
     async def fetch_media(self, ref: MediaRef) -> MediaBlob:
         self._enter("fetch_media", ref)
+        if ref.source.value != self.kind:
+            raise SendRejected("wrong_source")
         if ref.handle not in self.media:
             raise MediaExpired()
         return self.media[ref.handle]

@@ -4,6 +4,7 @@ from fakes.base import Failable
 from fakes.channels import FakeCaregiverChannel, FakeElderChannel
 from fakes.clock import FakeClock
 from fakes.escalators import FakeEscalator
+from fakes.people import FakePersonDirectory
 from fakes.services import (
     FakeAudit,
     FakeClassifier,
@@ -18,6 +19,7 @@ from fakes.voice import FakeASR, FakeAudioCodec, FakeCodec, FakeTTS, FakeVoiceSt
 __all__ = [
     "Failable", "FakeASR", "FakeAudioCodec", "FakeAudit", "FakeCaregiverChannel", "FakeClassifier", "FakeClock",
     "FakeCodec",
-    "FakeElderChannel", "FakeEscalator", "FakeGateway", "FakeMediaStore", "FakeOpener", "FakeSealer",
+    "FakeElderChannel", "FakeEscalator", "FakeGateway", "FakeMediaStore", "FakeOpener", "FakePersonDirectory",
+    "FakeSealer",
     "FakeStore", "FakeTTS", "FakeTrace", "FakeTx", "FakeVision", "FakeVoiceStore",
 ]  # fmt: skip
