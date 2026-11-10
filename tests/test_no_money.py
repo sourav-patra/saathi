@@ -1,7 +1,7 @@
 """LT-32: Saathi never holds, routes or initiates money movement (POLICY PL-36, rule PE-31).
 
 Three checks, each shown to fail on a planted fault:
-1. the Capability set has no payment member;
+1. no capability enum (Capability, ChannelCap, ...) has a payment member;
 2. no payment SDK, UPI intent or collect-request call appears in the code tree;
 3. the policy engine denies a payment method outside cash on delivery or a wallet
    inside the merchant's own flow.
@@ -21,7 +21,8 @@ from saathi.domain import OUT_OF_SCOPE_INTENTS, Intent, LineItem, PaymentMethod,
 from saathi.policy.engine import PolicyConfig, PolicyContext, PolicyEngine, Verdict
 
 ROOT = Path(__file__).resolve().parent.parent
-CODE_TREES = [ROOT / "src", ROOT / "scripts"]
+CODE_TREES = [ROOT / "src", ROOT / "scripts", ROOT / "evals"]
+CAP_CLASS = re.compile(r"\w*Cap(ability)?")
 NOW = datetime(2026, 11, 9, 10, 0, tzinfo=UTC)
 CTX = PolicyContext(paused=False, spent_today=Decimal("0"), spent_month=Decimal("0"))
 ALLOWED_METHODS = {PaymentMethod.COD, PaymentMethod.WALLET}
@@ -44,7 +45,18 @@ PAYMENT_WORDS = re.compile(r"(pay|upi|money|transfer|collect|topup|top_up|refund
 
 # --------------------------------------------------------------------- helpers
 def python_files(*roots: Path) -> list[Path]:
-    return sorted(p for r in roots for p in r.rglob("*.py") if ".venv" not in p.parts)
+    return sorted(p for r in roots if r.is_dir() for p in r.rglob("*.py") if ".venv" not in p.parts)
+
+
+def _string_import(node: ast.AST) -> str | None:
+    """The module name of import_module("x"), importlib.import_module("x") or __import__("x")."""
+    if isinstance(node, ast.Call) and node.args:
+        fn = node.func
+        name = fn.attr if isinstance(fn, ast.Attribute) else fn.id if isinstance(fn, ast.Name) else ""
+        arg = node.args[0]
+        if name in {"import_module", "__import__"} and isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+            return arg.value
+    return None
 
 
 def find_payment_imports(*roots: Path) -> list[str]:
@@ -58,6 +70,8 @@ def find_payment_imports(*roots: Path) -> list[str]:
                 names = [a.name for a in node.names]
             elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
                 names = [node.module]
+            if (dyn := _string_import(node)) is not None:
+                names.append(dyn)
             for n in names:
                 if n.split(".")[0].lower() in PAYMENT_MODULES:
                     found.append(f"{path}:{node.lineno}: import {n}")
@@ -68,11 +82,11 @@ def find_payment_imports(*roots: Path) -> list[str]:
 
 
 def capability_enums(*roots: Path) -> dict[str, list[str]]:
-    """Members of every class named Capability under the given trees."""
+    """Members of every class named Cap, Capability or <Word>Cap(ability) under the given trees."""
     out: dict[str, list[str]] = {}
     for path in python_files(*roots):
         for node in ast.walk(ast.parse(path.read_text())):
-            if isinstance(node, ast.ClassDef) and node.name == "Capability":
+            if isinstance(node, ast.ClassDef) and CAP_CLASS.fullmatch(node.name):
                 members = [
                     t.id
                     for stmt in node.body
@@ -119,10 +133,24 @@ def test_capability_set_has_no_payment():
     # (BILL_PAYMENT); it must stay in OUT_OF_SCOPE_INTENTS.
     for name in payment_members([i.name for i in Intent]):
         assert Intent[name] in OUT_OF_SCOPE_INTENTS, name
-    # Every Capability enum in the code tree (QUOTE, PLACE, FIND_ORDER once the ports land).
+    # Every capability enum in the code tree (ChannelCap now; Capability once the ports land).
     for where, members in capability_enums(*CODE_TREES).items():
         assert payment_members(members) == [], where
 
+
+@rule("PE-31")
+def test_capability_scan_sees_channel_cap_and_it_is_not_money():
+    found = {k.rsplit(":", 1)[0].split("/")[-1]: v for k, v in capability_enums(*CODE_TREES).items()}
+    assert "domain.py" in found, "the scan no longer finds ChannelCap"
+    members = found["domain.py"]
+    assert {"VOICE_IN", "TEXT", "TEMPLATES"} <= set(members)
+    assert payment_members(members) == []
+
+
+@rule("PE-31")
+def test_capability_check_fails_on_planted_channel_cap_payment_member(tmp_path):
+    (tmp_path / "x.py").write_text("from enum import StrEnum\n\nclass ChannelCap(StrEnum):\n    PAY_IN = 'p'\n")
+    assert [payment_members(m) for m in capability_enums(tmp_path).values()] == [["PAY_IN"]]
 
 @rule("PE-31")
 def test_capability_check_fails_on_planted_payment_member(tmp_path):
@@ -150,6 +178,11 @@ def test_code_tree_has_no_payment_import():
 
 @rule("PE-31")
 def test_no_payment_sdk_in_declared_dependencies():
+    assert declared_dependency_names() & PAYMENT_MODULES == set()
+
+
+def declared_dependency_names() -> set[str]:
+    """Names in pyproject.toml (all groups) and every locked package in uv.lock."""
     pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text())
     specs = list(pyproject["project"]["dependencies"])
     for group in pyproject["project"].get("optional-dependencies", {}).values():
@@ -157,7 +190,36 @@ def test_no_payment_sdk_in_declared_dependencies():
     for group in pyproject.get("dependency-groups", {}).values():
         specs += [s for s in group if isinstance(s, str)]
     names = {re.split(r"[<>=!~\[; ]", s, maxsplit=1)[0].lower().replace("-", "_") for s in specs}
-    assert names & PAYMENT_MODULES == set()
+    lock = ROOT / "uv.lock"
+    if lock.exists():
+        names |= {p["name"].lower().replace("-", "_") for p in tomllib.loads(lock.read_text()).get("package", [])}
+    return names
+
+
+@rule("PE-31")
+def test_uv_lock_is_read_and_covers_transitive_packages():
+    names = declared_dependency_names()
+    assert "pytest" in names and len(names) > 20  # the lock adds the transitive set
+
+
+@rule("PE-31")
+@pytest.mark.parametrize(
+    "line",
+    [
+        'importlib.import_module("razorpay")',
+        'import_module("stripe.api")',
+        '__import__("paytm")',
+    ],
+)
+def test_import_test_fails_on_planted_string_import(tmp_path, line):
+    (tmp_path / "bad.py").write_text(f"import importlib\nfrom importlib import import_module\n{line}\n")
+    assert find_payment_imports(tmp_path)
+
+
+@rule("PE-31")
+def test_import_module_of_harmless_name_passes(tmp_path):
+    (tmp_path / "ok.py").write_text('from importlib import import_module\nimport_module("json")\n')
+    assert find_payment_imports(tmp_path) == []
 
 
 @rule("PE-31")
