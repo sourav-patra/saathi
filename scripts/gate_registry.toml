@@ -1,0 +1,478 @@
+# Phase gate registry (RQ-100). One row per id; an id with no receipt or a command whose program or file does not exist yet is reported unavailable.
+# Source: LLD tests part section 4. Rows for later phases are added with their phase gate.
+
+[[row]]
+id = "RQ-16"
+phase = 0
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-17"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_guards.py", "tests/test_replies.py", "tests/test_voice_store.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-116"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_guards.py", "tests/test_replies.py", "tests/test_voice_store.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-18"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_alert_plan.py", "tests/test_alerts.py", "tests/test_signoff.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-36"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_empty_run.py", "tests/test_states.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-40"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_gateway.py", "tests/test_ledger.py", "tests/test_roster.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-45"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_gateway.py", "tests/test_ledger.py", "tests/test_roster.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-46"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_gateway.py", "tests/test_ledger.py", "tests/test_roster.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-47"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_gateway.py", "tests/test_ledger.py", "tests/test_roster.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-48"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_gateway.py", "tests/test_ledger.py", "tests/test_roster.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-49"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_gateway.py", "tests/test_ledger.py", "tests/test_roster.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-50"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_gateway.py", "tests/test_ledger.py", "tests/test_roster.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-96"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_gateway.py", "tests/test_ledger.py", "tests/test_roster.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-02"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_gateway.py", "tests/test_ledger.py", "tests/test_roster.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-41"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_redaction.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-03"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_redaction.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-43"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_hosts.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-04"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_hosts.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-44"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_trace_canary.py", "tests/test_cards.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-57"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_trace_canary.py", "tests/test_cards.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-97"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_trace_canary.py", "tests/test_cards.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-07"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_trace_canary.py", "tests/test_cards.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-56a"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_audit.py", "tests/test_roles.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-58"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_evals.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-59"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_evals.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-60"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_evals.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-61"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_evals.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-99"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_evals.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-62"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_fault_receipts.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-63"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "python", "scripts/rule_index.py", "--phase", "0"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-71"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "python", "scripts/license_audit.py", "--packages", "--dockerfiles", "--manifest", "tests/fixtures/image_manifest.txt"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-09"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "python", "scripts/license_audit.py", "--packages", "--dockerfiles", "--manifest", "tests/fixtures/image_manifest.txt"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-10"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "python", "scripts/license_audit.py", "--packages", "--dockerfiles", "--manifest", "tests/fixtures/image_manifest.txt"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-11"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "python", "scripts/license_audit.py", "--packages", "--dockerfiles", "--manifest", "tests/fixtures/image_manifest.txt"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-72a"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "python", "scripts/ci_lint.py", ".github/workflows"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-79"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_inbox_crash.py", "tests/test_lease.py", "tests/test_edge.py", "tests/test_channels_contract.py", "tests/test_whatsapp.py", "tests/test_elder_bot_authority.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-81"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_inbox_crash.py", "tests/test_lease.py", "tests/test_edge.py", "tests/test_channels_contract.py", "tests/test_whatsapp.py", "tests/test_elder_bot_authority.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-105"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_inbox_crash.py", "tests/test_lease.py", "tests/test_edge.py", "tests/test_channels_contract.py", "tests/test_whatsapp.py", "tests/test_elder_bot_authority.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-95a"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_signoff.py", "tests/test_admin.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-100"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_gate.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-101"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "python", "scripts/doc_lint.py", "00-INDEX.md", "README.md", "docs"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-19"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "python", "scripts/doc_lint.py", "00-INDEX.md", "README.md", "docs"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-103"
+phase = 0
+kind = "auto"
+command = ["python3", "scripts/design_check.py"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-24"
+phase = 0
+kind = "auto"
+command = ["python3", "scripts/design_check.py"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-104"
+phase = 0
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-109"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_schema.py", "tests/test_cross_tenant.py", "tests/test_keys.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-111a"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_schema.py", "tests/test_cross_tenant.py", "tests/test_keys.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-110"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_config.py", "tests/test_env_secrets.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-13"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_config.py", "tests/test_env_secrets.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-14"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_config.py", "tests/test_env_secrets.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-117"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_pilot_counts.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-118"
+phase = 0
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-119"
+phase = 0
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "PL-01"
+phase = 0
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "PL-05"
+phase = 0
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "PL-33"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_consent.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-34"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_consent.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-08"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "python", "scripts/leak_scan.py", "--names-file", "$SAATHI_NAMES_FILE"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-12"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "python", "scripts/leak_scan.py", "--names-file", "$SAATHI_NAMES_FILE"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-15"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "python", "scripts/leak_scan.py", "--names-file", "$SAATHI_NAMES_FILE"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-16"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "python", "scripts/repo_settings.py", "--check", "PL-16"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-17"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "python", "scripts/repo_settings.py", "--check", "PL-17"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-18"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "python", "scripts/repo_settings.py", "--check", "PL-18"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-21"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "python", "scripts/repo_settings.py", "--check", "PL-21"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-22"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "python", "scripts/repo_settings.py", "--check", "PL-22"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-31"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_commit_msg.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-32"
+phase = 0
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "PL-36"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_no_money.py", "-q"]
+receipt = "RECEIPT-v1"
