@@ -1,5 +1,7 @@
 # Setup (Phase 0)
 
+Note: elder and approver ids move to household config rows (RQ-110, RQ-111a). This page is rewritten after WU-12 and WU-22; until then the steps below describe the earlier environment-variable setup.
+
 Run these steps on your own machine and server. Keep everything personal (names, numbers, keys) in `.env` on the server; never put it in the repo.
 
 ## 1. Server (any always-on ARM64/x86_64 VPS, ≥ 4 vCPU and 16 GB RAM recommended)
@@ -61,7 +63,9 @@ docker compose --env-file .env -f infra/docker-compose.yml logs -f saathi
 
 ## Later phases
 
-- **Phase 1:** commerce MCP OAuth logins.
-- **Phase 2:** Raspberry Pi bridge and spare phone (ADB over Tailscale).
+- Phase 1: commerce MCP OAuth logins.
+- Phase 2: Raspberry Pi bridge and spare phone (ADB over Tailscale).
 
 Each phase's setup is documented when that phase lands.
+
+Skipped or not checked: the steps below were not run again in this pass.
