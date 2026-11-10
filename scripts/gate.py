@@ -162,6 +162,8 @@ def evaluate(
     except FileNotFoundError:
         return "unavailable"
     code, stdout = result if isinstance(result, tuple) else (result, "")
+    if code == 2:
+        return "unavailable"  # the exit-2 convention of the checkers: could not run, which is not a failed check
     if code != 0:
         return "invalid"
     if isinstance(result, tuple) and not _pytest_all_ran(argv, stdout):

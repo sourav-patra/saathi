@@ -406,21 +406,21 @@ receipt = "RECEIPT-v1"
 id = "PL-08"
 phase = 0
 kind = "auto"
-command = ["uv", "run", "python", "scripts/leak_scan.py", "--names-file", "$SAATHI_NAMES_FILE"]
+command = ["uv", "run", "python", "scripts/leak_scan.py", "--history"]
 receipt = "RECEIPT-v1"
 
 [[row]]
 id = "PL-12"
 phase = 0
 kind = "auto"
-command = ["uv", "run", "python", "scripts/leak_scan.py", "--names-file", "$SAATHI_NAMES_FILE"]
+command = ["uv", "run", "python", "scripts/leak_scan.py", "--names-file", "$SAATHI_NAMES_FILE", "--require-names"]
 receipt = "RECEIPT-v1"
 
 [[row]]
 id = "PL-15"
 phase = 0
 kind = "auto"
-command = ["uv", "run", "python", "scripts/leak_scan.py", "--names-file", "$SAATHI_NAMES_FILE"]
+command = ["uv", "run", "python", "scripts/leak_scan.py", "--history"]
 receipt = "RECEIPT-v1"
 
 [[row]]
