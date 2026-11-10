@@ -2,6 +2,8 @@
 
 **An agentic helper that handles everyday tech tasks for elderly family members, with a human approving every payment.**
 
+Saathi is a working codename; the public name is chosen later (D-90).
+
 The elder sends a WhatsApp voice note, photo or video in Hindi or everyday English. Saathi works out what they want and does everything up to the final step. A caregiver approves that step with one tap in Telegram.
 
 | Saathi can… | How |
@@ -22,7 +24,13 @@ The elder sends a WhatsApp voice note, photo or video in Hindi or everyday Engli
 
 ## Status
 
-**Phase 0: foundation.** WhatsApp ingest → speech-to-text → emergency/scam radar → intent triage → caregiver summary in Telegram. Nothing is ordered yet. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/ROADMAP.md`](docs/ROADMAP.md).
+Phase 0 build in progress; not usable yet. **Phase 0: foundation.** WhatsApp ingest → speech-to-text → emergency/scam radar → intent triage → caregiver summary in Telegram. Nothing is ordered yet. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/ROADMAP.md`](docs/ROADMAP.md).
+
+## Read next
+
+- [00-INDEX.md](00-INDEX.md) lists the current design files.
+- [The product requirements](docs/design/PRD-saathi-2026-11-09-r2.md) say what version 1 must do and in which phases.
+- [The technical design](docs/design/TRD-saathi-2026-11-09.md) and [the low-level design](docs/design/LLD-saathi-2026-11-10.md) say how Phase 0 is built.
 
 ## Quick start (dev)
 
