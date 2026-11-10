@@ -7,6 +7,7 @@ from saathi.store.repos.flags import FlagRepo
 from saathi.store.repos.identities import IdentityRepo
 from saathi.store.repos.inbox import InboxRepo
 from saathi.store.repos.requests import RequestRepo
+from saathi.store.repos.signoffs import SignoffRepo, SignoffState
 from saathi.store.repos.updates import UpdateRepo
 
 __all__ = [
@@ -18,5 +19,7 @@ __all__ = [
     "IdentityRepo",
     "InboxRepo",
     "RequestRepo",
+    "SignoffRepo",
+    "SignoffState",
     "UpdateRepo",
 ]

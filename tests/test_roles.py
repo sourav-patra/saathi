@@ -426,6 +426,39 @@ async def test_owner_can_audit_append(pg_db: PgDb):
         await su.close()
 
 
+async def test_signoffs_core_reads_only_and_owner_revokes_only(pg_db: PgDb):
+    await seed(pg_db)
+    owner = await connect(pg_db, OWNER, "h1")
+    try:
+        await owner.execute("INSERT INTO control.signoffs (household_id, scope, granter, expires_at)"
+                            " VALUES ('h1', 'SO-1', 'x', now() + interval '1 day')")
+        with pytest.raises(asyncpg.CheckViolationError):
+            await owner.execute("INSERT INTO control.signoffs (household_id, scope, granter, expires_at)"
+                                " VALUES ('h1', 'SO-9', 'x', now() + interval '1 day')")
+        with pytest.raises(asyncpg.CheckViolationError):
+            await owner.execute("INSERT INTO control.signoffs (household_id, scope, granter, expires_at)"
+                                " VALUES ('h1', 'SO-1', 'x', now() - interval '1 day')")
+        await denied(owner, "UPDATE control.signoffs SET expires_at = now() + interval '900 days'")
+        await denied(owner, "DELETE FROM control.signoffs")
+        assert await owner.execute("UPDATE control.signoffs SET revoked_at = now()") == "UPDATE 1"
+    finally:
+        await owner.close()
+    core = await connect(pg_db, CORE, "h1")
+    try:
+        assert await core.fetchval("SELECT count(*) FROM control.signoffs") == 1
+        await denied(core, "INSERT INTO control.signoffs (household_id, scope, granter, expires_at)"
+                           " VALUES ('h1', 'SO-1', 'x', now() + interval '1 day')")
+        await denied(core, "UPDATE control.signoffs SET revoked_at = NULL")
+        await denied(core, "DELETE FROM control.signoffs")
+    finally:
+        await core.close()
+    edge = await connect(pg_db, EDGE, "h1")
+    try:
+        await denied(edge, "SELECT * FROM control.signoffs")
+    finally:
+        await edge.close()
+
+
 async def test_migrator_is_not_superuser(pg_db: PgDb):
     conn = await connect(pg_db, "saathi_migrator")
     try:
