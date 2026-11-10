@@ -13,7 +13,7 @@ from typing import Any
 
 import httpx
 
-from saathi.domain import Channel, InboundMessage, MediaKind
+from saathi.legacy import Channel, InboundMessage, MediaKind
 
 _KIND_MAP = {
     "text": MediaKind.TEXT,

@@ -22,7 +22,8 @@ from aiogram import Bot, Dispatcher, F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
-from saathi.domain import Channel, InboundMessage, MediaKind, Understanding
+from saathi.domain import Understanding
+from saathi.legacy import Channel, InboundMessage, MediaKind
 
 log = logging.getLogger(__name__)
 
