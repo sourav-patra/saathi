@@ -32,7 +32,7 @@ Compare 12 characters of `sha256sum <path>`. A name with no slash is in docs/des
 |contract|LLD-saathi-intake-2026-11-10.md|abdf5244f830|
 |contract|LLD-saathi-safety-2026-11-10.md|de1abff2a9c1|
 |contract|LLD-saathi-tests-2026-11-10.md|bbe8579668ce|
-|receipt|docs/evidence/reviews/RECEIPT-design-reviews-2026-11-09.md|2e5eb83d445e|
-|record|docs/LOCKS.md|32badb2c6ea1|
+|receipt|docs/evidence/reviews/RECEIPT-design-reviews-2026-11-09.md|17e883b3bcce|
+|record|docs/LOCKS.md|c88d74e35c19|
 
 Skipped or not checked: other branches.
