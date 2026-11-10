@@ -13,10 +13,11 @@ from fakes.services import (
     FakeVision,
 )
 from fakes.store import FakeOpener, FakeSealer, FakeStore, FakeTx
-from fakes.voice import FakeASR, FakeAudioCodec, FakeTTS, FakeVoiceStore
+from fakes.voice import FakeASR, FakeAudioCodec, FakeCodec, FakeTTS, FakeVoiceStore
 
 __all__ = [
     "Failable", "FakeASR", "FakeAudioCodec", "FakeAudit", "FakeCaregiverChannel", "FakeClassifier", "FakeClock",
+    "FakeCodec",
     "FakeElderChannel", "FakeEscalator", "FakeGateway", "FakeMediaStore", "FakeOpener", "FakeSealer",
     "FakeStore", "FakeTTS", "FakeTrace", "FakeTx", "FakeVision", "FakeVoiceStore",
 ]  # fmt: skip

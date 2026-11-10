@@ -8,7 +8,7 @@ import re
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
-from typing import get_type_hints
+from typing import TypeVar, get_type_hints
 
 import pytest
 from fakes import (
@@ -18,6 +18,7 @@ from fakes import (
     FakeCaregiverChannel,
     FakeClassifier,
     FakeClock,
+    FakeCodec,
     FakeElderChannel,
     FakeEscalator,
     FakeGateway,
@@ -43,10 +44,12 @@ from saathi.domain import (
     AttemptResult,
     AudioBlob,
     AuditEvent,
+    Button,
     Card,
     ChannelCap,
     DataClass,
     Elder,
+    Grade,
     ImageBlob,
     InboundMessage,
     Lease,
@@ -56,13 +59,15 @@ from saathi.domain import (
     Message,
     ModelRequest,
     NewInbox,
+    Sensitivity,
     Source,
+    Transcript,
     VisionTask,
     VoiceCallback,
     VoiceClip,
     WavBlob,
 )
-from saathi.errors import PORT_ERRORS, SaathiError
+from saathi.errors import ERRORS_OF, PORT_ERRORS, SaathiError
 from saathi.ids import (
     ApproverId,
     ElderId,
@@ -134,12 +139,14 @@ def test_idem_key_joins_parts() -> None:
     assert idem_key("inbox1", "ack") == "inbox1:ack"
 
 
-def test_derive_id_is_stable_and_separates_prefixes() -> None:
+def test_derive_id_is_prefix_underscore_parent() -> None:
+    assert derive_id("r", "inbox42") == "r_inbox42"  # the request of an inbox row (LLD build flow 1.1)
     assert derive_id("alert", "x") == derive_id("alert", "x")
     assert derive_id("alert", "x") != derive_id("req", "x")
     assert derive_id("alert", "x") != derive_id("alert", "y")
-    with pytest.raises(ValueError):
-        derive_id("", "x")
+    for prefix, parent in (("", "x"), ("x", ""), (" ", "x"), ("x", " ")):
+        with pytest.raises(ValueError):
+            derive_id(prefix, parent)
 
 
 def test_no_datetime_now_outside_system_clock() -> None:
@@ -223,19 +230,62 @@ def test_every_port_has_a_fake() -> None:
         assert isinstance(fake, proto), f"{type(fake).__name__} does not satisfy {proto.__name__}"
 
 
+def _norm(hint: object) -> object:
+    """Type variables are made per function (PEP 695), so compare them by name."""
+    if isinstance(hint, TypeVar):
+        return f"~{hint.__name__}"
+    meta = getattr(hint, "__pydantic_generic_metadata__", None)  # ModelRequest[T] is a new class per T
+    if meta and meta["origin"] is not None:
+        return (meta["origin"], tuple(_norm(a) for a in meta["args"]))
+    return hint
+
+
+def _hints(fn: object) -> dict[str, object]:
+    out = {}
+    for name, hint in get_type_hints(fn).items():
+        origin = getattr(hint, "__origin__", None)
+        args = getattr(hint, "__args__", ())
+        out[name] = (origin, tuple(_norm(a) for a in args)) if origin and args else _norm(hint)
+    return out
+
+
+# `tx` is an @asynccontextmanager in the fake and returns the manager in the port; only its return differs.
+RETURN_MAY_DIFFER = {("FakeStore", "tx")}
+
+
 def test_fake_signatures_match_their_ports() -> None:
     for proto, fake in FAKES.items():
         for name, member in inspect.getmembers(proto, inspect.isfunction):
             if name.startswith("_"):
                 continue
-            want = inspect.signature(member)
-            got = inspect.signature(getattr(fake, name))
-            want_params = [(p.name, p.kind) for p in list(want.parameters.values())[1:]]
-            got_params = [(p.name, p.kind) for p in got.parameters.values()]
-            assert got_params == want_params, f"{type(fake).__name__}.{name}"
+            where = f"{type(fake).__name__}.{name}"
+            impl = getattr(fake, name)
+            want = list(inspect.signature(member).parameters.values())[1:]
+            got = list(inspect.signature(impl).parameters.values())
+            assert [(p.name, p.kind) for p in got] == [(p.name, p.kind) for p in want], where
+            assert [p.default for p in got] == [p.default for p in want], f"{where}: defaults differ"
+            want_hints, got_hints = _hints(member), _hints(impl)
+            if (type(fake).__name__, name) in RETURN_MAY_DIFFER:
+                want_hints.pop("return", None)
+                got_hints.pop("return", None)
+            assert got_hints == want_hints, f"{where}: type hints differ"
             assert inspect.iscoroutinefunction(member) == (
-                inspect.iscoroutinefunction(getattr(fake, name)) or inspect.isasyncgenfunction(getattr(fake, name))
-            ) or name in {"updates", "tx"}, f"{type(fake).__name__}.{name} sync/async differs"
+                inspect.iscoroutinefunction(impl) or inspect.isasyncgenfunction(impl)
+            ) or name in {"updates", "tx"}, f"{where} sync/async differs"
+
+
+def test_signature_check_catches_a_wrong_annotation_or_default() -> None:
+    """The check is shown to fail: the same comparison on a copy of FakeTTS with one hint and one default changed."""
+
+    class Bad(FakeTTS):
+        async def synthesize(self, text: str, *, voice: int, max_seconds: float = 3) -> domain.VoiceClip:  # type: ignore[override]
+            return await super().synthesize(text, voice=VoiceId("v"), max_seconds=max_seconds)
+
+    member = ports.TTS.synthesize
+    assert _hints(Bad().synthesize) != _hints(member)
+    ok = {p.name: p.default for p in inspect.signature(FakeTTS().synthesize).parameters.values()}
+    bad = {p.name: p.default for p in inspect.signature(Bad().synthesize).parameters.values()}
+    assert ok != bad
 
 
 MEDIA_REF = MediaRef(source=Source.WHATSAPP, handle="m1")
@@ -249,7 +299,7 @@ class _Out(BaseModel):
 
 
 def _gateway_call(f: FakeGateway):
-    req = ModelRequest(step="s", messages=[Message(role="user", content="hi")], schema=_Out, run=RunId("r"))
+    req = ModelRequest(step="s", messages=[Message(role="user", content="hi")], schema_=_Out, run=RunId("r"))
     return f.complete(req)
 
 
@@ -257,6 +307,8 @@ async def _tx_call(f: FakeStore):
     async with f.tx(household=H):
         pass
 
+
+AUDIT_EVENT = AuditEvent(household=H, run_id=RunId("r"), actor="system:test", event="k")
 
 # (port name in the TRD table, fake factory, {method: call})
 CALLS = [
@@ -269,7 +321,7 @@ CALLS = [
         "health": lambda f: f.health(),
     }),
     ("CaregiverChannel", FakeCaregiverChannel, {
-        "send_card": lambda f: f.send_card(APPROVER, Card(kind="k"), key=KEY),
+        "send_card": lambda f: f.send_card(APPROVER, Card(title="k"), key=KEY),
         "send_text": lambda f: f.send_text(APPROVER, "hi", key=KEY),
         "send_audio": lambda f: f.send_audio(APPROVER, AudioBlob(data=b"a"), "c", key=KEY),
         "health": lambda f: f.health(),
@@ -279,7 +331,7 @@ CALLS = [
         "on_dtmf": lambda f: f.on_dtmf(CALLBACK),
     }),
     ("ASR, AudioCodec", FakeASR, {"transcribe": lambda f: f.transcribe(AudioBlob(data=b"a"))}),
-    ("ASR, AudioCodec", FakeAudioCodec, {
+    ("ASR, AudioCodec", FakeCodec, {
         "to_wav16k": lambda f: f.to_wav16k(AudioBlob(data=b"a"), max_seconds=5),
         "encode_clip": lambda f: f.encode_clip(WavBlob(data=b"w")),
     }),
@@ -287,7 +339,7 @@ CALLS = [
     ("TTS, VoiceStore", FakeVoiceStore, {"fixed": lambda f: f.fixed(ReplyKey("r"))}),
     ("Vision", FakeVision, {"read": lambda f: f.read(ImageBlob(data=b"i"), VisionTask.OCR, run=RunId("r"))}),
     ("Gateway", FakeGateway, {"complete": _gateway_call}),
-    ("AuditSink", FakeAudit, {"append": lambda f: f.append(AuditEvent(household_id=H, kind="k", actor="a"))}),
+    ("AuditSink", FakeAudit, {"append": lambda f: f.append(AUDIT_EVENT)}),
     ("Store, KeyRing", FakeStore, {"tx": _tx_call}),
 ]
 
@@ -310,7 +362,7 @@ def test_every_listed_error_for_a_faked_port_is_exercised() -> None:
 
 
 async def test_fake_fail_times_and_clear() -> None:
-    f = FakeASR("hello")
+    f = FakeASR(text="hello")
     f.fail("transcribe", errors.AsrUnavailable, times=2)
     for _ in range(2):
         with pytest.raises(errors.AsrUnavailable):
@@ -324,11 +376,30 @@ async def test_fake_fail_times_and_clear() -> None:
 # --------------------------------------------------------------------------- #
 # fake behaviour the later units rely on
 # --------------------------------------------------------------------------- #
-async def test_elder_channel_repeated_key_sends_once() -> None:
+async def test_channels_refuse_a_repeated_key_by_default() -> None:
     ch = FakeElderChannel()
+    await ch.send_text(PERSON, "a", key=KEY)
+    with pytest.raises(errors.SendRejected) as exc:
+        await ch.send_text(PERSON, "a", key=KEY)
+    assert exc.value.code == "duplicate_key" and len(ch.sent) == 1
+    cg = FakeCaregiverChannel()
+    await cg.send_card(APPROVER, Card(title="k"), key=KEY)
+    with pytest.raises(errors.SendRejected):
+        await cg.send_card(APPROVER, Card(title="k"), key=KEY)
+    await cg.send_text(APPROVER, "t", key=IdemKey("k2"))
+    with pytest.raises(errors.SendRejected):
+        await cg.send_text(APPROVER, "t", key=IdemKey("k2"))
+    assert len(cg.sent) == 2
+
+
+async def test_channels_with_strict_keys_off_return_the_first_receipt() -> None:
+    ch = FakeElderChannel(strict_keys=False)
     r1 = await ch.send_text(PERSON, "a", key=KEY)
     r2 = await ch.send_text(PERSON, "a", key=KEY)
     assert r1 == r2 and len(ch.sent) == 1
+    cg = FakeCaregiverChannel(strict_keys=False)
+    ref = await cg.send_card(APPROVER, Card(title="k"), key=KEY)
+    assert await cg.send_card(APPROVER, Card(title="k"), key=KEY) == ref and len(cg.cards) == 1
 
 
 async def test_elder_channel_window_maps_to_proactive_not_allowed() -> None:
@@ -356,10 +427,9 @@ async def test_caregiver_updates_yield_pushed_updates() -> None:
     up = ApproverUpdate(update_id=1, approver_id=APPROVER, kind="callback", data="ack", nonce="n")
     cg.push_update(up)
     assert [u async for u in cg.updates()] == [up]
-    ref = await cg.send_card(APPROVER, Card(kind="k"), key=KEY)
-    assert await cg.send_card(APPROVER, Card(kind="k"), key=KEY) == ref and len(cg.cards) == 1
-    await cg.edit_card(ref, Card(kind="edited"))
-    assert cg.cards[ref].kind == "edited"
+    ref = await cg.send_card(APPROVER, Card(title="k", buttons=[Button(text="Acknowledge", data="ack:e1")]), key=KEY)
+    await cg.edit_card(ref, Card(title="edited"))
+    assert cg.cards[ref].title == "edited" and cg.cards[ref].lines == []
 
 
 async def test_escalator_script_signoff_and_callbacks() -> None:
@@ -403,8 +473,8 @@ async def test_gateway_fake_is_scripted_and_records_sensitivity() -> None:
     gw.will_return(_Out(answer="x"))
     res = await _gateway_call(gw)
     assert res.value == _Out(answer="x")
-    assert gw.requests[-1].sensitivity == DataClass.PERSONAL  # elder content is personal by default
-    assert res.cost_inr == Decimal(0)
+    assert gw.requests[-1].sensitivity == Sensitivity.PERSONAL  # elder content is personal by default
+    assert res.cost_inr == Decimal(0) and res.grade == Grade.G1
 
 
 async def test_store_requires_a_household() -> None:
@@ -461,8 +531,9 @@ def _models() -> list[type[BaseModel]]:
 
 
 def test_elder_scoped_types_carry_household_id() -> None:
-    for model in (Elder, Approver, NewInbox, Lease, AlertEventRef, AuditEvent):
+    for model in (Elder, Approver, NewInbox, Lease, AlertEventRef):
         assert "household_id" in model.model_fields, model.__name__
+    assert "household" in AuditEvent.model_fields  # M17 names it `household`
     assert get_type_hints(Elder)["household_id"] is HouseholdId
     assert get_type_hints(Elder)["id"] is ElderId
     assert get_type_hints(Lease)["inbox_id"] is InboxId
@@ -480,7 +551,7 @@ def test_core_types_hold_no_phone_number_or_chat_id() -> None:
 
 def test_inbound_message_names_a_source_not_a_platform_client() -> None:
     msg = InboundMessage(
-        source=Source.WHATSAPP, provider_message_id="p1", sender_ref="s", kind=MediaKind.TEXT, text="hi"
+        source=Source.WHATSAPP, provider_message_id="p1", sender_ref="s", kind=MediaKind.TEXT, text="hi", received_at=T0
     )
     assert msg.source == "whatsapp"
     assert MediaKind.UNSUPPORTED == "unsupported"
@@ -492,6 +563,146 @@ def test_data_classes_pl01() -> None:
     assert {c.value for c in DataClass} == {"restricted", "personal", "public", "synthetic"}
 
 
+def test_m15_m17_m19_value_types_have_the_lld_fields() -> None:
+    """Field names exactly as the LLD safety part gives them (M15 line 46, M17 line 76, M19 lines 105-111)."""
+    assert list(Card.model_fields) == ["title", "lines", "buttons"]
+    assert list(Button.model_fields) == ["text", "data"]
+    assert list(AuditEvent.model_fields) == [
+        "household", "run_id", "actor", "event", "subject", "detail", "sensitive",
+    ]  # fmt: skip
+    assert list(ModelRequest.model_fields) == [
+        "step", "messages", "schema_", "run", "sensitivity", "intent", "media",
+    ]  # fmt: skip
+    assert list(domain.ModelResult.model_fields) == [
+        "value", "refusal", "refusal_reason", "grade", "tokens", "cost_inr", "cached",
+    ]  # fmt: skip
+    assert {s.name: s.value for s in Sensitivity} == {"PERSONAL": "personal", "PUBLIC": "public"}
+    assert [(g.name, int(g)) for g in Grade] == [(f"G{i}", i) for i in range(5)]
+    assert ModelRequest(step="s", messages=[], schema_=_Out, run=RunId("r")).sensitivity is Sensitivity.PERSONAL
+
+
+def test_audit_event_actor_and_detail_are_checked() -> None:
+    from pydantic import ValidationError
+
+    detail = {"n": 1, "k": "a:b.c"}
+    ok = AuditEvent(household=H, run_id=RunId("r"), actor="approver:a-1", event="decided", detail=detail)
+    assert ok.subject is None and ok.sensitive == {}
+    for actor in ("someone", "approver:", "elder ", "system:x y"):
+        with pytest.raises(ValidationError):
+            AuditEvent(household=H, run_id=RunId("r"), actor=actor, event="e")
+    with pytest.raises(ValidationError):  # a free-text detail value could carry personal text
+        AuditEvent(household=H, run_id=RunId("r"), actor="elder", event="e", detail={"k": "has space"})
+
+
+def test_received_at_is_required() -> None:
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        InboundMessage(source=Source.WHATSAPP, provider_message_id="p", sender_ref="s", kind=MediaKind.TEXT)
+
+
 def test_new_id_helpers_reexported_from_domain() -> None:
     assert domain.new_id is not None and domain.idem_key is idem_key and domain.derive_id is derive_id
     assert len(domain.new_id()) == 32
+
+
+# --------------------------------------------------------------------------- #
+# the fixes of the WU-03 review: fakes the LLD names, scripted tags, failable tx and sealer, ERRORS_OF, legacy
+# --------------------------------------------------------------------------- #
+async def test_fake_asr_script_and_fake_codec_name() -> None:
+    asr = FakeASR(["first", errors.AsrUnavailable, Transcript(text="third")], text="after")
+    audio = AudioBlob(data=b"a")
+    assert (await asr.transcribe(audio)).text == "first"
+    with pytest.raises(errors.AsrUnavailable):
+        await asr.transcribe(audio)
+    assert (await asr.transcribe(audio)).text == "third"
+    assert (await asr.transcribe(audio)).text == "after"
+    with pytest.raises(TypeError):
+        FakeASR("one string")  # type: ignore[arg-type]
+    codec = FakeCodec()
+    assert isinstance(codec, ports.AudioCodec) and FakeCodec is FakeAudioCodec
+    codec.fail("to_wav16k", errors.DecodeTimeout)
+    with pytest.raises(errors.DecodeTimeout):
+        await codec.to_wav16k(audio, max_seconds=1)
+
+
+async def test_unreviewed_clip_raises_clip_unreviewed() -> None:
+    assert issubclass(errors.ClipUnreviewed, errors.ClipMissing)  # a caller that handles a missing clip handles it
+    vs = FakeVoiceStore()
+    vs.add(ReplyKey("ack"), b"bytes", reviewed=False)
+    with pytest.raises(errors.ClipUnreviewed):
+        await vs.fixed(ReplyKey("ack"))
+    vs.add(ReplyKey("ack"), b"bytes")  # the review is recorded
+    assert (await vs.fixed(ReplyKey("ack"))).data == b"bytes"
+
+
+async def test_tx_execute_returns_scripted_tags_and_can_fail() -> None:
+    store = FakeStore(FakeClock(T0))
+    store.tags.extend(["INSERT 0 0", "UPDATE 1"])
+    async with store.tx(household=H) as tx:
+        assert await tx.execute("insert") == "INSERT 0 0"
+        assert await tx.execute("update") == "UPDATE 1"
+        assert await tx.execute("insert") == "INSERT 0 1"  # the default tag
+        tx.fail("execute", errors.ConflictLost)  # type: ignore[attr-defined]
+        with pytest.raises(errors.ConflictLost):
+            await tx.execute("update")
+        tx.fail("fetch", errors.StoreUnavailable)  # type: ignore[attr-defined]
+        with pytest.raises(errors.StoreUnavailable):
+            await tx.fetch("select")
+    assert FakeStore(default_tag="DELETE 0")  # a store may change the default
+    direct = FakeTx(H, T0, tags=["UPDATE 2"], default_tag="DELETE 0")
+    assert [await direct.execute("a"), await direct.execute("b")] == ["UPDATE 2", "DELETE 0"]
+
+
+def test_sealer_can_fail_on_demand() -> None:
+    sealer = FakeSealer()
+    sealer.fail("seal", errors.KeyMissing)
+    with pytest.raises(errors.KeyMissing):
+        sealer.seal(b"pk", b"x", aad=b"a")  # type: ignore[arg-type]
+    assert sealer.seal(b"pk", b"x", aad=b"a")  # type: ignore[arg-type]
+
+
+def test_errors_of_is_keyed_by_protocol_class() -> None:
+    assert set(ERRORS_OF) == set(_protocols())
+    assert ERRORS_OF[ports.ElderChannel] == PORT_ERRORS["ElderChannel"]
+    assert ERRORS_OF[ports.ASR] == ERRORS_OF[ports.AudioCodec] == PORT_ERRORS["ASR, AudioCodec"]
+    assert ERRORS_OF[ports.VoiceStore] == PORT_ERRORS["TTS, VoiceStore"]
+    assert errors.KeyMissing in ERRORS_OF[ports.Opener] and errors.TenantNotSet in ERRORS_OF[ports.Store]
+    assert ERRORS_OF[ports.Clock] == ()
+    listed = {e for group in PORT_ERRORS.values() for e in group}
+    assert {e for group in ERRORS_OF.values() for e in group} <= listed
+
+
+# modules that import saathi.legacy today. The set may only shrink: see the removal plan in legacy.py.
+LEGACY_IMPORTERS = {
+    "src/saathi/app.py",  # WU-14
+    "src/saathi/channels/telegram.py",  # WU-18
+    "src/saathi/channels/whatsapp.py",  # WU-08
+    "src/saathi/pipeline.py",  # WU-15
+    "tests/test_channels_llm_pipeline.py",  # WU-20; the last to go also deletes legacy.py
+}
+
+
+LEGACY_IMPORT = re.compile(
+    r"^\s*(from saathi\.legacy\b|from saathi import[^\n]*\blegacy\b|import saathi\.legacy\b)", re.M
+)
+
+
+def _legacy_importers() -> set[str]:
+    found = set()
+    for base in ("src", "tests", "scripts", "evals"):
+        for path in (ROOT / base).rglob("*.py"):
+            rel = path.relative_to(ROOT).as_posix()
+            if rel == "src/saathi/legacy.py" or rel == "tests/test_foundation.py":
+                continue
+            if LEGACY_IMPORT.search(path.read_text()):
+                found.add(rel)
+    return found
+
+
+def test_legacy_importers_only_shrink() -> None:
+    now = _legacy_importers()
+    assert now <= LEGACY_IMPORTERS, f"new importer of saathi.legacy: {sorted(now - LEGACY_IMPORTERS)}"
+    plan = (ROOT / "src/saathi/legacy.py").read_text()
+    for unit in ("WU-08", "WU-14", "WU-15", "WU-18", "WU-20"):
+        assert unit in plan, f"legacy.py removal plan lacks {unit}"

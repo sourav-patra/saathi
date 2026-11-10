@@ -1,4 +1,9 @@
-"""Fake elder and caregiver channels. A repeated idempotency key returns the first receipt and sends nothing."""
+"""Fake elder and caregiver channels.
+
+By default (`strict_keys=True`, LLD build part, rule on idempotency) a repeated idempotency key is refused with
+`SendRejected("duplicate_key")` and sends nothing. With `strict_keys=False` it returns the first receipt, as a
+platform that deduplicates would.
+"""
 
 from __future__ import annotations
 
@@ -19,7 +24,7 @@ from saathi.domain import (
     SendReceipt,
     VoiceClip,
 )
-from saathi.errors import MediaExpired, ProactiveNotAllowed
+from saathi.errors import MediaExpired, ProactiveNotAllowed, SendRejected
 from saathi.ids import ApproverId, IdemKey, PersonRef, TemplateId
 
 ALL_CAPS = frozenset(ChannelCap)
@@ -30,8 +35,11 @@ class FakeElderChannel(Failable):
         self,
         kind: Literal["whatsapp", "telegram_elder"] = "whatsapp",
         capabilities: frozenset[ChannelCap] = ALL_CAPS,
+        *,
+        strict_keys: bool = True,
     ) -> None:
         super().__init__()
+        self.strict_keys = strict_keys
         self.kind = kind
         self.capabilities = capabilities
         self.window_open = True  # False: free-form sends raise ProactiveNotAllowed, templates still go
@@ -43,6 +51,8 @@ class FakeElderChannel(Failable):
     def _send(self, method: str, to: PersonRef, payload: object, key: IdemKey, *, free_form: bool) -> SendReceipt:
         self._enter(method, to, payload, key=key)
         if key in self._receipts:
+            if self.strict_keys:
+                raise SendRejected("duplicate_key")
             return self._receipts[key]
         if free_form and not self.window_open:
             raise ProactiveNotAllowed("window_closed")
@@ -77,8 +87,9 @@ class FakeElderChannel(Failable):
 
 
 class FakeCaregiverChannel(Failable):
-    def __init__(self) -> None:
+    def __init__(self, *, strict_keys: bool = True) -> None:
         super().__init__()
+        self.strict_keys = strict_keys
         self.channel_health = ChannelHealth.UP
         self.cards: dict[CardRef, Card] = {}
         self.sent: list[tuple[str, ApproverId, object, IdemKey]] = []
@@ -91,6 +102,8 @@ class FakeCaregiverChannel(Failable):
     async def send_card(self, to: ApproverId, card: Card, *, key: IdemKey) -> CardRef:
         self._enter("send_card", to, card, key=key)
         known = self._receipts.get(key)
+        if known is not None and self.strict_keys:
+            raise SendRejected("duplicate_key")
         if isinstance(known, CardRef):
             return known
         ref = CardRef(approver_id=to, message_ref=f"card-{len(self.cards) + 1}")
@@ -106,6 +119,8 @@ class FakeCaregiverChannel(Failable):
     def _send(self, method: str, to: ApproverId, payload: object, key: IdemKey) -> SendReceipt:
         self._enter(method, to, payload, key=key)
         known = self._receipts.get(key)
+        if known is not None and self.strict_keys:
+            raise SendRejected("duplicate_key")
         if isinstance(known, SendReceipt):
             return known
         receipt = SendReceipt(provider_id=f"cg-{len(self.sent) + 1}", key=key)

@@ -104,12 +104,40 @@ def test_table_matches_trd(name: str) -> None:
     assert table_diff(name, TABLES[name]) == []
 
 
+# Rows whose TRD To cell names reasons without backticks, or backticks a word that is not a reason code.
+NOT_REASONS = {"unscanned", "confirm2"}  # A11 (event kind) and K02 (token action)
+REASONS_BY_HAND = {  # typed from the TRD To cells of R12, R23, R26 and R36
+    "R12": {"no_access", "no_find_order", "phone_offline", "macro_failed"},
+    "R23": {"paused", "policy_denied", "consent_missing"},
+    "R26": {"verify_failed", "paused"},
+    "R36": {"channel_down", "window_closed", "budget", "refusal"},
+}
+
+
 @pytest.mark.parametrize("name", list(TABLES))
 def test_guard_and_reason_match_trd(name: str) -> None:
     for row in TABLES[name]:
-        _, _, guard, reasons = TRD_ROWS[name][row.id]
-        assert _plain(row.guard) == guard, row.id
-        assert reasons <= set(re.split(r"[|, ]+", row.reason)), f"{row.id}: reasons {reasons} not in {row.reason!r}"
+        _, _, guard, backticked = TRD_ROWS[name][row.id]
+        # A11 and K02 add the event kind and the token action, which the TRD puts in the To cell
+        assert _plain(row.guard).startswith(guard), row.id
+        want = REASONS_BY_HAND.get(row.id, backticked - NOT_REASONS)
+        assert set(row.reasons) == want, f"{row.id}: {row.reasons} != {sorted(want)}"
+        assert len(set(row.reasons)) == len(row.reasons)
+        assert all(re.fullmatch(r"[a-z_]+", r) for r in row.reasons), f"{row.id}: a reason is a bare code"
+
+
+def test_stage_fields_match_the_trd_alert_table() -> None:
+    """A01, A11 set stage a; A03 b; A04 c. A12 and A13 apply only to a stage c event (TRD section 4)."""
+    by_id = {r.id: r for r in ALERT}
+    assert {i: (by_id[i].stage, by_id[i].from_stage) for i in ("A01", "A03", "A04", "A11", "A12", "A13")} == {
+        "A01": ("a", None),
+        "A03": ("b", None),
+        "A04": ("c", None),
+        "A11": ("a", None),
+        "A12": (None, "c"),
+        "A13": ("c", "c"),
+    }
+    assert all(r.stage is None and r.from_stage is None for rows in TABLES.values() for r in rows if r.id not in by_id)
 
 
 def test_deleting_one_row_fails_the_table_check() -> None:
@@ -131,11 +159,126 @@ def test_phase_marks() -> None:
 # --------------------------------------------------------------------------- #
 # one case per row
 # --------------------------------------------------------------------------- #
-@pytest.mark.parametrize(("name", "row"), ALL_ROWS, ids=[f"{n}-{r.id}-{r.from_}-{r.event}" for n, r in ALL_ROWS])
-def test_every_row_has_a_case(name: str, row: Row) -> None:
-    machine = Machine(TABLES[name], phase=row.phase)
-    assert machine.lookup(row.from_, row.event) is row
-    assert machine.lookup(row.from_, row.event + "_x") is None
+# Typed by hand from the TRD states tables (sections 2 to 6), one line per TRD row: id, from states, event.
+# The event names are this build's keys for the TRD's prose. Do not generate this from tables.py.
+GOLDEN_TEXT = {
+    "request": """
+        R01 new lease_creates_request
+        R02 received consent_missing
+        R03 received router_outcome_a
+        R04 received router_outcome_b
+        R05 received router_outcome_c
+        R06 received no_commit_reply_sent
+        R07 clarifying answer_complete
+        R08 clarifying answer_incomplete
+        R09 clarifying answer_incomplete_final
+        R10 quoting facts_in_evaluate_ok
+        R11 quoting facts_in_evaluate_deny
+        R12 quoting no_access_or_offline_or_macro_failed
+        R13 awaiting_approval approve_tap
+        R14 awaiting_approval approve_tap_over_cap
+        R15 awaiting_approval valid_second_code
+        R16 awaiting_approval reject_tap
+        R17 awaiting_approval edit_tap
+        R18 awaiting_approval timer_fired
+        R19 awaiting_approval amendment_targets_this
+        R20 received,clarifying,quoting,awaiting_approval request_expiry
+        R21 awaiting_approval urgent_refresh_max
+        R22 approved step1_commits
+        R23 approved step1_denies
+        R24 committing intent_committed
+        R25 committing intent_rejected_by_service
+        R26 committing intent_aborted_no_call
+        R27 committing intent_timeout
+        R28 committing reaper_no_step3
+        R29 timeout,commit_unknown find_order_found
+        R30 timeout,commit_unknown find_order_not_found
+        R31 timeout,commit_unknown find_order_errors
+        R32 received,clarifying,quoting,awaiting_approval,approved cancel_phrase
+        R33 committing cancel_phrase
+        R34 received,clarifying,quoting,awaiting_approval,approved withdrawal_confirmed
+        R35 committing,timeout,commit_unknown withdrawal_confirmed
+        R36 received,clarifying,quoting,awaiting_approval rule_blocks
+        R37 timeout,commit_unknown late_step3_reference
+        R38 timeout,commit_unknown late_step3_refusal
+        R39 timeout,commit_unknown find_order_unsupported_or_owner_timeout
+    """,
+    "intent": """
+        I01 new step1_commits
+        I02 attempting final_check_fails
+        I03 attempting step3_reference
+        I04 attempting step3_refusal
+        I05 attempting call_time_cap
+        I06 attempting reaper_no_step3
+        I07 timeout,commit_unknown find_order_found
+        I08 timeout,commit_unknown find_order_not_found
+        I09 timeout,commit_unknown late_step3_reference
+        I10 timeout,commit_unknown late_step3_refusal
+        I11 timeout,commit_unknown find_order_unsupported_or_owner_timeout
+        I12 timeout,commit_unknown owner_records_placed
+        I12 timeout,commit_unknown owner_records_not_placed
+    """,
+    "alert": """
+        A01 new radar_flag_persisted
+        A02 open cadence_due
+        A03 open t0_plus_2_min
+        A04 open t0_plus_4_min
+        A05 open stage_bc_signoff_missing
+        A06 open acknowledge_tap
+        A07 open every_cap_spent
+        A08 acknowledged false_alarm_tap
+        A09 open t0_plus_10_min
+        A10 open restart
+        A11 new audio_row_unscanned
+        A12 open key_press_1
+        A13 open call_no_ack
+    """,
+    "inbox": """
+        N01 new valid_webhook
+        N02 new invalid_signature
+        N03 new unregistered_sender
+        N04 new sender_over_rate_limit
+        N05 received worker_leases
+        N06 leased lease_expired_or_attempt_failed
+        N07 leased effects_sent
+        N08 leased kind_unsupported
+        N09 leased media_fetch_failed
+        N10 leased fifth_failed_attempt
+    """,
+    "token": """
+        K01 new approve_tap
+        K02 new valid_second_code
+        K03 issued commit_step1
+        K04 issued void
+        K05 issued clock_passes_expires_at
+        K06 spent,voided,expired any_use
+    """,
+}
+
+
+def _golden(name: str) -> list[tuple[str, str, str]]:
+    out = []
+    for line in GOLDEN_TEXT[name].strip().splitlines():
+        id_, froms, event = line.split()
+        out += [(id_, f, event) for f in froms.split(",")]
+    return out
+
+
+@pytest.mark.parametrize("name", list(TABLES))
+def test_event_binding_equals_the_golden_list(name: str) -> None:
+    """Which event belongs to which row. Swapping two events (R07 and R09, say) must fail here."""
+    have = sorted((r.id, r.from_, r.event) for r in TABLES[name])
+    assert have == sorted(_golden(name))
+
+
+@pytest.mark.parametrize("name", list(TABLES))
+def test_every_golden_row_is_found_by_lookup(name: str) -> None:
+    for id_, from_, event in _golden(name):
+        row = next(r for r in TABLES[name] if r.id == id_ and r.from_ == from_)
+        machine = Machine(TABLES[name], phase=row.phase)
+        found = machine.lookup(from_, event)
+        assert found is not None and found.id == id_, (id_, from_, event)
+        assert machine.lookup(from_, event + "_x") is None
 
 
 @pytest.mark.parametrize("name", list(TABLES))

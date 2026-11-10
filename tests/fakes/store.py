@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Mapping
+from collections import deque
+from collections.abc import AsyncIterator, Iterable, Mapping
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
@@ -14,27 +14,45 @@ from saathi.errors import KeyMissing, TenantNotSet
 from saathi.ids import HouseholdId, PublicKey
 from saathi.ports import Tx
 
+DEFAULT_TAG = "INSERT 0 1"
 
-@dataclass
-class FakeTx:
-    household: HouseholdId
-    now: datetime
-    statements: list[tuple[str, tuple[Any, ...]]] = field(default_factory=list)
-    rows: list[Mapping[str, Any]] = field(default_factory=list)
+
+class FakeTx(Failable):
+    """Records statements. `execute` returns the next scripted command tag, else `default_tag`; it can fail."""
+
+    def __init__(
+        self,
+        household: HouseholdId,
+        now: datetime,
+        *,
+        tags: Iterable[str] = (),
+        default_tag: str = DEFAULT_TAG,
+    ) -> None:
+        super().__init__()
+        self.household = household
+        self.now = now
+        self.statements: list[tuple[str, tuple[Any, ...]]] = []
+        self.rows: list[Mapping[str, Any]] = []
+        self.tags: deque[str] = deque(tags)
+        self.default_tag = default_tag
 
     async def execute(self, sql: str, *args: Any) -> str:
+        self._enter("execute", sql, *args)
         self.statements.append((sql, args))
-        return "OK"
+        return self.tags.popleft() if self.tags else self.default_tag
 
     async def fetch(self, sql: str, *args: Any) -> list[Mapping[str, Any]]:
+        self._enter("fetch", sql, *args)
         self.statements.append((sql, args))
         return list(self.rows)
 
 
 class FakeStore(Failable):
-    def __init__(self, clock: FakeClock | None = None) -> None:
+    def __init__(self, clock: FakeClock | None = None, *, default_tag: str = DEFAULT_TAG) -> None:
         super().__init__()
         self.clock = clock or FakeClock()
+        self.default_tag = default_tag  # the tag `execute` returns in each transaction
+        self.tags: deque[str] = deque()  # scripted tags, taken by the next statements of any transaction
         self.transactions: list[FakeTx] = []
         self.locked: list[HouseholdId] = []
 
@@ -45,15 +63,17 @@ class FakeStore(Failable):
             raise TenantNotSet()
         if lock_household:
             self.locked.append(household)
-        tx = FakeTx(household=household, now=self.clock.now())
+        tx = FakeTx(household=household, now=self.clock.now(), default_tag=self.default_tag)
+        tx.tags = self.tags
         self.transactions.append(tx)
         yield tx
 
 
-class FakeSealer:
+class FakeSealer(Failable):
     """Reversible stand-in for sealing: the blob is bound to its aad, as the real one is."""
 
     def seal(self, public: PublicKey, plaintext: bytes, *, aad: bytes) -> bytes:
+        self._enter("seal", public, plaintext, aad=aad)
         return b"sealed:" + aad + b":" + plaintext
 
 

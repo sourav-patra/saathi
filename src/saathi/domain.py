@@ -7,9 +7,9 @@ elder is reached through an opaque `PersonRef`.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import datetime
 from decimal import Decimal
-from collections.abc import Mapping
 from enum import IntEnum, StrEnum
 from typing import Annotated, Literal
 from uuid import UUID

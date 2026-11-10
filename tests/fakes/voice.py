@@ -1,13 +1,14 @@
-"""Fakes for ASR, the audio codec, TTS and the fixed-clip voice store (the store checks the clip hash)."""
+"""Fakes for ASR, the audio codec, TTS and the fixed-clip voice store (it checks hash and review)."""
 
 from __future__ import annotations
 
 import hashlib
 from collections import deque
+from collections.abc import Iterable
 
 from fakes.base import Failable
 from saathi.domain import AudioBlob, Transcript, VoiceClip, WavBlob
-from saathi.errors import ClipHashMismatch, ClipMissing
+from saathi.errors import ClipHashMismatch, ClipMissing, ClipUnreviewed
 from saathi.ids import ReplyKey, VoiceId
 
 
@@ -16,15 +17,31 @@ def sha256_hex(data: bytes) -> str:
 
 
 class FakeASR(Failable):
-    def __init__(self, text: str = "synthetic transcript") -> None:
+    """`FakeASR(script)`: each call takes the next item, a transcript text or an error to raise. Then `text`."""
+
+    def __init__(
+        self,
+        script: Iterable[str | Transcript | BaseException | type[BaseException]] = (),
+        *,
+        text: str = "synthetic transcript",
+    ) -> None:
         super().__init__()
+        if isinstance(script, str):
+            raise TypeError("script is a list of transcripts or errors, not one string")
         self.text = text
-        self.script: deque[Transcript] = deque()
+        self.script: deque[str | Transcript | BaseException | type[BaseException]] = deque(script)
 
     async def transcribe(self, audio: AudioBlob, *, hint: str = "hi") -> Transcript:
         self._enter("transcribe", audio, hint=hint)
         if self.script:
-            return self.script.popleft()
+            item = self.script.popleft()
+            if isinstance(item, BaseException):
+                raise item
+            if isinstance(item, type):
+                raise item()
+            if isinstance(item, Transcript):
+                return item
+            return Transcript(text=item, language=hint, confidence=0.9, engine="fake")
         return Transcript(text=self.text, language=hint, confidence=0.9, engine="fake")
 
 
@@ -36,6 +53,9 @@ class FakeAudioCodec(Failable):
     async def encode_clip(self, wav: WavBlob) -> VoiceClip:
         self._enter("encode_clip", wav)
         return VoiceClip(key=ReplyKey("encoded"), data=wav.data, sha256=sha256_hex(wav.data))
+
+
+FakeCodec = FakeAudioCodec  # the name the LLD uses
 
 
 class FakeTTS(Failable):
@@ -51,10 +71,18 @@ class FakeVoiceStore(Failable):
     def __init__(self) -> None:
         super().__init__()
         self._clips: dict[tuple[ReplyKey, str], VoiceClip] = {}
+        self._unreviewed: set[tuple[ReplyKey, str]] = set()
 
-    def add(self, key: ReplyKey, data: bytes, language: str = "hi", version: int = 1) -> VoiceClip:
+    def add(
+        self, key: ReplyKey, data: bytes, language: str = "hi", version: int = 1, *, reviewed: bool = True
+    ) -> VoiceClip:
+        """`reviewed=False` stores a clip whose review columns are null: `fixed` then raises ClipUnreviewed."""
         clip = VoiceClip(key=key, language=language, data=data, sha256=sha256_hex(data), version=version)
         self._clips[(key, language)] = clip
+        if reviewed:
+            self._unreviewed.discard((key, language))
+        else:
+            self._unreviewed.add((key, language))
         return clip
 
     def corrupt(self, key: ReplyKey, language: str = "hi") -> None:
@@ -67,6 +95,8 @@ class FakeVoiceStore(Failable):
         clip = self._clips.get((key, language))
         if clip is None:
             raise ClipMissing()
+        if (key, language) in self._unreviewed:
+            raise ClipUnreviewed()
         if sha256_hex(clip.data) != clip.sha256:
             raise ClipHashMismatch()
         return clip

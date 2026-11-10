@@ -13,6 +13,7 @@ from saathi.domain import (
     AuditRef,
     ClassifierFlag,
     DataBlock,
+    Grade,
     ImageBlob,
     MediaBlob,
     MediaRef,
@@ -46,7 +47,7 @@ class FakeGateway(Failable):
         self.requests: list[ModelRequest[Any]] = []
 
     def will_return(self, value: BaseModel | None = None, *, refusal: bool = False, reason: str | None = None) -> None:
-        self.script.append(ModelResult(value=value, refusal=refusal, refusal_reason=reason, tier_grade="G1"))
+        self.script.append(ModelResult(value=value, refusal=refusal, refusal_reason=reason, grade=Grade.G1))
 
     async def complete[T: BaseModel](self, req: ModelRequest[T]) -> ModelResult[T]:
         self._enter("complete", req)
