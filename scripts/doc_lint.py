@@ -12,8 +12,9 @@ Scope and exemptions, kept next to the code so the lint and the design agree:
 - closing_line applies to every file except README.md (the entry page, DOC-PHILOSOPHY, Entry pages) and receipts.
   A receipt is machine format (DOC-PHILOSOPHY, Four kinds): its skipped-or-not-checked line is a labelled field,
   so it is exempt from closing_line and record_shape.
-- fenced code blocks (``` or ~~~) and the front matter block are skipped by the prose rules (dash, filler, bullet_bold).
-- dash fires only with letters on both sides or spaces around the dash; a number range such as 2-3 with an en dash passes.
+- fenced code blocks (``` or ~~~) and the front matter block are skipped by the prose rules (dash, filler,
+  bullet_bold).
+- dash fires only with letters on both sides or spaces around the dash; a number range with an en dash passes.
 """
 
 from __future__ import annotations
@@ -171,7 +172,8 @@ def rule_index_row(path: Path, text: str) -> list[Finding]:
         if not m or m.group(1).lower() == "kind" or set(m.group(2)) <= set("-:"):
             continue
         if not HASH12.fullmatch(m.group(3)):
-            out.append(Finding("index_row", path, n, f"hash {m.group(3)!r} of {m.group(2)} is not 12 lowercase hex characters"))
+            msg = f"hash {m.group(3)!r} of {m.group(2)} is not 12 lowercase hex characters"
+            out.append(Finding("index_row", path, n, msg))
             continue
         target = resolve_index_path(root, m.group(2))
         if not target.is_file():
