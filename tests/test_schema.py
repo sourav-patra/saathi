@@ -13,10 +13,6 @@ from saathi.store.migrate import MigrationError, migrate
 
 # LLD data part, rule 6: tables with no household column.
 TENANTLESS = {"rejected_inbound", "voice_clips", "heartbeats", "schema_migrations"}
-# Until migration 005 lands (WU-05): voice_clips and heartbeats do not exist yet, and approvals and llm_spend
-# have no household column yet. Drop these two sets when 005 exists.
-NOT_YET_005 = {"voice_clips", "heartbeats"}
-NO_HOUSEHOLD_UNTIL_005 = {"approvals", "llm_spend"}
 
 _TABLES = """
 SELECT c.oid, n.nspname, c.relname, c.relrowsecurity, c.relforcerowsecurity,
@@ -28,14 +24,52 @@ SELECT c.oid, n.nspname, c.relname, c.relrowsecurity, c.relforcerowsecurity,
 """
 
 
+APPEND_ONLY = {"audit_log", "consent_events"}  # select and insert policies only (LLD data rule 2)
+# The only policies a household table may carry besides its tenant policies: the scan and owner reads (LLD grants 2).
+ALLOWED_ROLE_POLICIES = {
+    ("households", "scan_hh"), ("households", "owner_hh"),
+    ("elder_identities", "scan_ident"), ("approvers", "scan_appr"),
+}
+
+_POLICIES = """
+SELECT p.polname, p.polcmd::text AS cmd, p.polpermissive, p.polroles = '{0}'::oid[] AS is_public,
+       pg_get_expr(p.polqual, p.polrelid) AS using_expr, pg_get_expr(p.polwithcheck, p.polrelid) AS check_expr
+  FROM pg_policy p WHERE p.polrelid = $1
+"""
+
+
 async def rls_violations(conn: asyncpg.Connection) -> list[str]:
-    """Household tables (a household_id column, or `households` itself) lacking forced RLS or a policy."""
+    """Household tables (a household_id column, or `households` itself) without forced RLS or an exact tenant policy.
+
+    Per command there must be exactly one permissive PUBLIC policy whose expression is
+    `(<col> = current_setting('app.household_id'::text, true))` (USING for select, update and delete, WITH CHECK for
+    insert and update). The command set is exact: {select, insert} for an append-only table, all four otherwise. Any
+    other policy is a violation, except the four scan and owner read policies of LLD grants section 2.
+    """
     bad: list[str] = []
     for t in await conn.fetch(_TABLES):
         if not (t["has_household"] or t["relname"] == "households"):
             continue
-        n_pol = await conn.fetchval("SELECT count(*) FROM pg_policy WHERE polrelid = $1", t["oid"])
-        if not (t["relrowsecurity"] and t["relforcerowsecurity"] and n_pol > 0):
+        col = "id" if t["relname"] == "households" else "household_id"
+        want = f"({col} = current_setting('app.household_id'::text, true))"
+        tenant: dict[str, list[asyncpg.Record]] = {}
+        extra = False
+        for p in await conn.fetch(_POLICIES, t["oid"]):
+            if (t["relname"], p["polname"]) in ALLOWED_ROLE_POLICIES:
+                extra = extra or p["is_public"] or p["cmd"] != "r" or p["using_expr"] != "true"
+                continue
+            tenant.setdefault(p["cmd"], []).append(p)
+        need = {"r", "a"} if t["relname"] in APPEND_ONLY else {"r", "a", "w", "d"}
+        ok = t["relrowsecurity"] and t["relforcerowsecurity"] and not extra and set(tenant) == need
+        for cmd, ps in tenant.items():
+            if len(ps) != 1:
+                ok = False
+                continue
+            p = ps[0]
+            using_ok = p["using_expr"] == want if cmd in ("r", "w", "d") else p["using_expr"] is None
+            check_ok = p["check_expr"] == want if cmd in ("a", "w") else p["check_expr"] is None
+            ok = ok and p["polpermissive"] and p["is_public"] and using_ok and check_ok
+        if not ok:
             bad.append(f"{t['nspname']}.{t['relname']}")
     return bad
 
@@ -77,6 +111,57 @@ async def test_planted_table_without_policy_fails(pg_db: PgDb):
         assert await rls_violations(conn) == ["public.planted_open"]
         await conn.execute("SELECT control.apply_tenant_rls('planted_open')")
         assert await rls_violations(conn) == []
+        await conn.execute("DROP POLICY tenant_del ON planted_open")  # one missing command is enough
+        assert await rls_violations(conn) == ["public.planted_open"]
+    finally:
+        await conn.close()
+
+
+_T = "current_setting('app.household_id', true)"
+# name: (qualified table, policy to drop first or None, statement that plants the fault)
+PLANTED_POLICIES = {
+    "using_true": ("public.elders", "tenant_sel", "CREATE POLICY tenant_sel ON elders FOR SELECT USING (true)"),
+    "wrong_column": (
+        "public.elders", "tenant_sel", f"CREATE POLICY tenant_sel ON elders FOR SELECT USING (id = {_T})"),
+    "extra_permissive": (
+        "public.inbox", None, f"CREATE POLICY extra ON inbox FOR SELECT USING (household_id <> {_T})"),
+    "role_scoped_true": (
+        "public.requests", None, "CREATE POLICY sneaky ON requests FOR SELECT TO saathi_core USING (true)"),
+    "update_on_consent_events": (
+        "control.consent_events", None,
+        f"CREATE POLICY upd ON control.consent_events FOR UPDATE USING (household_id = {_T})"),
+    "tenant_policy_scoped_to_a_role": (
+        "public.elders", "tenant_sel",
+        f"CREATE POLICY tenant_sel ON elders FOR SELECT TO saathi_core USING (household_id = {_T})"),
+    "restrictive_tenant_policy": (
+        "public.elders", "tenant_sel",
+        f"CREATE POLICY tenant_sel ON elders AS RESTRICTIVE FOR SELECT USING (household_id = {_T})"),
+    "scan_policy_on_another_table": (
+        "public.inbox", None, "CREATE POLICY scan_hh ON inbox FOR SELECT TO saathi_scan USING (true)"),
+}
+
+
+@pytest.mark.parametrize("name", sorted(PLANTED_POLICIES))
+async def test_planted_policy_fails(pg_db: PgDb, name: str):
+    table, drop, create = PLANTED_POLICIES[name]
+    conn = await asyncpg.connect(pg_db.dsn("saathi_migrator"))
+    try:
+        assert await rls_violations(conn) == []
+        if drop:
+            await conn.execute(f"DROP POLICY {drop} ON {table}")
+        await conn.execute(create)
+        assert await rls_violations(conn) == [table]
+    finally:
+        await conn.close()
+
+
+async def test_role_policies_are_the_allowlisted_set(pg_db: PgDb):
+    conn = await _connect(pg_db)
+    try:
+        rows = await conn.fetch(
+            "SELECT c.relname, p.polname FROM pg_policy p JOIN pg_class c ON c.oid = p.polrelid"
+            " WHERE p.polroles <> '{0}'::oid[] ORDER BY 1, 2")
+        assert {(r["relname"], r["polname"]) for r in rows} == ALLOWED_ROLE_POLICIES | {("rejected_inbound", "rej_dig")}
     finally:
         await conn.close()
 
@@ -98,13 +183,10 @@ async def test_key_id_beside_every_encrypted_column(pg_db: PgDb):
 async def test_tenantless_list_is_exact(pg_db: PgDb):
     conn = await _connect(pg_db)
     try:
-        applied = {r["version"] for r in await conn.fetch("SELECT version FROM schema_migrations")}
-        has_005 = any(v.startswith("005") for v in applied)
         found = {
             t["relname"] for t in await conn.fetch(_TABLES) if not t["has_household"] and t["relname"] != "households"
         }
-        expected = set(TENANTLESS) if has_005 else (TENANTLESS - NOT_YET_005) | NO_HOUSEHOLD_UNTIL_005
-        assert found == expected
+        assert found == TENANTLESS
     finally:
         await conn.close()
 
