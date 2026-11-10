@@ -3,7 +3,7 @@ id: LLD-saathi-intake
 kind: contract
 governs: Phase 0 modules M01 to M13: shared types, ports, store, keys, config, edge, elder channels, radar, redaction, worker, ASR; part of LLD-saathi-2026-11-10.md
 status: draft, pending review
-upstream: TRD-saathi-ports-2026-11-09.md sha256 ff04d8c694fdea9b73761416dcaf147963c9693aa450993079cc8a7c459596ca; TRD-saathi-states-2026-11-09.md sha256 9968ebcd8b7add49595cc4aebfa3ebb3ddbd2127609017273e5611939b7c9076; TRD-saathi-2026-11-09.md sha256 4fa28f253d0ea99931584fde4f9ed025890200dd2fae175fb15ac16864af6bd2; LLD-saathi-2026-11-10.md sha256 bd6d3584d0dc1e98ae4e3973a5546f534a6dbe06ffd4e2e146bce146645a80ff
+upstream: TRD-saathi-ports-2026-11-09.md sha256 ff04d8c694fdea9b73761416dcaf147963c9693aa450993079cc8a7c459596ca; TRD-saathi-states-2026-11-09.md sha256 9968ebcd8b7add49595cc4aebfa3ebb3ddbd2127609017273e5611939b7c9076; TRD-saathi-2026-11-09.md sha256 4fa28f253d0ea99931584fde4f9ed025890200dd2fae175fb15ac16864af6bd2; LLD-saathi-2026-11-10.md sha256 a4217aeeee13ff47e529f8e567012358e2efe65b32b23f4f482d06470c3ba482
 sources: src/saathi/ and tests/ on branch phase-0/foundation at 3d46456; the TRD components table and ports part; DOC-PHILOSOPHY.md
 checked-at: 3d46456, 2026-11-10. Code read with `git show`. Nothing below was run in this pass.
 ---
@@ -86,11 +86,14 @@ class ScanFns:                                # one method per security-definer 
     async def due_alerts(self, now: datetime, limit: int = 50) -> list[tuple[HouseholdId, EventId]]: ...
     async def unscanned_audio(self, now: datetime, max_s: int) -> list[tuple[HouseholdId, InboxId]]: ...
     async def rejected_digest(self, since: datetime) -> tuple[int, int]: ...
+    async def reject_inbound(self, sender_hmac: str, reason: str) -> None: ...   # tenantless insert, no household (C-6)
 ```
 Repos are stateless classes with static async methods that take `Tx` first (names from the TRD Store port):
 - `InboxRepo.insert_if_new(tx, n: NewInbox, *, public_key: PublicKey, keys: KeyRing, expires_at) -> bool` inserts the row and one sealed `raw_text` row per part with `ON CONFLICT DO NOTHING`, no RETURNING; reads the tag; `False` on a repeat. Also `renew(tx, lease, until) -> bool`, `settle(tx, lease, state) -> bool`, `mark_acked(tx, inbox_id, now)`, `set_radar_at`, `add_transcript(tx, lease, text, keys)`. Every worker write names `lease.token` and returns `False` on a stale token.
 - `RequestRepo.create_first(tx, inbox_id, elder_id, intent) -> RequestId` (id `r_<inbox>`), `transition(tx, id, from_, event, to, reason) -> bool` (one `UPDATE ... WHERE id AND state = from_`), `get`.
 - `AlertRepo.open(tx, inbox_id, elder_id, a: AlertOpen, t0, audio_ref) -> bool`, `due(tx, event_id) -> AlertView`, `add_attempt(tx, ...) -> bool` (unique `idem_key`), `mark_attempt`, `ack(tx, event_id, approver, via: Literal["tap","dtmf"]) -> bool`, `set_stage`, `set_next_due`, `false_alarm`, `block(tx, event_id, reason)`.
+- `SignoffRepo.valid(tx, scope, now) -> SignoffState` (valid, expires_at, revoked); inserts only through the owner role.
+- `IdentityRepo.person_ref(tx, elder_id, source) -> PersonRef`, `register(tx, ...)`; the `PersonDirectory` of M08 opens `person_ref_enc` with the private half in the core.
 - `UpdateRepo.first_seen(tx, bot, update_id, kind) -> bool`; `FlagRepo.read_paused(tx) -> bool` (raises `FlagUnreadable`); `VoiceRepo` (M16); `LedgerRepo` (M19); `ConsentRepo` and `ConfigRepo` (M06).
 
 `migrate.py`: `async def migrate(dsn: str, dir: Path) -> list[str]` applies files `NNN_*.sql` in order inside one transaction each, records them in `schema_migrations(version, sha256, applied_at)`, and refuses an applied file whose hash changed.

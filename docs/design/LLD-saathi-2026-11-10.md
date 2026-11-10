@@ -37,7 +37,7 @@ src/saathi/
   __init__.py  app.py  admin.py  config.py  hosts.py  domain.py  errors.py  ids.py  ports.py  clock.py
   faults.py  media.py  health.py  householdcfg.py  replies.py
   store/      __init__.py db.py scan.py keys.py migrate.py repos/{inbox,requests,alerts,updates,flags,ledger,
-              voice,config,consents,signoffs}.py
+              voice,config,consents,signoffs,identities}.py
   edge/       __init__.py app.py handler.py ratelimit.py health.py
   channels/   __init__.py whatsapp.py telegram_elder.py telegram.py
   guards/     __init__.py radar.py pii.py
@@ -66,7 +66,7 @@ Disposition of every file at 3d46456 (K kept, C changed, R removed). Change numb
 
 | File | | What and why | Change |
 |---|---|---|---|
-| `src/saathi/__init__.py` | K | none | none |
+| `src/saathi/__init__.py`, `channels/`, `guards/`, `llm/`, `perception/`, `policy/`, `understand/` package `__init__.py` | K | none | none |
 | `src/saathi/app.py` | C | composition root `main_edge`; `_Dedupe`, the background task and `elder_phones` go; routes move to `edge/` | 1, 2, 27, 30 |
 | `src/saathi/channels/whatsapp.py` | C | `WhatsAppElderChannel`, `PersonRef`, `ProactiveNotAllowed`, sticker and contact map to `unsupported` | 2, 30 |
 | `src/saathi/channels/telegram.py` | C | caregiver bot only: cards from slots, durable alert path via `alerts/`, no in-memory pause or acknowledgement set | 5, 6 |
@@ -130,7 +130,7 @@ Ids are the Phase 0 requirement ids of PRD section 8. Every Phase 0 id appears i
 | M25 | `policy/` (kept) | RQ-63; PL-36 | TQ-28, 82 | safety |
 | M26 | `scripts/design_check.py` | RQ-103; PL-24 | TQ-59 | safety |
 
-M25 and M26 have no section of their own: M25 is unchanged code whose tests gain `@rule` markers and the no-money tests (LT-32, LT-33); M26 is the check of section 6, whose new function `check_lld(root)` reads the PRD phase-0 row, the rows above and the `LT-` rows of the tests part.
+M25 and M26 have no section of their own: M25 is unchanged code whose tests gain `@rule` markers and the no-money tests (LT-32, LT-33); M26 is the check of section 6; its check 8 reads the PRD Phase 0 row, the rows above and the `LT-` rows of the tests part.
 
 ## 4. Where this LLD departs from or adds to the TRD
 
@@ -169,6 +169,6 @@ Decision recorded with this LLD: D-90, in RECORD-saathi-decisions-strategy-2026-
 
 ## 6. Checks run on this design set
 
-`python3 scripts/design_check.py` gains check 8: every Phase 0 id of the PRD phase table appears in the Serves cell of a module row (`| M` rows of the hub) and of a test row (`| LT-` rows of the tests part), and every id in those cells exists in a contract. Output and the deliberate faults are in the commit that adds this LLD and are repeated in the report of the session. The index lists paths under `docs/design/` by file name only, as its first line says. Pins: every part pins this hub and the contracts it relies on; this file pins all 20 upstream contracts.
+`python3 scripts/design_check.py` gains check 8: every Phase 0 id of the PRD phase table appears in the Serves cell of a module row (`| M` rows of the hub) and of a test row (`| LT-` rows of the tests part), and every id in those cells exists in a contract. Result on this set, run 2026-11-10: `lld: 68 Phase 0 ids; 26 module rows and 48 test rows; 0 without a module, 0 without a test`, `result: OK`. Deliberate faults, each on a scratch copy with pins, index and locks recomputed so that only check 8 failed: removing RQ-104 from the M07 and M20 rows printed `lld: Phase 0 ids with no module row: RQ-104`; replacing RQ-117, 118, 119 in LT-45 with RQ-300 printed `no test row: RQ-117, RQ-118, RQ-119` and `test rows name ids no contract defines: RQ-300`; a changed hex digit in a pin printed `pin of ... is stale`. The index lists paths under `docs/design/` by file name only, as its first line says. Pins: every part pins this hub and the contracts it relies on; this file pins all 20 upstream contracts.
 
-Skipped or not checked: no code, SQL or test ran; the TRD was read in full but the threats part only by search; hosted terms and licences were not read; the module signatures were not type-checked; the work unit sizes were not estimated; the reader check of this LLD did not run.
+Skipped or not checked: no code, SQL or test ran; the result block in the TRD checks part is older (23 index rows, no check 8) and was not edited; the TRD was read in full but the threats part only by search; hosted terms and licences were not read; the module signatures were not type-checked; the work unit sizes were not estimated; the reader check of this LLD did not run.

@@ -3,7 +3,7 @@ id: LLD-saathi-data
 kind: contract
 governs: Phase 0 migrations 002 to 005, roles, row-level security and household keys; part of LLD-saathi-2026-11-10.md
 status: draft, pending review
-upstream: TRD-saathi-ports-2026-11-09.md sha256 ff04d8c694fdea9b73761416dcaf147963c9693aa450993079cc8a7c459596ca; SPEC-saathi-platform-2026-11-10.md sha256 8b84438c0b5167a7ba63c887285a3b8cca200d8045b9a86b462e74a93722b250; POLICY-saathi-data-2026-11-09.md sha256 d892eb25058f315132efc589bbc515d961c8d50baa4aece3d16a63bd28aa48c1; LLD-saathi-2026-11-10.md sha256 bd6d3584d0dc1e98ae4e3973a5546f534a6dbe06ffd4e2e146bce146645a80ff
+upstream: TRD-saathi-ports-2026-11-09.md sha256 ff04d8c694fdea9b73761416dcaf147963c9693aa450993079cc8a7c459596ca; SPEC-saathi-platform-2026-11-10.md sha256 8b84438c0b5167a7ba63c887285a3b8cca200d8045b9a86b462e74a93722b250; POLICY-saathi-data-2026-11-09.md sha256 d892eb25058f315132efc589bbc515d961c8d50baa4aece3d16a63bd28aa48c1; LLD-saathi-2026-11-10.md sha256 a4217aeeee13ff47e529f8e567012358e2efe65b32b23f4f482d06470c3ba482
 sources: infra/sql/schema/001_init.sql and 00-create-databases.sh at 3d46456; the TRD ports part sections 4 and 5
 checked-at: 3d46456, 2026-11-10. 001 read with `git show`; no SQL ran.
 ---
@@ -17,7 +17,7 @@ Read section 1 for the table rules, 2 for the four migrations, 3 for roles and g
 All SQL is P; E facts cite 001 at 3d46456. Files live in `infra/sql/schema/` and run in order by `saathi.store.migrate` as `saathi_migrator`, forward only, one transaction each.
 
 1. A household table has `household_id text NOT NULL REFERENCES households(id)` and, in its migration, a call `control.apply_tenant_rls('<table>')`, which enables and forces row-level security and adds one policy per command testing `household_id = current_setting('app.household_id', true)`. An unset setting is NULL, so no row passes. `households` tests `id`.
-2. Append-only tables (`audit_log`, `control.consent_events`) get select and insert policies only, so update and delete fail even with a grant.
+2. Append-only tables (`audit_log`, `consent_events`) get select and insert policies only, so update and delete fail even with a grant.
 3. The edge never reads or uses RETURNING: ids come from `new_id()`, a conflict shows as the tag `INSERT 0 0`.
 4. Every function that scans households is SECURITY DEFINER, owned by `saathi_scan`, pinned to `search_path = pg_catalog, public`, takes `p_now` (never `now()`, so a fake clock works) and returns ids only (RQ-109).
 5. Encrypted values carry `key_id` beside them; keyed hashes carry `key_id` too (RQ-111a).
@@ -55,7 +55,7 @@ CREATE TABLE elder_identities (          -- created here, not in 012 (C-5)
   person_ref text NOT NULL UNIQUE,       -- opaque PersonRef the core holds
   person_ref_enc bytea NOT NULL,         -- sealed platform address
   key_id text NOT NULL, registered_at timestamptz NOT NULL DEFAULT now(), active boolean NOT NULL DEFAULT true);
-ALTER TABLE elders DROP COLUMN wa_phone_e164;   -- E: plaintext phone, 001 line 15 (C-5)
+ALTER TABLE elders DROP COLUMN wa_phone_e164;   -- E: plaintext phone, 001:15 (C-5)
 
 CREATE TABLE inbox (
   id text PRIMARY KEY, household_id text NOT NULL REFERENCES households(id),
@@ -79,6 +79,8 @@ CREATE TABLE raw_text (
   body_sealed bytea NOT NULL, key_id text NOT NULL,   -- sealed box, AAD household|inbox|part (section 4)
   expires_at timestamptz NOT NULL, PRIMARY KEY (inbox_id, part));
 
+SELECT control.apply_tenant_rls(t) FROM unnest(ARRAY['elder_identities','inbox','raw_text']::regclass[]) AS t;
+
 CREATE TABLE rejected_inbound (          -- tenantless: the sender is unknown (C-6)
   id bigserial PRIMARY KEY, sender_hmac text NOT NULL, reason text NOT NULL, at timestamptz NOT NULL DEFAULT now());
 ALTER TABLE rejected_inbound ENABLE ROW LEVEL SECURITY; ALTER TABLE rejected_inbound FORCE ROW LEVEL SECURITY;
@@ -96,7 +98,7 @@ ALTER TABLE requests DROP COLUMN provider_message_id, DROP COLUMN transcript_red
   ADD COLUMN slots jsonb NOT NULL DEFAULT '{}', ADD COLUMN quote_id text, ADD COLUMN plan_step text;
 ```
 
-E: `requests.intent` exists (001 line 63) and stays. A request's first id is `'r_' || inbox_id`, so a retried step inserts it with `ON CONFLICT (id) DO NOTHING`.
+E: `requests.intent` exists (001:63) and stays. A request's first id is `'r_' || inbox_id`, so a retried step inserts it with `ON CONFLICT (id) DO NOTHING`.
 
 ### 003_alerts.sql (RQ-18, 23)
 
@@ -125,8 +127,7 @@ CREATE TABLE tg_updates (
   bot text NOT NULL CHECK (bot IN ('caregiver','elder')), update_id bigint NOT NULL,
   household_id text NOT NULL REFERENCES households(id), kind text NOT NULL,
   received_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (bot, update_id));  -- ids repeat across bots
-SELECT control.apply_tenant_rls(t) FROM unnest(ARRAY['elder_identities','inbox','raw_text','alert_events',
-  'alert_attempts','tg_updates']::regclass[]) AS t;
+SELECT control.apply_tenant_rls(t) FROM unnest(ARRAY['alert_events','alert_attempts','tg_updates']::regclass[]) AS t;
 ```
 
 ### 004_audit_control.sql (RQ-56a, 95a, 110, 111a; PL-05, 33, 34)
@@ -134,16 +135,16 @@ SELECT control.apply_tenant_rls(t) FROM unnest(ARRAY['elder_identities','inbox',
 ```sql
 CREATE TABLE audit_log (
   seq bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  household_id text NOT NULL REFERENCES households(id), hseq bigint,      -- hseq, prev_hash, row_hash: 013
+  household_id text NOT NULL REFERENCES households(id), hseq bigint,      -- chain columns: 013
   ts timestamptz NOT NULL DEFAULT now(), run_id text NOT NULL,
   actor text NOT NULL CHECK (actor ~ '^(elder|approver:.+|system:.+|agent:.+)$'),
   event text NOT NULL, subject text, payload_hmac text, key_id text NOT NULL,
-  detail jsonb NOT NULL DEFAULT '{}', prev_hash text, row_hash text);      -- detail: ids and codes only
+  detail jsonb NOT NULL DEFAULT '{}', prev_hash text, row_hash text);      -- detail: codes only
 CREATE INDEX audit_household ON audit_log (household_id, seq);
 
 CREATE TABLE control.signoffs (
   id bigserial PRIMARY KEY, household_id text NOT NULL REFERENCES households(id),
-  scope text NOT NULL CHECK (scope = 'SO-1'),         -- other scopes arrive in 011
+  scope text NOT NULL CHECK (scope = 'SO-1'),         -- others: 011
   granter text NOT NULL, granted_at timestamptz NOT NULL DEFAULT now(),
   expires_at timestamptz NOT NULL, revoked_at timestamptz, CHECK (expires_at > granted_at));
 CREATE TABLE control.consent_events (
@@ -190,7 +191,7 @@ ALTER TABLE approvals ADD COLUMN household_id text REFERENCES households(id);   
 ALTER TABLE llm_spend ADD COLUMN household_id text REFERENCES households(id),
   ADD COLUMN reservation_id bigint;                                              -- E: absent, 001:107-114
 ALTER TABLE runtime_flags ADD COLUMN paused_by text, ADD COLUMN reason text;
-CREATE TABLE control.heartbeats (               -- tenantless (C-8); written only through control.beat()
+CREATE TABLE control.heartbeats (               -- tenantless (C-8); via control.beat()
   component text PRIMARY KEY, beat_at timestamptz NOT NULL, status text NOT NULL DEFAULT 'ok');
 CREATE TABLE llm_reservations (
   id bigserial PRIMARY KEY, household_id text NOT NULL REFERENCES households(id), run_id text NOT NULL,

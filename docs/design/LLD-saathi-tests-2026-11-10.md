@@ -3,7 +3,7 @@ id: LLD-saathi-tests
 kind: contract
 governs: the Phase 0 test plan: fixtures, test files and names per module, crash, isolation and canary tests, lint faults, and the gate registry rows; part of LLD-saathi-2026-11-10.md
 status: draft, pending review
-upstream: TRD-saathi-checks-2026-11-09.md sha256 7d330c42037220e5a2eaf8945f55d9cbaf27304f3f5bae38431bd13c56973b91; TRD-saathi-checks-product-2026-11-10.md sha256 c6d68a965a9bb612b722e0c1252534b0453aa85374692331adddfd0934e720ef; SPEC-saathi-evidence-2026-11-09-r2.md sha256 8287da0716f654469c98397b8fb16bc2d8ab041fb1a94572e9dc245b95741386; LLD-saathi-2026-11-10.md sha256 bd6d3584d0dc1e98ae4e3973a5546f534a6dbe06ffd4e2e146bce146645a80ff
+upstream: TRD-saathi-checks-2026-11-09.md sha256 7d330c42037220e5a2eaf8945f55d9cbaf27304f3f5bae38431bd13c56973b91; TRD-saathi-checks-product-2026-11-10.md sha256 c6d68a965a9bb612b722e0c1252534b0453aa85374692331adddfd0934e720ef; SPEC-saathi-evidence-2026-11-09-r2.md sha256 8287da0716f654469c98397b8fb16bc2d8ab041fb1a94572e9dc245b95741386; LLD-saathi-2026-11-10.md sha256 a4217aeeee13ff47e529f8e567012358e2efe65b32b23f4f482d06470c3ba482
 sources: tests/ and evals/ on branch phase-0/foundation at 3d46456 (73 test cases in 53 functions, PRD section 2); the TRD checks parts and build part; DOC-PHILOSOPHY.md
 checked-at: 3d46456, 2026-11-10. No test below exists yet; names are proposals.
 ---

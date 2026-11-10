@@ -25,13 +25,13 @@ Compare 12 characters of `sha256sum <path>`. A name without a slash is in docs/d
 | contract | TRD-saathi-ports-2026-11-09.md | ff04d8c694fd |
 | contract | TRD-saathi-states-2026-11-09.md | 9968ebcd8b7a |
 | contract | TRD-saathi-threats-2026-11-09.md | 1abc227d24b8 |
-| contract | LLD-saathi-2026-11-10.md | bd6d3584d0dc |
-| contract | LLD-saathi-build-2026-11-10.md | a7f663765d79 |
-| contract | LLD-saathi-data-2026-11-10.md | 4f7d86ddcb93 |
-| contract | LLD-saathi-intake-2026-11-10.md | f95f88736ac3 |
-| contract | LLD-saathi-safety-2026-11-10.md | 43bf6bbccda5 |
-| contract | LLD-saathi-tests-2026-11-10.md | 232ef6d40a33 |
+| contract | LLD-saathi-2026-11-10.md | a4217aeeee13 |
+| contract | LLD-saathi-build-2026-11-10.md | c605ce6a250d |
+| contract | LLD-saathi-data-2026-11-10.md | a9954000d4f1 |
+| contract | LLD-saathi-intake-2026-11-10.md | 0ea943a708b8 |
+| contract | LLD-saathi-safety-2026-11-10.md | e3f208e8341d |
+| contract | LLD-saathi-tests-2026-11-10.md | d3c3c80e560b |
 | receipt | docs/evidence/reviews/RECEIPT-design-reviews-2026-11-09.md | b62bf2eb482a |
-| record | docs/LOCKS.md | 2e588cc41598 |
+| record | docs/LOCKS.md | 74d8d1007bfd |
 
 Skipped or not checked: other branches.
