@@ -16,6 +16,11 @@ from saathi.domain import Intent, PaymentMethod, Quote
 from saathi.policy.quote import ApprovalToken, quote_hash, quote_hash_without_total
 
 
+# PL-36: Saathi never moves money. Only these methods can ever be allowed; a setting
+# (PolicyConfig.allowed_payment_methods) may narrow the set but never widen it.
+PERMITTED_PAYMENT_METHODS = frozenset({PaymentMethod.COD, PaymentMethod.WALLET})
+
+
 class Verdict(StrEnum):
     OK = "ok"
     NEEDS_SECOND_CONFIRMATION = "needs_second_confirmation"
@@ -98,7 +103,7 @@ class PolicyEngine:
         if ctx.paused:
             deny.append("paused: /pause is active")
 
-        if quote.payment_method not in cfg.allowed_payment_methods:
+        if quote.payment_method not in (cfg.allowed_payment_methods & PERMITTED_PAYMENT_METHODS):
             deny.append(f"payment method '{quote.payment_method}' not allowed (COD/wallet only)")
 
         if quote.currency != "INR":

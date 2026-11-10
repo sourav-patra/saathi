@@ -211,10 +211,6 @@ def test_default_payment_set_is_cod_and_wallet_only():
 
 
 @rule("PE-31")
-@pytest.mark.xfail(
-    strict=True,
-    reason="design-issue: PolicyConfig.allowed_payment_methods is a setting and can lift PL-36",
-)
 def test_setting_cannot_lift_the_payment_ban():
     widened = frozenset(PaymentMethod)
     d = engine(allowed_payment_methods=widened).evaluate(cart(PaymentMethod.UPI), CTX, NOW)
