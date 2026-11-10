@@ -82,9 +82,9 @@ Every commit re-reads live data, whatever the caches hold.
 
 ## License policy
 
-- **Allowed:** MIT and Apache-2.0, plus permissive infrastructure licenses (PostgreSQL, BSD, ISC) and OFL for fonts.
-- **Banned:** GPL, LGPL, AGPL, SSPL, ELv2, BUSL, RSAL and non-commercial licenses.
-- **Enforcement:** `scripts/license_audit.py` runs in CI. Justified exceptions for unmodified, file-level-copyleft transitive dependencies live in `scripts/license_exceptions.toml`.
+- Allowed: MIT and Apache-2.0, plus permissive infrastructure licenses (PostgreSQL, BSD, ISC) and OFL for fonts.
+- Banned: GPL, LGPL, AGPL, SSPL, ELv2, BUSL, RSAL and non-commercial licenses.
+- Enforcement: `scripts/license_audit.py` runs in CI. Justified exceptions for unmodified, file-level-copyleft transitive dependencies live in `scripts/license_exceptions.toml`.
 
 | Not used | License | Use instead |
 |---|---|---|

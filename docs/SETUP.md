@@ -61,7 +61,7 @@ docker compose --env-file .env -f infra/docker-compose.yml logs -f saathi
 
 ## Later phases
 
-- **Phase 1:** commerce MCP OAuth logins.
-- **Phase 2:** Raspberry Pi bridge and spare phone (ADB over Tailscale).
+- Phase 1: commerce MCP OAuth logins.
+- Phase 2: Raspberry Pi bridge and spare phone (ADB over Tailscale).
 
 Each phase's setup is documented when that phase lands.
