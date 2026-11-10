@@ -15,6 +15,12 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+from saathi.errors import SaathiError
+
+
+class RestrictedDataLeft(SaathiError):  # noqa: N818  (name fixed by the LLD, M11)
+    """Text still matches a restricted pattern, or the input is not text."""
+
 # Verhoeff tables, used to validate Aadhaar numbers.
 _D = (
     (0, 1, 2, 3, 4, 5, 6, 7, 8, 9), (1, 2, 3, 4, 0, 6, 7, 8, 9, 5),
@@ -54,6 +60,9 @@ _AADHAAR_RE = re.compile(r"(?<!\d)([2-9]\d{3})[\s-]?(\d{4})[\s-]?(\d{4})(?!\d)")
 _PAN_RE = re.compile(r"(?<![A-Za-z0-9])[A-Z]{5}\d{4}[A-Z](?![A-Za-z0-9])")
 _CARD_RE = re.compile(r"(?<!\d)(?:\d[\s-]?){12,18}\d(?!\d)")
 _PHONE_RE = re.compile(r"(?<![\d+])(?:\+?91[\s-]?|0)?[6-9]\d{4}[\s-]?\d{5}(?!\d)")
+# Checksum-free, word-bounded (LLD M11, change 8). Voter: 3 letters and 7 digits; passport: 1 letter and 7 digits.
+VOTER_RE = re.compile(r"(?<![A-Za-z0-9])[A-Za-z]{3}\d{7}(?![A-Za-z0-9])")
+PASSPORT_RE = re.compile(r"(?<![A-Za-z0-9])[A-Za-z]\d{7}(?![A-Za-z0-9])")
 _EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 _UPI_RE = re.compile(r"(?<![\w.])[\w.-]{2,}@[A-Za-z]{2,}(?![\w.])")
 _OTP_RE = re.compile(
@@ -103,6 +112,8 @@ def redact(text: str | None) -> RedactionResult:
 
     for pattern, label, token in (
         (_PAN_RE, "IN_PAN", "<PAN>"),
+        (VOTER_RE, "IN_VOTER", "<VOTER_ID>"),
+        (PASSPORT_RE, "IN_PASSPORT", "<PASSPORT>"),
         (_EMAIL_RE, "EMAIL", "<EMAIL>"),
         (_UPI_RE, "UPI_ID", "<UPI_ID>"),
         (_PHONE_RE, "PHONE", "<PHONE>"),
@@ -111,3 +122,18 @@ def redact(text: str | None) -> RedactionResult:
         found.extend([label] * n)
 
     return RedactionResult(out, found)
+
+
+def assert_clean(text: str | None) -> None:
+    """Raise `RestrictedDataLeft` when a restricted pattern remains in `text`.
+
+    Called by the gateway and the trace exporter. Text only: anything that is not text
+    (bytes, a media blob) is never claimed clean and raises.
+    """
+    if text is None:
+        return
+    if not isinstance(text, str):
+        raise RestrictedDataLeft("media is not checked and is never claimed clean")
+    entities = redact(text).entities
+    if entities:
+        raise RestrictedDataLeft(f"restricted pattern left: {sorted(set(entities))}")
