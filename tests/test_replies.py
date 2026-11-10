@@ -164,8 +164,9 @@ async def test_dynamic_reply_sends_audio_and_text_and_falls_back_to_text():
     assert [m for m, *_ in ch2.sent] == ["send_text"] and r.key == IdemKey("d2:text")
 
 
-def test_legacy_names_are_still_there_for_the_old_caller():
-    assert callable(replies.emergency_to_elder)
+def test_the_name_interpolating_functions_are_gone():
+    names = ("emergency_to_elder", "scam_to_elder", "ack_to_elder", "asked_caregiver")
+    assert not any(hasattr(replies, n) for n in names)
 
 
 class _RaisingStore:

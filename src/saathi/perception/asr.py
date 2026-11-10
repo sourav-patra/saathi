@@ -1,61 +1,50 @@
-"""Speech-to-text behind a provider interface.
+"""Speech-to-text (M13) behind the `ASR` port: a client of the local whisper.cpp server (MIT).
 
-Phase 0 ships one T1 provider: a **whisper.cpp server** (MIT) running as its
-own container. Two reasons for the separate container:
-- It runs fast on the VPS's ARM CPU with a quantised multilingual model, which
-  handles Hindi/Hinglish.
-- Audio decoding (OGG/Opus voice notes) happens through ffmpeg *inside that
-  container*, an external program. No FFmpeg-linked Python wheel enters our
-  dependency tree, which keeps the license policy clean.
+The server runs as its own container and takes 16 kHz WAV only: it has no decoder of its own.
+Voice notes arrive as Ogg Opus, so the worker decodes them first through the `AudioCodec` port (`opusdec`,
+`saathi.voice.codec`) and hands this client the WAV it produced. The client posts exactly what it is given.
 
-The ASR eval (evals/) decides whether a hosted ASR engine should become the
-primary engine for the elder's real voice notes.
+The ASR eval (evals/) decides whether a hosted engine should become the primary one for real voice notes. A hosted
+engine needs a receipt first (PL-20) and is not built in Phase 0.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Protocol
-
 import httpx
 
+from saathi.domain import AudioBlob, Transcript
+from saathi.errors import AsrUnavailable
 
-@dataclass
-class Transcript:
-    text: str
-    language: str | None = None
-    provider: str = ""
-    confidence: float | None = None  # not every provider reports one
+_EXTENSION = {"audio/wav": "wav", "audio/x-wav": "wav", "audio/ogg": "ogg", "audio/mpeg": "mp3", "audio/mp4": "m4a"}
 
 
-class ASRProvider(Protocol):
-    name: str
+class LocalAsrClient:
+    """Implements `ports.ASR`. Any transport error, bad status or empty body is `AsrUnavailable`: the caller forwards
+    the audio to a human and never waits on this client (RQ-16)."""
 
-    async def transcribe(self, audio: bytes, mime: str) -> Transcript: ...
+    engine = "whispercpp"
 
+    def __init__(self, base_url: str, *, client: httpx.AsyncClient | None = None, timeout_s: float = 180.0) -> None:
+        self._url = base_url.rstrip("/") + "/inference"
+        self._client = client or httpx.AsyncClient(timeout=timeout_s)
 
-class WhisperCppASR:
-    name = "whispercpp"
+    async def transcribe(self, audio: AudioBlob, *, hint: str = "hi") -> Transcript:
+        mime = audio.mime.split(";")[0].strip().lower()
+        filename = "note." + _EXTENSION.get(mime, "wav")
+        try:
+            resp = await self._client.post(
+                self._url,
+                files={"file": (filename, audio.data, mime)},
+                data={"response_format": "json", "language": hint, "temperature": "0.0"},
+            )
+            resp.raise_for_status()
+            body = resp.json()
+        except (httpx.HTTPError, ValueError) as exc:
+            raise AsrUnavailable(type(exc).__name__) from None
+        text = body.get("text") if isinstance(body, dict) else None
+        if not isinstance(text, str):
+            raise AsrUnavailable("bad_body")
+        return Transcript(text=text.strip(), language=hint, engine=self.engine)
 
-    def __init__(self, base_url: str, *, language: str = "hi", client: httpx.AsyncClient | None = None):
-        self.base_url = base_url.rstrip("/")
-        self.language = language
-        self._client = client or httpx.AsyncClient(timeout=180)
-
-    async def transcribe(self, audio: bytes, mime: str) -> Transcript:
-        ext = {"audio/ogg": "ogg", "audio/mpeg": "mp3", "audio/mp4": "m4a", "audio/wav": "wav"}
-        filename = "note." + ext.get(mime.split(";")[0].strip(), "ogg")
-        resp = await self._client.post(
-            f"{self.base_url}/inference",
-            files={"file": (filename, audio, mime)},
-            data={"response_format": "json", "language": self.language, "temperature": "0.0"},
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        return Transcript(text=(data.get("text") or "").strip(), language=self.language, provider=self.name)
-
-
-def build_asr(provider: str, *, whispercpp_url: str) -> ASRProvider:
-    if provider == "whispercpp":
-        return WhisperCppASR(whispercpp_url)
-    raise ValueError(f"unknown ASR provider: {provider}")
+    async def aclose(self) -> None:
+        await self._client.aclose()

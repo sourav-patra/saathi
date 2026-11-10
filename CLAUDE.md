@@ -28,6 +28,6 @@ Saathi is an agentic helper for elders. It runs on WhatsApp (elder side) and Tel
 ## Conventions
 
 - Python 3.12+, async everywhere, pydantic models in `domain.py`.
-- Side effects go behind Protocol ports so that graphs are testable with fakes (see `pipeline.py`).
+- Side effects go behind Protocol ports so that graphs are testable with fakes (see `worker/steps.py`).
 - Prompts carry a version string (`PROMPT_VERSION`). Prompt changes must pass the evals.
 - Keep `.env.example` in sync with `config.py`.

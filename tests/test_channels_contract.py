@@ -448,7 +448,7 @@ async def test_unknown_person_ref_is_not_guessed() -> None:
 PLATFORM_NAMES = {"whatsapp", "telegram", "telegram_elder", "telegram_forward"}
 SOURCE_MEMBERS = {"WHATSAPP", "TELEGRAM_ELDER", "CAREGIVER_FORWARD"}
 # Every module outside `channels/` and `edge/` is checked, the composition root `app.py` included. The vocabulary
-# modules (domain, ports, config, ids), pipeline.py and legacy.py have no hits.
+# modules (domain, ports, config, ids) and legacy.py have no hits.
 LEGACY_PLATFORM_MODULES: set[str] = set()
 ALLOWED_PREFIXES = ("src/saathi/channels/", "src/saathi/edge/")
 

@@ -32,14 +32,24 @@ class RequestRepo:
         return rid
 
     @staticmethod
-    async def transition(tx: Tx, id: RequestId, from_: str, event: str, to: str, reason: str | None) -> bool:  # noqa: A002
+    async def transition(
+        tx: Tx,
+        id: RequestId,  # noqa: A002
+        from_: str,
+        event: str,
+        to: str,
+        reason: str | None,
+        *,
+        machine: Machine | None = None,
+    ) -> bool:
         """One ``UPDATE ... WHERE id AND state = from_``, after the machine allows the pair. Raises `ValueError`,
         with no statement sent, for a pair outside the table, a later-phase row, a wrong target or a reason the row
-        does not list: those are caller bugs. False, also with no statement, for a terminal from state; False when
-        the row is no longer in `from_` (another worker won the race)."""
+        does not list: those are caller bugs. `machine` names another phase for a row the caller must run early (the
+        worker takes R02 at phase 0, LLD intake M12). False, also with no statement, for a terminal from state; False
+        when the row is no longer in `from_` (another worker won the race)."""
         if from_ in TERMINAL["request"]:
             return False
-        row = RequestRepo.MACHINE.lookup(from_, event)
+        row = (machine or RequestRepo.MACHINE).lookup(from_, event)
         if row is None:
             raise ValueError(f"request machine has no row for {from_!r} on {event!r}")
         if row.to != to:
@@ -48,6 +58,19 @@ class RequestRepo:
             raise ValueError(f"request machine row {from_!r} on {event!r} does not list reason {reason!r}")
         tag = await tx.execute(
             "UPDATE requests SET state = $3, state_reason = $4 WHERE id = $1 AND state = $2", id, from_, to, reason
+        )
+        return affected(tag) == 1
+
+    @staticmethod
+    async def fail_no_result(tx: Tx, id: RequestId) -> bool:  # noqa: A002
+        """RQ-36: a run that produced no quote, no sources, no steps and no effect ends `failed`, reason `no_result`,
+        never `done`. The states table has no row that leaves an open state for `failed`, so this is the one update
+        that skips the machine; it still never touches a terminal state. False when the request is already terminal."""
+        tag = await tx.execute(
+            "UPDATE requests SET state = 'failed', state_reason = 'no_result'"
+            " WHERE id = $1 AND state <> ALL($2::text[])",
+            id,
+            sorted(TERMINAL["request"]),
         )
         return affected(tag) == 1
 

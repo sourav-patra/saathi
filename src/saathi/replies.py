@@ -3,9 +3,6 @@
 Reply text is constants in Hindi and English. None holds a name, an address or a number except 108 and 112.
 Every text that gives those numbers also says that Saathi is not an emergency service (RQ-116).
 `send_reply` sends the signed fixed clip and the text; when the clip cannot be used it sends the text alone.
-
-The functions at the end (`emergency_to_elder` and the rest) interpolate a caregiver name. They are kept only until
-WU-15 rewrites `pipeline.py`, their one caller; nothing new may call them.
 """
 
 from __future__ import annotations
@@ -175,29 +172,3 @@ async def send_dynamic(
     except Exception:  # noqa: BLE001  (the text always goes, whatever the speech or codec does)
         pass
     return await ch.send_text(to, text, key=IdemKey(f"{idem}:text"))
-
-
-# ---- legacy, removed by WU-15 ----
-
-def emergency_to_elder(caregiver: str) -> str:
-    return (
-        f"Aapka sandesh mila. {caregiver} ko turant bata diya hai.\n"
-        "Agar haalat gambhir hai to abhi 112 (emergency) ya 108 (ambulance) par call karein.\n"
-        "Paas mein kisi ko awaaz dein."
-    )
-
-
-def scam_to_elder(caregiver: str) -> str:
-    return (
-        "⚠️ Dhyaan dein: kisi ko bhi OTP, PIN, CVV ya bank details na batayein, "
-        "aur kisi anjaan link par click na karein.\n"
-        f"Maine {caregiver} ko bata diya hai. Woh dekh rahe hain."
-    )
-
-
-def ack_to_elder(caregiver: str) -> str:
-    return f"Theek hai, aapka sandesh mil gaya 🙏 {caregiver} ko bata diya hai."
-
-
-def asked_caregiver(caregiver: str) -> str:
-    return f"{caregiver} se approve karwa raha hoon, thoda intezaar karein 🙏"

@@ -7,7 +7,7 @@ Nothing new may import this module (tests/test_foundation.py pins the importer s
 Removal plan, one importer per unit:
 - WU-08 replaces `channels/whatsapp.py`
 - WU-14 replaces `app.py`; it has dropped its import and `LegacyHouseholdEnv` is gone
-- WU-15 replaces `pipeline.py`
+- WU-15 replaced `pipeline.py` (removed; its import is gone)
 - WU-18 replaces `channels/telegram.py`
 - WU-20 replaces `tests/test_channels_llm_pipeline.py`
 The last of these to land deletes this module.

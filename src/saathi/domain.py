@@ -7,6 +7,7 @@ elder is reached through an opaque `PersonRef`.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from datetime import datetime
 from decimal import Decimal
@@ -14,7 +15,7 @@ from enum import IntEnum, StrEnum
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
 from saathi.clock import SystemClock
 from saathi.ids import (
@@ -330,10 +331,28 @@ class AlertOpen(BaseModel):
     rule_ids: list[str] = Field(default_factory=list)
 
 
-class SummarySlots(BaseModel):
-    """Enums and counts only. The fields are set by the unit that builds summaries (WU-15)."""
+SummaryFlag = Literal["none", "asr_failed", "media_lost", "consent_missing", "unsupported"]
 
-    model_config = ConfigDict(extra="forbid")
+
+class SummarySlots(BaseModel):
+    """What the caregiver summary says, as enums, flags and rule ids only. No field can hold transcript text (RQ-97)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    kind: MediaKind
+    intent: str = "unknown"  # an `Intent` value; anything else is stored as `unknown`
+    emergency: bool = False
+    scam: bool = False
+    rule_ids: tuple[str, ...] = ()
+    transcribed: bool = False
+    audio_attached: bool = False
+    flag: SummaryFlag = "none"
+
+    @field_validator("rule_ids")
+    @classmethod
+    def _rule_ids_only(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        if not all(re.fullmatch(r"RD-[A-Z]{3}-\d{1,4}", v) for v in value):
+            raise ValueError("a summary lists radar rule ids and nothing else")
+        return value
 
 
 class AlertView(BaseModel):
