@@ -42,3 +42,21 @@ def test_image_needs_a_digest(tmp_path: Path) -> None:
 
 def test_repo_workflows_are_pinned() -> None:
     assert ci_lint.main([str(ROOT / ".github" / "workflows")]) == 0
+
+
+def test_flow_form_uses_is_checked() -> None:
+    findings = ci_lint.check_actions_pinned(FIXTURES / "flow_unpinned.yml")
+    assert len(findings) == 1 and "actions/checkout@v4" in findings[0]
+    assert ci_lint.main([str(FIXTURES / "flow_unpinned.yml")]) == 1
+    assert ci_lint.check_actions_pinned(FIXTURES / "flow_pinned.yml") == []
+    assert ci_lint.main([str(FIXTURES / "flow_pinned.yml")]) == 0
+
+
+def test_comment_lines_are_not_uses_lines(tmp_path: Path) -> None:
+    wf = tmp_path / "w.yml"
+    wf.write_text("# every `uses:` is pinned\nsteps:\n  - run: echo ok\n")
+    assert ci_lint.check_actions_pinned(wf) == []
+
+
+def test_no_workflow_files_fails(tmp_path: Path) -> None:
+    assert ci_lint.main([str(tmp_path)]) == 1

@@ -41,7 +41,10 @@ def test_fails_per_rule(rule: str) -> None:
 
 @pytest.mark.parametrize("rule", RULES)
 def test_passes_per_rule(rule: str) -> None:
-    assert rules_hit(FIXTURES / rule / "pass") == set()
+    passes = sorted((FIXTURES / rule).glob("pass*"))
+    assert passes, f"no passing fixture for {rule}"
+    for d in passes:
+        assert rules_hit(d) == set(), d.name
 
 
 def test_names_rule_fails_with_file() -> None:
@@ -100,3 +103,8 @@ def test_ci_scope_passes() -> None:
     """The exact CI command: doc_lint.py 00-INDEX.md README.md docs."""
     findings, _ = doc_lint.lint([ROOT / "00-INDEX.md", ROOT / "README.md", ROOT / "docs"])
     assert [str(f) for f in findings] == []
+
+
+def test_badhash_message_is_clear() -> None:
+    findings, _ = doc_lint.lint([FIXTURES / "index_row" / "fail_badhash"])
+    assert any("not 12 lowercase hex" in f.message for f in findings)

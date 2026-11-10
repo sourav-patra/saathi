@@ -6,12 +6,14 @@ filename_date, filename_space, dash, filler, size, index_row, record_shape, clos
 Exit 1 when any rule fires. The names rule needs --names-file; without it that rule is unavailable and does not fail.
 
 Scope and exemptions, kept next to the code so the lint and the design agree:
-- kind comes from front matter `kind:`, else the 00-INDEX.md row, else the file name prefix. A file with no kind is
-  checked for names, dashes, filler words and bold bullet starts only.
-- size applies to records (16000 bytes), contracts and rules (24000, warning at 22500) and the index (2000).
-- closing_line applies to contracts, records, rules and the index. A receipt is machine format (DOC-PHILOSOPHY, Four
-  kinds): its skipped-or-not-checked line is a labelled field, so it is exempt from closing_line and record_shape.
-- fenced code blocks and the front matter block are skipped by the prose rules (dash, filler, bullet_bold).
+- kind comes from front matter `kind:`, else the 00-INDEX.md row, else the file name prefix.
+- size applies to records (16000 bytes), contracts and rules (24000, warning at 22500), the index (2000) and every
+  other file except README.md (24000, the contract limit).
+- closing_line applies to every file except README.md (the entry page, DOC-PHILOSOPHY, Entry pages) and receipts.
+  A receipt is machine format (DOC-PHILOSOPHY, Four kinds): its skipped-or-not-checked line is a labelled field,
+  so it is exempt from closing_line and record_shape.
+- fenced code blocks (``` or ~~~) and the front matter block are skipped by the prose rules (dash, filler, bullet_bold).
+- dash fires only with letters on both sides or spaces around the dash; a number range such as 2-3 with an en dash passes.
 """
 
 from __future__ import annotations
@@ -35,9 +37,12 @@ PREFIX_KINDS = {
     "RECORD-": "record", "RECEIPT-": "receipt", "PRD-": "contract", "SPEC-": "contract", "POLICY-": "contract",
     "TRD-": "contract", "LLD-": "contract", "DOC-": "rules",
 }
-INDEX_ROW = re.compile(r"^\|\s*(\w+)\s*\|\s*(\S+)\s*\|\s*([0-9a-f]{12})\s*\|")
+INDEX_ROW = re.compile(r"^\|\s*(\w+)\s*\|\s*(\S+)\s*\|\s*(\S+)\s*\|")
+HASH12 = re.compile(r"[0-9a-f]{12}")
+ENTRY_PAGE = "README.md"
+DEFAULT_LIMIT = 24000
 RECORD_LINE = re.compile(r"^- \d{4}-\d{2}-\d{2} \S")
-DASH = re.compile(r"\w\s*[—–]\s*\w|\s[—–]\s")
+DASH = re.compile(r"[^\W\d_]\s*[—–]\s*[^\W\d_]|\s[—–]\s")
 
 
 @dataclass(frozen=True)
@@ -77,7 +82,7 @@ def prose_lines(text: str) -> Iterator[tuple[int, str]]:
     fenced = False
     for n in range(start, len(lines)):
         line = lines[n]
-        if line.lstrip().startswith("```"):
+        if line.lstrip().startswith(("```", "~~~")):
             fenced = not fenced
             continue
         if not fenced:
@@ -135,6 +140,8 @@ def rule_filler(path: Path, text: str, words: Sequence[str] | None = None) -> li
 def rule_size(path: Path, text: str) -> list[Finding]:
     kind = kind_of(path, text)
     limit = LIMITS.get(kind or "")
+    if limit is None and kind != "receipt" and path.name != ENTRY_PAGE:
+        limit = DEFAULT_LIMIT
     size = len(text.encode("utf-8"))
     if limit and size > limit:
         return [Finding("size", path, 0, f"{size} bytes is over the {limit} byte limit of a {kind}")]
@@ -161,7 +168,10 @@ def rule_index_row(path: Path, text: str) -> list[Finding]:
     out = []
     for n, line in enumerate(text.splitlines(), 1):
         m = INDEX_ROW.match(line)
-        if not m:
+        if not m or m.group(1).lower() == "kind" or set(m.group(2)) <= set("-:"):
+            continue
+        if not HASH12.fullmatch(m.group(3)):
+            out.append(Finding("index_row", path, n, f"hash {m.group(3)!r} of {m.group(2)} is not 12 lowercase hex characters"))
             continue
         target = resolve_index_path(root, m.group(2))
         if not target.is_file():
@@ -180,7 +190,7 @@ def rule_record_shape(path: Path, text: str) -> list[Finding]:
 
 
 def rule_closing_line(path: Path, text: str) -> list[Finding]:
-    if kind_of(path, text) not in ("contract", "record", "rules", "index"):
+    if path.name == ENTRY_PAGE or kind_of(path, text) == "receipt":
         return []
     body = text.rstrip("\n").splitlines()
     if not body or not body[-1].startswith(CLOSING):

@@ -18,7 +18,7 @@ jobs:
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
       - run: uv python install 3.12
       - run: uv sync --frozen
-      - run: uv run ruff check src tests scripts
+      - run: uv run ruff check src tests scripts evals
       - run: uv run python scripts/ci_lint.py .github/workflows
 
   test:
@@ -76,4 +76,4 @@ jobs:
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
       - run: uv python install 3.12
       - run: uv sync --frozen
-      - run: uv run python scripts/gate.py --phase 0 --report
+      - run: uv run python scripts/gate.py --phase 0 --report | tee -a "$GITHUB_STEP_SUMMARY"
