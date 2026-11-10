@@ -31,6 +31,7 @@ from saathi.domain import (
     SummaryFlag,
 )
 from saathi.errors import MediaExpired
+from saathi.faults import WORKER_BEFORE_SETTLE, fault
 from saathi.guards import pii, radar
 from saathi.guards.radar import RadarResult
 from saathi.householdcfg import HouseholdConfig
@@ -318,6 +319,7 @@ async def process(lease: Lease, deps: WorkerDeps) -> Outcome:
 
     effects = await _send_effects(ctx, deps, run, hit, flag, intent, blob, transcript is not None)
 
+    fault(WORKER_BEFORE_SETTLE)  # test hook: every effect is sent, the row is not settled yet
     state = {"unsupported": "unsupported", "media_lost": "media_lost"}.get(flag, "processed")
     async with deps.store.tx(household=ctx.household) as tx:  # TX-W4: only after every effect was sent
         settled = await InboxRepo.settle(tx, lease, state)

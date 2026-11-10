@@ -20,6 +20,7 @@ from saathi.channels import ChannelParseError
 from saathi.domain import AlertOpen, InboundMessage, MediaKind, NewInbox, RawPart, Source
 from saathi.edge.adapters import InboundAdapter
 from saathi.edge.ratelimit import rate_state
+from saathi.faults import EDGE_AFTER_COMMIT, EDGE_BEFORE_COMMIT, fault
 from saathi.guards.radar import RadarResult
 from saathi.ids import new_id
 from saathi.ports import Clock
@@ -106,6 +107,8 @@ async def _persist(deps: EdgeDeps, msg: InboundMessage, raw: bytes, household, e
             # Audio over the limit waits for the worker's transcript; until then it is unscanned and a human is told.
             alert = AlertOpen(kind="unscanned", origin="unscanned_edge")
             await AlertRepo.open(tx, new.id, elder, alert, now, None)
+        fault(EDGE_BEFORE_COMMIT)  # test hook: inert unless the test switch is on
+    fault(EDGE_AFTER_COMMIT)  # test hook: the commit is done, the 200 is not sent yet
 
 
 async def handle_inbound(raw: bytes, headers: Mapping[str, str], source: Source, *, deps: EdgeDeps) -> HTTPStatus:
