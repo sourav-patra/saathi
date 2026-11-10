@@ -1,7 +1,14 @@
-# Dependencies outside the MIT/Apache/permissive allowlist, each with a reason.
-# Only weak, file-level copyleft used UNMODIFIED as a transitive dependency
-# may be listed here. Strong copyleft (GPL/LGPL/AGPL/SSPL) never qualifies.
+# Dependencies outside the MIT/Apache/permissive allowlist (PL-11). Each entry has
+# licence, reason and date. Only weak, file-level copyleft used UNMODIFIED as a
+# transitive dependency may be listed here. A banned licence (GPL, LGPL, AGPL, SSPL,
+# ELv2, BUSL, RSAL, non-commercial) never qualifies, and the audit refuses it.
 
-[allow]
-certifi = "MPL-2.0 (file-level copyleft). Mozilla CA bundle used unmodified via httpx/aiohttp; we never modify or vendor it. Unavoidable for TLS in Python."
-orjson = "MPL-2.0 AND (Apache-2.0 OR MIT): a few MPL-licensed vendored source files, used unmodified as a compiled wheel. Pulled in transitively by langgraph/langsmith."
+[allow.certifi]
+licence = "MPL-2.0"
+reason = "File-level copyleft. Mozilla CA bundle used unmodified via httpx/aiohttp; we never modify or vendor it. Unavoidable for TLS in Python."
+date = "2026-11-10"
+
+[allow.orjson]
+licence = "MPL-2.0 AND (Apache-2.0 OR MIT)"
+reason = "A few MPL-licensed vendored source files, used unmodified as a compiled wheel. Pulled in transitively by langgraph/langsmith."
+date = "2026-11-10"

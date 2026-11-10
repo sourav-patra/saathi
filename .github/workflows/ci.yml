@@ -42,7 +42,7 @@ jobs:
       - run: uv python install 3.12
       - run: uv sync --frozen
       - name: License audit (MIT/Apache + permissive only)
-        run: uv run python scripts/license_audit.py
+        run: uv run python scripts/license_audit.py --packages --dockerfiles --manifest tests/fixtures/image_manifest.txt
 
   design-check:
     runs-on: ubuntu-latest
