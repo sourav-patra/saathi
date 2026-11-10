@@ -1,30 +1,63 @@
-"""Core domain types shared across channels, the graph and the policy engine.
+"""Core domain types shared across channels, the worker, the alert path and the policy engine (M01).
 
-Multi-household from day 1: every record hangs off a ``household_id`` so more
-elders and families can be added without schema changes.
+Multi-household from day 1: every record that names an elder, a request or an event also names its
+`household_id` (RQ-109). Core types hold no phone number, chat id or platform client (RQ-105): the
+elder is reached through an opaque `PersonRef`.
 """
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from uuid import uuid4
+from typing import Literal
+from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+from saathi.clock import SystemClock
+from saathi.ids import (
+    ApproverId,
+    ElderId,
+    EventId,
+    HouseholdId,
+    IdemKey,
+    InboxId,
+    PersonRef,
+    ReplyKey,
+    RunId,
+    TemplateId,
+    VoiceId,
+    derive_id,
+    idem_key,
+    new_id,
+)
+
+__all__ = [
+    "ApproverId", "ElderId", "EventId", "HouseholdId", "IdemKey", "InboxId", "PersonRef", "ReplyKey",
+    "RunId", "TemplateId", "VoiceId", "derive_id", "idem_key", "new_id",
+]  # fmt: skip
 
 
 def utcnow() -> datetime:
-    return datetime.now(UTC)
+    return SystemClock().now()
 
 
-def new_id() -> str:
-    return uuid4().hex
+class DataClass(StrEnum):
+    """PL-01: the four data classes."""
+
+    RESTRICTED = "restricted"
+    PERSONAL = "personal"
+    PUBLIC = "public"
+    SYNTHETIC = "synthetic"
 
 
-class Channel(StrEnum):
+class Source(StrEnum):
+    """Where an inbound message came from. Replaces the old `Channel` enum."""
+
     WHATSAPP = "whatsapp"
-    TELEGRAM_FORWARD = "telegram_forward"  # caregiver forwarding an elder's message
+    TELEGRAM_ELDER = "telegram_elder"
+    CAREGIVER_FORWARD = "caregiver_forward"
 
 
 class MediaKind(StrEnum):
@@ -33,9 +66,253 @@ class MediaKind(StrEnum):
     IMAGE = "image"
     VIDEO = "video"
     DOCUMENT = "document"
-    OTHER = "other"
+    UNSUPPORTED = "unsupported"  # sticker, contact, location (inbox state `unsupported`)
 
 
+class ChannelCap(StrEnum):
+    VOICE_IN = "voice_in"
+    VOICE_OUT = "voice_out"
+    IMAGE_IN = "image_in"
+    IMAGE_OUT = "image_out"
+    VIDEO_IN = "video_in"
+    TEXT = "text"
+    PROACTIVE_FREE = "proactive_free"
+    TEMPLATES = "templates"
+
+
+class ChannelHealth(StrEnum):
+    UP = "up"
+    DEGRADED = "degraded"
+    DOWN = "down"
+
+
+class AttemptResult(StrEnum):
+    DELIVERED = "delivered"
+    FAILED = "failed"
+    ANSWERED_NO_ACK = "answered_no_ack"  # stage c: call answered, no key press (A13)
+    VOICEMAIL = "voicemail"
+
+
+class VisionTask(StrEnum):
+    OCR = "ocr"
+    LABEL = "label"
+
+
+# --------------------------------------------------------------------------- #
+# Blobs and small port values. All frozen: a port never mutates what it is given.
+# --------------------------------------------------------------------------- #
+class _Frozen(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+
+class MediaRef(_Frozen):
+    source: Source
+    handle: str
+    mime: str | None = None
+
+
+class MediaBlob(_Frozen):
+    data: bytes
+    mime: str
+
+
+class AudioBlob(_Frozen):
+    data: bytes
+    mime: str = "audio/ogg"
+
+
+class WavBlob(_Frozen):
+    data: bytes
+
+
+class ImageBlob(_Frozen):
+    data: bytes
+    mime: str = "image/jpeg"
+
+
+class VoiceClip(_Frozen):
+    """A stored, hash-checked clip (D-69)."""
+
+    key: ReplyKey
+    language: str = "hi"
+    data: bytes
+    sha256: str
+    version: int = 1
+
+
+class DataBlock(_Frozen):
+    """External text (transcript, OCR, web, screen) carried as data, never as instructions."""
+
+    text: str
+    origin: str
+
+
+class Transcript(_Frozen):
+    text: str
+    language: str | None = None
+    confidence: float | None = None
+    engine: str = "unknown"
+
+
+class SendReceipt(_Frozen):
+    provider_id: str
+    key: IdemKey
+
+
+class Card(_Frozen):
+    """A caregiver card built from slots (enums and counts), never from model prose."""
+
+    kind: str
+    slots: dict[str, str | int] = Field(default_factory=dict)
+
+
+class CardRef(_Frozen):
+    approver_id: ApproverId
+    message_ref: str
+
+
+class ApproverUpdate(_Frozen):
+    """A callback or message from a registered approver; an update id is seen at most once."""
+
+    update_id: int
+    approver_id: ApproverId
+    kind: Literal["callback", "text"]
+    data: str = ""
+    nonce: str | None = None
+
+
+class AlertEventRef(_Frozen):
+    household_id: HouseholdId
+    event_id: EventId
+    kind: Literal["emergency", "scam", "unscanned"]
+
+
+class VoiceCallback(_Frozen):
+    call_id: str
+    digit: str
+    signature: str
+    timestamp: datetime
+
+
+class VoiceAckResult(_Frozen):
+    approver_id: ApproverId
+
+
+class VisionResult(_Frozen):
+    ocr_text: DataBlock
+    labels: list[str] = Field(default_factory=list)
+    refusal: bool = False
+
+
+class Message(_Frozen):
+    role: Literal["system", "user", "assistant"]
+    content: str | DataBlock
+
+
+class ModelRequest[T: BaseModel](BaseModel):
+    """What the gateway takes (TRD ports section 2). Elder content is personal by default (PL-02)."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True, populate_by_name=True)
+    step: str
+    messages: list[Message]
+    output_schema: type[T] = Field(alias="schema")
+    sensitivity: DataClass = DataClass.PERSONAL
+    run: RunId
+    intent: str | None = None
+    media: tuple[MediaRef, ...] = ()
+
+
+class ModelResult[T: BaseModel](BaseModel):
+    value: T | None = None
+    refusal: bool = False
+    refusal_reason: str | None = None
+    tier_grade: str = ""
+    tokens: int = 0
+    cost_inr: Decimal = Decimal(0)
+    cached: bool = False
+
+
+class AuditEvent(_Frozen):
+    household_id: HouseholdId
+    kind: str
+    actor: str
+    subject: str = ""
+    detail: dict[str, str | int | bool] = Field(default_factory=dict)
+
+
+class AuditRef(_Frozen):
+    id: str
+
+
+class ClassifierFlag(_Frozen):
+    kind: str
+    score: float
+
+
+SpanValue = str | int | float | bool | None
+
+
+# --------------------------------------------------------------------------- #
+# Inbox and worker types (LLD intake M01)
+# --------------------------------------------------------------------------- #
+class InboundMessage(BaseModel):
+    """Parsed by a channel, never stored whole. `sender_ref` is the platform sender id, hashed before it is stored."""
+
+    source: Source
+    provider_message_id: str
+    sender_ref: str
+    kind: MediaKind
+    text: str | None = None
+    media: MediaRef | None = None
+    received_at: datetime = Field(default_factory=utcnow)
+
+
+class RawPart(BaseModel):
+    part: Literal["text", "caption", "transcript"]
+    text: str
+
+
+class NewInbox(BaseModel):
+    """One inbox row and its parts, inserted in one transaction."""
+
+    id: InboxId
+    household_id: HouseholdId
+    elder_id: ElderId
+    msg: InboundMessage
+    sender_hmac: str
+    payload_sha256: str
+    not_before: datetime | None = None
+    parts: list[RawPart] = Field(default_factory=list)
+
+
+class Lease(BaseModel):
+    household_id: HouseholdId
+    inbox_id: InboxId
+    elder_id: ElderId
+    token: UUID
+
+
+class AlertOpen(BaseModel):
+    kind: Literal["emergency", "scam", "unscanned"]
+    origin: str
+    rule_ids: list[str] = Field(default_factory=list)
+
+
+class SummarySlots(BaseModel):
+    """Enums and counts only. The fields are set by the unit that builds summaries (WU-15)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class AlertView(BaseModel):
+    """One alert event as the alert service reads it. The fields are set by WU-17."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+# --------------------------------------------------------------------------- #
+# Request-side types kept for Phase 1
+# --------------------------------------------------------------------------- #
 class Intent(StrEnum):
     RIDE = "ride"
     GROCERY = "grocery"
@@ -71,34 +348,18 @@ class PaymentMethod(StrEnum):
 
 
 class Elder(BaseModel):
-    id: str = Field(default_factory=new_id)
-    household_id: str
-    display_name: str                 # how Saathi addresses them, e.g. "the name the elder prefers"
-    wa_phone_e164: str                # sender id on the helper number
+    id: ElderId = Field(default_factory=lambda: ElderId(new_id()))
+    household_id: HouseholdId
+    display_name: str                 # how Saathi addresses them; a profile value, never a literal in code
     languages: list[str] = ["hi", "en"]
 
 
 class Approver(BaseModel):
-    id: str = Field(default_factory=new_id)
-    household_id: str
+    id: ApproverId = Field(default_factory=lambda: ApproverId(new_id()))
+    household_id: HouseholdId
     name: str
     telegram_user_id: int
     is_primary: bool = False
-
-
-class InboundMessage(BaseModel):
-    """A single message from (or forwarded on behalf of) an elder."""
-
-    id: str = Field(default_factory=new_id)
-    channel: Channel
-    provider_message_id: str
-    sender_phone_e164: str | None = None   # WhatsApp sender
-    forwarded_by_telegram_id: int | None = None
-    kind: MediaKind
-    text: str | None = None                # text body or caption
-    media_id: str | None = None            # provider media handle
-    media_mime: str | None = None
-    received_at: datetime = Field(default_factory=utcnow)
 
 
 class Slots(BaseModel):

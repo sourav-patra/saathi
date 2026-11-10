@@ -19,8 +19,9 @@ from typing import Any, Protocol, TypedDict
 from langgraph.graph import END, StateGraph
 
 from saathi import replies
-from saathi.domain import InboundMessage, MediaKind, Understanding
+from saathi.domain import Understanding
 from saathi.guards import pii, radar
+from saathi.legacy import InboundMessage, MediaKind
 from saathi.llm.gateway import Gateway
 from saathi.observability import observe
 from saathi.perception.asr import ASRProvider

@@ -23,7 +23,7 @@ from saathi.channels.telegram import (
 )
 from saathi.channels.whatsapp import WhatsAppClient, parse_webhook, verify_signature
 from saathi.config import Settings, get_settings
-from saathi.domain import Channel, InboundMessage
+from saathi.legacy import Channel, InboundMessage
 from saathi.llm.gateway import BudgetLedger, Gateway, tiers_from_settings
 from saathi.observability import flush as flush_traces
 from saathi.observability import init_tracing

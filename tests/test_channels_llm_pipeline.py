@@ -6,7 +6,8 @@ import httpx
 import pytest
 
 from saathi.channels.whatsapp import parse_webhook, verify_signature
-from saathi.domain import Channel, InboundMessage, Intent, MediaKind, Understanding
+from saathi.domain import Intent, Understanding
+from saathi.legacy import Channel, InboundMessage, MediaKind
 from saathi.llm.gateway import (
     BudgetExceeded,
     BudgetLedger,
