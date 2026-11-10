@@ -407,7 +407,7 @@ class Understanding(BaseModel):
     slots: dict = Field(default_factory=dict)
     missing_slots: list[str] = Field(default_factory=list)
     urgency: str = "normal"               # "normal" | "urgent"
-    tier_used: str = "T1"
+    tier_used: str = "none"  # "G<n>" of the grade that answered; "none" when no model did
     issue_category: str | None = None     # anonymised taxonomy label (v2 dataset)
 
 

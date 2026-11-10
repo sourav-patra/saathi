@@ -21,6 +21,7 @@ from langgraph.graph import END, StateGraph
 from saathi import replies
 from saathi.domain import Understanding
 from saathi.guards import pii, radar
+from saathi.ids import RunId, derive_id
 from saathi.legacy import InboundMessage, MediaKind
 from saathi.llm.gateway import Gateway
 from saathi.observability import observe
@@ -108,7 +109,8 @@ def build_graph(deps: Deps):
 
     async def classify(state: State) -> State:
         try:
-            u = await understand(deps.gateway, state.get("redacted") or "(empty message)")
+            run = RunId(derive_id("run", state["msg"].id))
+            u = await understand(deps.gateway, state.get("redacted") or "(empty message)", run=run)
         except Exception as e:
             u = Understanding(intent="unknown", confidence=0.0, summary_en=f"(router failed: {e})")
         return {"understanding": u}

@@ -52,6 +52,7 @@ class Settings(BaseSettings):
     t4_api_key: SecretStr = SecretStr("")
     t4_model: str = ""
 
+    roster_path: str = ""           # private TOML roster (schema: infra/roster.example.toml); empty = no model tier
     paid_monthly_cap_inr: float = 0.0   # 0 = paid tiers disabled until set privately
     usd_to_inr: float = 88.0
 

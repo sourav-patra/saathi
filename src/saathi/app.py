@@ -11,6 +11,7 @@ import asyncio
 import logging
 from collections import OrderedDict
 from contextlib import asynccontextmanager
+from decimal import Decimal
 
 from aiogram import Bot
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Request, Response
@@ -24,7 +25,8 @@ from saathi.channels.telegram import (
 from saathi.channels.whatsapp import WhatsAppClient, parse_webhook, verify_signature
 from saathi.config import Settings, get_settings
 from saathi.legacy import Channel, InboundMessage
-from saathi.llm.gateway import BudgetLedger, Gateway, tiers_from_settings
+from saathi.llm.gateway import Gateway
+from saathi.llm.roster import Roster, load_roster_file
 from saathi.observability import flush as flush_traces
 from saathi.observability import init_tracing
 from saathi.perception.asr import build_asr
@@ -98,7 +100,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         media = _Media(wa)
         deps = Deps(
             gateway=Gateway(
-                tiers_from_settings(s), BudgetLedger(s.paid_monthly_cap_inr), usd_to_inr=s.usd_to_inr
+                load_roster_file(s.roster_path) if s.roster_path else Roster.load([]),
+                cap_inr=Decimal(str(s.paid_monthly_cap_inr)) if s.paid_monthly_cap_inr > 0 else None,
+                usd_to_inr=Decimal(str(s.usd_to_inr)),
             ),
             asr=build_asr(s.asr_provider, whispercpp_url=s.whispercpp_url),
             media=media,
