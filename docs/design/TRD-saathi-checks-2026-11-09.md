@@ -3,7 +3,7 @@ id: TRD-saathi-checks
 kind: contract
 governs: the design rules (TQ) that tie every RQ and PL id to a design element and a check, and the known limits of this design; part of TRD-saathi-2026-11-09.md
 status: draft, review F fixes applied, pending owner lock (see docs/LOCKS.md)
-upstream: PRD-saathi-2026-11-09-r2.md sha256 ee2a21d4115ce10d07f5fcae7567b00866e8411d2b40380f12c03450b4e16c8d; SPEC-saathi-requests-2026-11-09.md sha256 7e0cee8a2dab273d3776eafd6d68d6a7a0f51e1d75fa7b55064136b0c4ed0e1e; SPEC-saathi-safety-2026-11-09-r2.md sha256 9c8988b2c9415f62ed6bb32b4247238e313319339e800fd9c9ef52f06b25e470; SPEC-saathi-assurance-2026-11-09-r2.md sha256 e9489fdd228d9f8fcd058108a61053ca7cba808f3b07d0775671888788d2f1c8; SPEC-saathi-evidence-2026-11-09-r2.md sha256 8287da0716f654469c98397b8fb16bc2d8ab041fb1a94572e9dc245b95741386; SPEC-saathi-alternatives-2026-11-09.md sha256 5bcbf4c859075f2908976d07509ec0e289036b7c008832d7d9184789df9167e1; POLICY-saathi-2026-11-09-r2.md sha256 c4b26bb7e3e39eba4e83c73891040b125dfebc5872091dd742178264d3072ff1; POLICY-saathi-data-2026-11-09.md sha256 d892eb25058f315132efc589bbc515d961c8d50baa4aece3d16a63bd28aa48c1; RECORD-saathi-decisions-2026-11-09.md sha256 41bbe3270e83e1a23535f8903d7e5b60edeea9dae846b0b6feb4c3b152ff82d9
+upstream: PRD-saathi-2026-11-09-r2.md sha256 141b677d217017de6973d67f2f5d46eb549b2b40464d4f7426f4ee83d0ed15ec; SPEC-saathi-requests-2026-11-09.md sha256 0e595737a4216baecdc1ad6a1436d3b4351988e7fc8f26c4f752935930eb60b5; SPEC-saathi-safety-2026-11-09-r2.md sha256 711d673b563105b0115376a8fbb5b2fb6e9a12dfa06afdd4e60103bd53e8bc12; SPEC-saathi-assurance-2026-11-09-r2.md sha256 4d02d7a0ce53e02870ecb794d179f9863522f86df962c60489060c3e1069867a; SPEC-saathi-evidence-2026-11-09-r2.md sha256 84e320c15d8d622da37071101ab30bedccfdcaa0ce671f3d5fccb2cd44eccf3d; SPEC-saathi-alternatives-2026-11-09.md sha256 9d566412ad77d4afd845e8067b55e316074e37827730cb1dfaeb77ddae07378d; POLICY-saathi-2026-11-09-r2.md sha256 2ef14b0294378ff7a44be0e96e1f74a94c90614844e59f390eb29f1471bf339c; POLICY-saathi-data-2026-11-09.md sha256 907e2bd010ffdebe8e22a43fd693258be096922972c1846bf73f64593bf3f6c4; RECORD-saathi-decisions-2026-11-09.md sha256 41bbe3270e83e1a23535f8903d7e5b60edeea9dae846b0b6feb4c3b152ff82d9
 sources: the contracts in upstream; src/, tests/, infra/ and .github/workflows/ci.yml on branch phase-0/foundation at 3d46456; scripts/design_check.py in this repository
 checked-at: 3d46456, 2026-11-09. Code read with `git show`; the coverage script ran on this design set after the review F edits (section 3).
 ---
@@ -31,7 +31,7 @@ Each row is a design rule (TQ), the RQ and PL ids it serves, the check that show
 | TQ-09 | An alert event is a set of rows; stages a, b and c run on the cadence, stop on a registered approver's Acknowledge tap or key press of 1 on the call (an answered call with no key press does not count) and resume after a restart; unscanned audio opens an `unscanned` alert | RQ-18 | `tests/test_alerts.py` under a fake clock; six counter scripts; unscanned-audio and replay tests; key-press, no-key, voicemail and forged-callback tests on a fake provider | E: in-memory repeat, 5 times 120 s, `telegram.py:29-30`, `:83-88`. N |
 | TQ-10 | Stages b and c need a valid SO-1 row; expiry silences them, alerts the owner and leaves stage a running | RQ-18, 95a; PL-26 | SO-1 expiry test; use-audit test; write-denied test for agent roles | N |
 | TQ-11 | Stages a and c use no WhatsApp, model or ASR; with every model service down an emergency still alerts and plays the stored clip | RQ-16, 17, 18, 78 | all-fake-down test | N |
-| TQ-12 | Voice notes are decoded by `opusdec` to 16 kHz WAV before ASR; audio that fails decode or ASR is forwarded to the caregiver with a templated reply; two in 10 min start stage a | RQ-82 | decode test on a real fixture; ASR failure fixtures | E: failure becomes a placeholder, `pipeline.py:78-80`. N |
+| TQ-12 | Voice notes are decoded by `opusdec` to 16 kHz WAV before ASR; audio that fails decode or ASR is forwarded to the caregiver with a templated reply; two in 10 min start stage a | RQ-82 | decode test on a real fixture (Phase 1; Phase 0 runs the ports with fakes); ASR failure fixtures | E: failure becomes a placeholder, `pipeline.py:78-80`. N |
 | TQ-13 | Replies follow D-69: stored clips with hashes, each version signed by the caregiver (D-71), local dynamic speech, hosted fallback only after PL-20, Hindi text when speech fails; a reply is never skipped | RQ-01, 74, 82; PL-20 | `tests/test_voice_store.py`: hash mismatch, runtime down, no receipt, a clip row without a signed receipt | N |
 | TQ-14 | Redaction is deterministic, text only, and runs before any hosted call, trace or cache write | RQ-41, 44; PL-03 | suite redaction with canaries per ID type; canary test across stores | E: five patterns, `pii.py:53-62`. N: voter, passport |
 | TQ-15 | Transcripts live only in `raw_text`; cards and alerts hold a summary and slots; show raw reads the table and writes an audit row | RQ-97, 19; PL-07 | trace-canary suite; show-raw audit test | E: raw text reaches cards and traces, `telegram.py:57`, `pipeline.py:59` |
@@ -67,7 +67,7 @@ Each row is a design rule (TQ), the RQ and PL ids it serves, the check that show
 | TQ-45 | A nightly encrypted dump goes off-site for 30 days; a monthly restore replays the erasure log | RQ-37 | `file` on the dump; restore exit code | N |
 | TQ-46 | Every outbound host is a row in POLICY-data; model-driven containers reach only their egress listener, whose route set is the allowlist; every client takes a base URL setting | RQ-43, 102; PL-02, 04 | host-list test; `strace` run; reach test inside each container, with each base URL setting; compose test | E: one default network, `docker-compose.yml:55-223`. N |
 | TQ-47 | Credentials are registered with an expiry and injected outside model-driven processes; `.env` is mode 600; keys are separate | RQ-93; PL-13, 14 | register test; environment test; `stat -c %a .env` | E: the whole `.env` goes to one service, `docker-compose.yml:201`. N |
-| TQ-48 | A compromise has a kill switch, a runbook with checks and a quarterly drill | PL-28, RQ-91 | the revocation steps and the drill receipt | N |
+| TQ-48 | A compromise has a commit pause, a runbook with checks and a quarterly drill | PL-28, RQ-91 | the revocation steps and the drill receipt | N |
 | TQ-49 | Debunk: claim extraction, verdicts, fetch records and the auto-send gate with SO-2 | RQ-09, 10, 11; PL-26 | suite debunk; rule table tests; expiry test | N |
 | TQ-50 | Shopping, tech help, Q&A and appointments reuse the adapters and the empty allowlists the PRD names | RQ-08, 12, 13, 15 | allowlist unit tests; shadow suite; safety suite | N |
 | TQ-51 | The elder reply follows the language of the elder's message; the card follows the caregiver's | RQ-01 | 10-case language table test | N |
@@ -91,14 +91,16 @@ Each row is a design rule (TQ), the RQ and PL ids it serves, the check that show
 
 `python3 scripts/design_check.py` from the repository root fails on any RQ or PL id of the PRD, SPEC and POLICY requirement tables that no Serves cell above names. It also checks every `upstream:` pin against `sha256sum`, every index prefix, every size limit, the closing line of each file, the absence of long dashes, and each edge of the architecture figure against the edge and components tables.
 
-Result on this design set, run 2026-11-10 after the strategy fold and the final hashes (the TQ rows of the fold are in TRD-saathi-checks-product-2026-11-10.md, which the script also reads):
+Result on this design set, run 2026-11-10 after the final review fixes (the TQ rows of the strategy fold are in TRD-saathi-checks-product-2026-11-10.md, which the script also reads; the LLD checks 8 and 9 are described in the LLD hub section 6):
 
 ```
 coverage: 117 RQ ids and 37 PL ids in the contracts; 83 TQ rows; 154 mapped, 0 unmapped, 0 unknown
-pins: 112 upstream pins checked
-index: 23 rows checked
+pins: 156 upstream pins checked
+index: 30 rows checked
 sizes, closing lines, dashes: checked
 figure: 26 edges match the edge table; 20 of 22 components drawn; not drawn: C19, C20
+lld: 68 Phase 0 ids; 29 module rows and 51 test rows; 0 without a module, 0 without a test
+order: 26 work units; 29 modules; 80 import edges; 0 violations
 result: OK
 ```
 

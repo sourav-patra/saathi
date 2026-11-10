@@ -5,7 +5,7 @@ status: current
 sources: the owner's decisions of 2026-11-10 on an independent strategy review, in sanitized form; the review report is held privately; personal values, names and places are left out on purpose
 ---
 
-Continues RECORD-saathi-decisions-2026-11-09.md, which holds D-01 to D-77. Cite a decision by its D number. The marks are defined in PRD-saathi-2026-11-09-r2.md section 2. The source of every decided line is the owner. Phases are set only in the PRD phase table.
+Continues RECORD-saathi-decisions-2026-11-09.md, which holds D-01 to D-77. This file holds D-78 to D-95. Cite a decision by its D number. The marks are defined in PRD-saathi-2026-11-09-r2.md section 2. The source of every decided line is the owner. Phases are set only in the PRD phase table.
 
 ## Platform risk and the elder channel
 
@@ -31,5 +31,13 @@ Continues RECORD-saathi-decisions-2026-11-09.md, which holds D-01 to D-77. Cite 
 ## Name
 
 - 2026-11-10 D-90 decision: "saathi" is the internal codename of the repository, package and identifiers. The public name is chosen after the first stable test (Stage A). Candidates are vetted privately, and a trademark search on the registry is required before any name is adopted. The elder-facing persona name is a private config value and is never the codename. @mark=decided
+
+## Final design review decisions
+
+- 2026-11-10 D-91 decision: addresses and profile values (and the display names) are sealed with per-household keys in the first Phase 1 migration, before any real data exists. Phase 0 uses synthetic data only (LLD hub question Q22, C-5; TRD ports migration table). @mark=decided
+- 2026-11-10 D-92 decision: Phase 0 runs two compose services of one image, `edge` and `worker`; the zone split of `worker` stays Phase 1 (Q23, C-3; TRD ops section 3, PRD phase table). @mark=decided
+- 2026-11-10 D-93 decision: the Telegram elder channel class is built in Phase 0 and tested against a fake client; the live elder bot, start codes and the channel switch stay Phase 1 (Q24, C-2; PRD phase table, TRD build change 30). @mark=decided
+- 2026-11-10 D-94 decision: the shortened index form is accepted: a name with no slash in `00-INDEX.md` is a file in `docs/design/` (Q25; SPEC evidence RQ-101 and RQ-103, `scripts/design_check.py`). @mark=decided
+- 2026-11-10 D-95 decision: the caregiver writes the radar evaluation set, about 100 Hindi and Hinglish phrases covering emergency, scam and normal messages, as a manual receipt; the keyword lists, whoever or whatever wrote them, never see it (Q26, C-9; SPEC safety RQ-16, SPEC product G-6, SPEC evidence suite registry). @mark=decided
 
 Skipped or not checked: no decision here was checked against a live service, platform term or legal text; the strategy report's claims about outside parties were not copied and were not re-verified.

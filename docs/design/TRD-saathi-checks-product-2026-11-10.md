@@ -3,7 +3,7 @@ id: TRD-saathi-checks-product
 kind: contract
 governs: the design rules (TQ) for the strategy fold: channels, tenancy, consent, autonomy, the fence, the pilot, and the invariants; part of TRD-saathi-2026-11-09.md
 status: draft, new in the strategy fold, pending owner lock (see docs/LOCKS.md)
-upstream: SPEC-saathi-platform-2026-11-10.md sha256 8b84438c0b5167a7ba63c887285a3b8cca200d8045b9a86b462e74a93722b250; SPEC-saathi-product-2026-11-10.md sha256 b0543f42556020349f6e86f688f66e73832113fed3a67c10a69115123dd080b1; POLICY-saathi-data-2026-11-09.md sha256 d892eb25058f315132efc589bbc515d961c8d50baa4aece3d16a63bd28aa48c1; POLICY-saathi-2026-11-09-r2.md sha256 c4b26bb7e3e39eba4e83c73891040b125dfebc5872091dd742178264d3072ff1; TRD-saathi-ports-2026-11-09.md sha256 ff04d8c694fdea9b73761416dcaf147963c9693aa450993079cc8a7c459596ca; RECORD-saathi-decisions-strategy-2026-11-10.md sha256 2d6d32e8f7f743b397f9daa4b429c009b5275b47232cb441fc4d2e6a8754d931
+upstream: SPEC-saathi-platform-2026-11-10.md sha256 2ccd496e0116592e2461f70d0fdbe2190dd8373e11afda13b53206be1c303a99; SPEC-saathi-product-2026-11-10.md sha256 d39d13904842ec48b5cc0fc8284c06a0f863cfc23ff1dcdd044e401dc8682fb0; POLICY-saathi-data-2026-11-09.md sha256 907e2bd010ffdebe8e22a43fd693258be096922972c1846bf73f64593bf3f6c4; POLICY-saathi-2026-11-09-r2.md sha256 2ef14b0294378ff7a44be0e96e1f74a94c90614844e59f390eb29f1471bf339c; TRD-saathi-ports-2026-11-09.md sha256 993e28969a4c98164e04767cd324f88930b1e73dbc2a854f74a725be1163ec3c; RECORD-saathi-decisions-strategy-2026-11-10.md sha256 8fa8da2c82c49bdee5900b977dd29c721b20ce53afe10ef9cea7c14e86d4c2b8
 sources: the contracts in upstream; scripts/design_check.py in this repository
 checked-at: 2026-11-10. Contracts read in this repository; the coverage script ran on this design set (TRD-saathi-checks-2026-11-09.md section 3); no design rule here has been run as a test.
 ---
@@ -21,7 +21,7 @@ Marks follow PRD section 2. Every rule is P until its check runs. The TQ numberi
 | Id | Design rule | Serves | Check | Mark |
 |---|---|---|---|---|
 | TQ-67 | The core reaches the elder only through `ElderChannel`; two implementations and a fake pass one contract suite; core code holds `PersonRef` and reads `capabilities` | RQ-105 | contract suite on all three; a grep test for platform names in core modules | N |
-| TQ-68 | The elder bot is a second bot with its own token, secret and chat registry; it has no callback handler and no path to a token; the caregiver token is held only by the approval service | RQ-106, 23 | environment test for each token; the "approved" and forged callback tests; start code tests | N |
+| TQ-68 | The elder bot is a second bot with its own token, secret and chat registry; it has no callback handler and no path to a token; the caregiver token is never in the edge environment and, from Phase 1, is held only by the approval service | RQ-106, 23 | Phase 0: `tests/test_elder_bot_authority.py` (callback update and the text "approved" create no approval, token or commit) and the edge environment test; Phase 1: the environment test for each token and the start code tests | N |
 | TQ-69 | The active channel is a field of the household config; inbound on any enabled channel is processed; replies follow the inbound channel; a switch moves no request state | RQ-107, 78 | switch test over `clarifying`, `awaiting_approval` and a due reminder; WhatsApp `down` test with the Switch button | N |
 | TQ-70 | Parity matrix of kinds on both channels with fakes, with the 10 s acknowledgement on both | RQ-108 | parity test; oversize media test | N. R: Telegram limits not read |
 | TQ-71 | Every household table has forced row-level security keyed to `app.household_id`; `Store.tx` takes the household; scans return ids only | RQ-109, 38 | cross-tenant suite; schema test shown to fail on a planted table | N |
@@ -42,7 +42,7 @@ Marks follow PRD section 2. Every rule is P until its check runs. The TQ numberi
 
 | Id | Limit | Next step |
 |---|---|---|
-| L-10 | Row-level security trusts the value that `Store.tx` sets. A bug that sets the wrong household passes the policy, and the suite tests the helper, not every call site | a lint that bans raw connections outside `Store`; cross-tenant tests on every new repository |
+| L-10 | Row-level security trusts the value that `Store.tx` sets. A bug that sets the wrong household passes the policy, and the suite tests the helper, not every call site. The setting `app.household_id` is a plain session variable: a role that is compromised can set any household id, so row-level security stops bugs, not a compromised role; the role grants limit what such a role can do | a lint that bans raw connections outside `Store`; cross-tenant tests on every new repository |
 | L-11 | The superuser, the backup role and the holder of the key-encryption key see every household; key destruction reaches backups only after the restore test of platform RQ-111b | a second operator and a break-glass rule when a second household exists |
 | L-12 | The Telegram elder bot is on a platform that keeps chats and does not offer end-to-end encryption for bots (R, not read); a leaked bot token lets an attacker write to the elder as the helper | the terms receipt (PL-32) and the registration of both channels at onboarding |
 

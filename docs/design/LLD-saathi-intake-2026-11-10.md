@@ -3,7 +3,7 @@ id: LLD-saathi-intake
 kind: contract
 governs: Phase 0 modules M01 to M13: shared types, ports, store, keys, config, edge, elder channels, radar, redaction, worker, ASR; part of LLD-saathi-2026-11-10.md
 status: draft, pending review
-upstream: TRD-saathi-ports-2026-11-09.md sha256 ff04d8c694fdea9b73761416dcaf147963c9693aa450993079cc8a7c459596ca; TRD-saathi-states-2026-11-09.md sha256 9968ebcd8b7add49595cc4aebfa3ebb3ddbd2127609017273e5611939b7c9076; TRD-saathi-2026-11-09.md sha256 4fa28f253d0ea99931584fde4f9ed025890200dd2fae175fb15ac16864af6bd2; LLD-saathi-2026-11-10.md sha256 a4217aeeee13ff47e529f8e567012358e2efe65b32b23f4f482d06470c3ba482
+upstream: TRD-saathi-ports-2026-11-09.md sha256 993e28969a4c98164e04767cd324f88930b1e73dbc2a854f74a725be1163ec3c; TRD-saathi-states-2026-11-09.md sha256 6a6843a411f59ce326c9573fe7ed14e6bb76ed19e30c1b9a5e3514b4bda25db6; TRD-saathi-2026-11-09.md sha256 88d14bcfec16d0b6b158a0437c2f2c7dd61ab84b9ab7f1c8b1bf94c51d322075; LLD-saathi-2026-11-10.md sha256 bda71cce7ddb7c9fe5b18223d08d360f881cfc660c1d3befaf70294488692309
 sources: src/saathi/ and tests/ on branch phase-0/foundation at 3d46456; the TRD components table and ports part; DOC-PHILOSOPHY.md
 checked-at: 3d46456, 2026-11-10. Code read with `git show`. Nothing below was run in this pass.
 ---
@@ -30,11 +30,13 @@ class NewInbox(BaseModel):                  # one inbox row plus its parts, inse
     sender_hmac: str; payload_sha256: str; not_before: datetime | None; parts: list[RawPart]
 class Lease(BaseModel): household_id: HouseholdId; inbox_id: InboxId; elder_id: ElderId; token: UUID
 class AlertOpen(BaseModel): kind: Literal["emergency", "scam", "unscanned"]; origin: str; rule_ids: list[str]
+class SummarySlots(BaseModel): ...        # enums and counts only; fields set by the unit that builds summaries (WU-15)
+class AlertView(BaseModel): ...            # one alert event as the service reads it (WU-17)
 def new_id() -> str: ...                    # E: domain.py:21, kept; ids.py adds derive_id(prefix, parent)
 def idem_key(*parts: str) -> IdemKey: ...   # ":".join, no empty part
 ```
 
-`errors.py` defines `SaathiError(Exception)` and every error of the TRD ports part section 3, each a subclass (`ProactiveNotAllowed(reason)`, `ChannelDown`, `AsrUnavailable`, `ClipHashMismatch`, `ReceiptMissing`, `NoAcceptedResult`, `TenantNotSet`, `KeyMissing`, `ConflictLost`, `FlagUnreadable`, `AuditUnavailable`, `SignoffMissing`, `CallbackRejected`). Removed from domain: `Channel` and `Elder.wa_phone_e164` (change 30); `Approver`, `Quote`, `Slots`, `Understanding` stay for Phase 1.
+These two view types sit in `domain.py` so the caregiver bot (M15) does not import the worker (M12). `errors.py` defines `SaathiError(Exception)` and every error of the TRD ports part section 3, each a subclass (`ProactiveNotAllowed(reason)`, `ChannelDown`, `AsrUnavailable`, `ClipHashMismatch`, `ReceiptMissing`, `NoAcceptedResult`, `TenantNotSet`, `KeyMissing`, `ConflictLost`, `FlagUnreadable`, `AuditUnavailable`, `SignoffMissing`, `CallbackRejected`). Removed from domain: `Channel` and `Elder.wa_phone_e164` (change 30); `Approver`, `Quote`, `Slots`, `Understanding` stay for Phase 1.
 - Serves: RQ-105, 109; PL-01; TQ-67. Never: a field named for a platform in core modules; a phone number or chat id in a core type.
 
 ## M02 `saathi/config.py`, `saathi/hosts.py`
@@ -49,12 +51,18 @@ def configured_hosts(s: Settings) -> set[str]: ...   # every base URL the code c
 
 ## M03 `saathi/ports.py`, `saathi/clock.py`
 
-`ports.py` holds the TRD ports section 2 verbatim (ElderChannel, CaregiverChannel, Escalator, ASR, AudioCodec, TTS, VoiceStore, Vision, Gateway, AuditSink, Clock, Store) and adds:
+`ports.py` holds the TRD ports section 2 verbatim (ElderChannel, CaregiverChannel, Escalator, ASR, AudioCodec, TTS, VoiceStore, Vision, Gateway, AuditSink, Clock, Store) and adds the protocols below. The states tables (M21) and every fake are built in the same unit (WU-03), before the store, so that no later unit needs a type that comes after it:
 ```python
 class Classifier(Protocol):          # G1 local; Phase 0 has a fake only
     async def flags(self, text: str, *, run: RunId) -> list[ClassifierFlag]: ...   # ClassifierFlag(kind, score)
 class TraceExporter(Protocol):
     def span(self, name: str, **fields: SpanValue) -> None: ...   # never raises, never blocks the caller
+class Tx(Protocol):                  # what a repo needs from a transaction: execute, fetch, household, now
+    household: HouseholdId; now: datetime
+class Sealer(Protocol):              # implemented by KeyRing (M05); repos take it so M04 does not import M05
+    def seal(self, public: PublicKey, plaintext: bytes, *, aad: bytes) -> bytes: ...
+class Opener(Protocol):
+    async def open(self, tx: Tx, blob: bytes, key_id: str, *, aad: bytes) -> bytes: ...
 class MediaStore(Protocol):
     async def put(self, ref: MediaRef, blob: MediaBlob, *, household: HouseholdId) -> str: ...  # returns a local path key
     async def get(self, key: str) -> MediaBlob: ...
@@ -66,18 +74,18 @@ class MediaStore(Protocol):
 
 ```python
 class Role(StrEnum): EDGE="edge"; CORE="core"; MODEL="model"; OWNER="owner"; MIGRATOR="migrator"
-class Tx:                                     # one transaction on one connection
+class PgTx:                                   # implements ports.Tx: one transaction on one connection
     conn: asyncpg.Connection; household: HouseholdId; now: datetime
 class Store:
     def __init__(self, pool: asyncpg.Pool, role: Role, clock: Clock) -> None: ...
     @asynccontextmanager
-    async def tx(self, *, household: HouseholdId, lock_household: bool = False) -> AsyncIterator[Tx]: ...
+    async def tx(self, *, household: HouseholdId, lock_household: bool = False) -> AsyncIterator[PgTx]: ...
     @property
     def scan(self) -> ScanFns: ...            # raises PermissionError for a role without scan grants
 ```
 `tx` opens a transaction, runs `SELECT set_config('app.household_id', $1, true)` first, and with `lock_household` takes `pg_advisory_xact_lock(hashtextextended(household, 1))`. An empty household raises `TenantNotSet` before any statement. A `StoreUnavailable` wraps connection errors.
 ```python
-class ScanFns:                                # one method per security-definer function (data part, section 3)
+class ScanFns:                                # one method per security-definer function (grants part, section 2)
     async def resolve_sender(self, hmac: str) -> tuple[HouseholdId, ElderId] | None: ...
     async def resolve_approver(self, telegram_id: int) -> tuple[HouseholdId, ApproverId] | None: ...
     async def lease_next(self, now: datetime, lease_s: int = 60) -> Lease | None: ...
@@ -89,8 +97,8 @@ class ScanFns:                                # one method per security-definer 
     async def reject_inbound(self, sender_hmac: str, reason: str) -> None: ...   # tenantless insert, no household (C-6)
 ```
 Repos are stateless classes with static async methods that take `Tx` first (names from the TRD Store port):
-- `InboxRepo.insert_if_new(tx, n: NewInbox, *, public_key: PublicKey, keys: KeyRing, expires_at) -> bool` inserts the row and one sealed `raw_text` row per part with `ON CONFLICT DO NOTHING`, no RETURNING; reads the tag; `False` on a repeat. Also `renew(tx, lease, until) -> bool`, `settle(tx, lease, state) -> bool`, `mark_acked(tx, inbox_id, now)`, `set_radar_at`, `add_transcript(tx, lease, text, keys)`. Every worker write names `lease.token` and returns `False` on a stale token.
-- `RequestRepo.create_first(tx, inbox_id, elder_id, intent) -> RequestId` (id `r_<inbox>`), `transition(tx, id, from_, event, to, reason) -> bool` (one `UPDATE ... WHERE id AND state = from_`), `get`.
+- `InboxRepo.insert_if_new(tx, n: NewInbox, *, public_key: PublicKey, sealer: Sealer, expires_at) -> bool` inserts the row and one sealed `raw_text` row per part with `ON CONFLICT DO NOTHING`, no RETURNING; reads the tag; `False` on a repeat. Also `renew(tx, lease, until) -> bool`, `settle(tx, lease, state) -> bool`, `mark_acked(tx, inbox_id, now)`, `set_radar_at`, `add_transcript(tx, lease, text, sealer, public_key)`. Every worker write names `lease.token` and returns `False` on a stale token.
+- `RequestRepo.create_first(tx, inbox_id, elder_id, intent) -> RequestId` (id `r_<inbox>`), `transition(tx, id, from_, event, to, reason) -> bool` (calls `Machine.lookup` of M21, built in WU-03, then one `UPDATE ... WHERE id AND state = from_`), `get`.
 - `AlertRepo.open(tx, inbox_id, elder_id, a: AlertOpen, t0, audio_ref) -> bool`, `due(tx, event_id) -> AlertView`, `add_attempt(tx, ...) -> bool` (unique `idem_key`), `mark_attempt`, `ack(tx, event_id, approver, via: Literal["tap","dtmf"]) -> bool`, `set_stage`, `set_next_due`, `false_alarm`, `block(tx, event_id, reason)`.
 - `SignoffRepo.valid(tx, scope, now) -> SignoffState` (valid, expires_at, revoked); inserts only through the owner role.
 - `IdentityRepo.person_ref(tx, elder_id, source) -> PersonRef`, `register(tx, ...)`; the `PersonDirectory` of M08 opens `person_ref_enc` with the private half in the core.
@@ -102,8 +110,8 @@ Repos are stateless classes with static async methods that take `Tx` first (name
 ## M05 `saathi/store/keys.py` (RQ-111a)
 
 ```python
-class KeyRing:
-    def __init__(self, kek: bytes, store_reader: KeyReader) -> None: ...
+class KeyRing:                                # implements Sealer and Opener of ports.py; imports the store, never the reverse
+    def __init__(self, kek: bytes | None, reader: KeyReader) -> None: ...
     async def public(self, tx: Tx, purpose: Literal["content"]) -> PublicKey: ...    # edge and core
     def seal(self, public: PublicKey, plaintext: bytes, *, aad: bytes) -> bytes: ...  # edge may call
     async def open(self, tx: Tx, blob: bytes, key_id: str, *, aad: bytes) -> bytes: ...  # core only
@@ -186,16 +194,16 @@ class Worker:
     def __init__(self, store: Store, deps: WorkerDeps, clock: Clock, cfg: WorkerConfig) -> None: ...
     async def run_forever(self) -> None: ...                 # polls every cfg.poll_s (2 s); stops on cancel
     async def run_once(self) -> bool: ...                    # True when a row was processed; used by tests
-class Heartbeat:                                             # renews a lease every lease_s / 3
+class LeaseRenewer:                                          # renews a lease every lease_s / 3 while a step runs
     async def __aenter__(self) -> Lease: ...
     async def __aexit__(self, *exc) -> None: ...
 async def ack_pass(store: Store, deps: WorkerDeps, clock: Clock) -> int: ...   # RQ-74, outside per-elder order
-async def process(lease: Lease, deps: WorkerDeps) -> Outcome: ...             # Phase 0 steps 1 to 6 of the flow
+async def process(lease: Lease, deps: WorkerDeps) -> Outcome: ...             # steps 7 to 13 of flow 1.1
 def summary_slots(kind: MediaKind, rule_ids: Sequence[str], intent: str) -> SummarySlots: ...
 @dataclass(frozen=True)
 class RunProduced: quotes: int; sources: int; steps: int; effects: int    # all zero: the request ends failed, reason no_result (RQ-36)
 ```
-Phase 0 `process`: (1) in one `tx`: load the inbox row and its `raw_text`; (2) consent gate; (3) for audio, `AudioCodec.to_wav16k`, `ASR.transcribe`, `InboxRepo.add_transcript`; failure ends in the forward path; (4) `combine` radar on the transcript and `AlertRepo.open` (origin `radar_worker`); (5) `RequestRepo.create_first`, transition `new` to `received` (R01) then to `handoff` reason `summary_only` (R05); (6) send the caregiver summary and the elder acknowledgement, each keyed by `idem_key(inbox_id, "<effect>")`; (7) `InboxRepo.settle(processed)`. A kind `unsupported` ends `unsupported` with a summary (N08). The step never calls a model and never marks a row processed before its effects are sent. `ack_pass` sends the stored acknowledgement clip or text to rows with `acked_at` null within 10 s of `received_at`. `summary_slots` builds the one-line summary from enums and counts, never from transcript text (RQ-97).
+Phase 0 `process` follows flow 1.1 (build part) in order. (1) TX-W1: load the inbox row and its `raw_text`, `ConfigRepo.load`, `consent.gate`, `RequestRepo.create_first` (`new` to `received`, R01); a closed gate ends `blocked`, reason `consent_missing` (R02). (2) For media, `ElderChannel.fetch_media` and `MediaStore.put`; a failure inside the URL lifetime sets `media_lost` (N09) and a flagged summary. (3) For audio, `AudioCodec.to_wav16k` and `ASR.transcribe` (fakes in Phase 0); an error forwards the audio with a templated reply and no transcript. (4) TX-W2: `InboxRepo.add_transcript`, radar `combine`, `AlertRepo.open` (origin `radar_worker`). (5) TX-W3: transition `received` to `handoff`, reason `summary_only` (R05). (6) Send the caregiver summary and the elder acknowledgement, each keyed by `idem_key(inbox_id, "<effect>")`. (7) TX-W4: `InboxRepo.settle(lease, processed)`. A kind `unsupported` ends `unsupported` with a summary (N08). The step never calls a model and never marks a row processed before its effects are sent. `ack_pass` sends the stored acknowledgement clip or text to rows with `acked_at` null within 10 s of `received_at`. `summary_slots` builds the one-line summary from enums and counts, never from transcript text (RQ-97).
 - Serves: RQ-79, 35 (partial), 36, 74 (ack), 82; TQ-03, 06, 12. Never: mark a row processed before its effects are sent; call a model; hold request state in memory between steps; drop a message; write after a lost lease.
 
 ## M13 `saathi/perception/asr.py`, `saathi/voice/codec.py`, `saathi/media.py`
@@ -211,4 +219,4 @@ class LocalMediaStore:                         # MediaStore: files under `media_
 Phase 0 builds the `ASR` and `AudioCodec` ports with `FakeASR(script)` and `FakeCodec` (scripted text, `AsrUnavailable`, `AudioUndecodable`, `DecodeTimeout`); `LocalAsrClient` keeps posting what it is given and the real decode path waits for Phase 1. The ASR image loses ffmpeg and `--convert` now (change 22).
 - Errors: `AsrUnavailable`, `AudioUndecodable`, `DecodeTimeout`. Serves: RQ-16 (audio forward and the `unscanned` alert); TQ-12. Never: send audio to a hosted tier without a receipt; clear a radar flag.
 
-Skipped or not checked: no signature or query was run; the `Heartbeat` interface and the rate state shape are proposals; the module sizes were not estimated; the Telegram client library calls were not read.
+Skipped or not checked: no signature or query was run; the `LeaseRenewer` interface and the rate state shape are proposals; the module sizes were not estimated; the Telegram client library calls were not read.

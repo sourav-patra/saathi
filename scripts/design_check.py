@@ -10,7 +10,13 @@
 7. figure: edges of figures/architecture.svg equal the edge table, endpoints exist
 8. lld: every Phase 0 id of the PRD phase table is in the Serves cell of a module row (`| M01 |`) and of a test row
    (`| LT-01 |`) of the LLD files, and every id in those cells exists in a contract
-Index paths: a name with a slash is relative to the repository root; a name without one is in docs/design/.
+9. order: the work unit table of the LLD build part (`| WU-nn |` rows: Modules, After) and the module map of the LLD hub
+   (`| Mnn |` rows: Imports). Units are numbered 01.. in order; every After number is lower than the unit's own; every module
+   is created by exactly one unit; every module a unit creates imports only modules created by that unit or by a unit it
+   depends on, directly or through other After arrows. A module imported before it exists fails the check.
+Index paths (decision D-94): a name with a slash is relative to the repository root; a name without a slash is a file in
+docs/design/. Index rows are `| kind | path | 12 hex |`; spaces around the bars are optional so the index stays under 2000 bytes.
+docs/LOCKS.md and the files of docs/archive/ are records with front matter and are size checked like any record.
 Exit 0 only when every check passes.
 """
 from __future__ import annotations
@@ -143,7 +149,7 @@ def main() -> int:
     listed: dict[str, str] = {}
     kinds: dict[str, str] = {}
     for line in idx.read_text().splitlines():
-        m = re.match(r"^\| (\w+) \| (\S+) \| ([0-9a-f]{12}) \|", line)
+        m = re.match(r"^\|\s*(\w+)\s*\|\s*(\S+)\s*\|\s*([0-9a-f]{12})\s*\|", line)
         if m:
             full = resolve(root, m.group(2)).relative_to(root).as_posix()
             listed[full] = m.group(3)
@@ -167,7 +173,8 @@ def main() -> int:
             fail(f"current hash of {path} has no row in docs/LOCKS.md")
 
     # 5 sizes, closing line; 6 dashes
-    for p in [*files, idx, root / "docs" / "LOCKS.md"]:
+    archive = sorted((root / "docs" / "archive").glob("*.md"))
+    for p in [*files, idx, root / "docs" / "LOCKS.md", *archive]:
         b = p.read_bytes()
         text = b.decode()
         kind = re.search(r"^kind: (\w+)", text, re.M)
@@ -254,6 +261,85 @@ def main() -> int:
               f"{len(phase0 - mod)} without a module, {len(phase0 - tst)} without a test")
     elif lld:
         fail("lld files exist but the PRD is missing")
+
+    # 9 work unit order
+    hub = next((f for f in files if f.name == "LLD-saathi-2026-11-10.md"), None)
+    bld = next((f for f in files if f.name == "LLD-saathi-build-2026-11-10.md"), None)
+    if hub and bld:
+        imports: dict[str, set[str]] = {}
+        for line in hub.read_text().splitlines():
+            m = re.match(r"^\| (M\d+) \|", line)
+            if m:
+                c = cells(line)
+                if len(c) < 6:
+                    fail(f"order: module row {m.group(1)} has no Imports cell")
+                    continue
+                imports[m.group(1)] = set(re.findall(r"M\d+", c[5]))
+        wus: dict[int, tuple[set[str], set[int]]] = {}
+        for line in bld.read_text().splitlines():
+            m = re.match(r"^\| WU-(\d+) \|", line)
+            if m:
+                c = cells(line)
+                if len(c) < 8:
+                    fail(f"order: WU-{m.group(1)} row has no Modules and After cells")
+                    continue
+                aft: set[int] = set()
+                nums = re.findall(r"\d+|to", c[7])
+                k = 0
+                while k < len(nums):
+                    if k + 2 < len(nums) and nums[k + 1] == "to":
+                        aft |= set(range(int(nums[k]), int(nums[k + 2]) + 1))
+                        k += 3
+                    elif nums[k].isdigit():
+                        aft.add(int(nums[k]))
+                        k += 1
+                    else:
+                        k += 1
+                wus[int(m.group(1))] = (set(re.findall(r"M\d+", c[3])), aft)
+        if sorted(wus) != list(range(1, len(wus) + 1)):
+            fail("order: work units are not numbered 01.. without gaps")
+        creator: dict[str, int] = {}
+        for n, (mods, _) in sorted(wus.items()):
+            for m_ in mods:
+                if m_ in creator:
+                    fail(f"order: {m_} is created by WU-{creator[m_]:02d} and WU-{n:02d}")
+                creator.setdefault(m_, n)
+                if m_ not in imports:
+                    fail(f"order: WU-{n:02d} creates {m_}, which the module map lacks")
+        for m_ in imports:
+            if m_ not in creator:
+                fail(f"order: {m_} is created by no work unit")
+
+        def closure(n: int, seen: set[int] | None = None) -> set[int]:
+            seen = set() if seen is None else seen
+            for a in wus[n][1]:
+                if a in wus and a not in seen:
+                    seen.add(a)
+                    closure(a, seen)
+            return seen
+
+        edges = viol = 0
+        for n, (mods, aft) in sorted(wus.items()):
+            for a in aft:
+                if a not in wus or a >= n:
+                    fail(f"order: WU-{n:02d} comes after WU-{a:02d}, which is not an earlier unit")
+                    viol += 1
+            reach = closure(n) if all(a in wus for a in aft) else set()
+            for m_ in sorted(mods):
+                for i in sorted(imports.get(m_, ())):
+                    edges += 1
+                    c_ = creator.get(i)
+                    if c_ is None:
+                        continue
+                    if c_ > n:
+                        fail(f"order: {m_} (WU-{n:02d}) imports {i}, created later in WU-{c_:02d}")
+                        viol += 1
+                    elif c_ != n and c_ not in reach:
+                        fail(f"order: {m_} (WU-{n:02d}) imports {i} from WU-{c_:02d}, which WU-{n:02d} does not depend on")
+                        viol += 1
+        print(f"order: {len(wus)} work units; {len(imports)} modules; {edges} import edges; {viol} violations")
+    elif hub or bld:
+        fail("order: only one of the LLD hub and build part exists")
 
     for w in warns:
         print("warn:", w)

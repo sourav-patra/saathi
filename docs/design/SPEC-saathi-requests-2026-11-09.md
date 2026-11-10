@@ -3,7 +3,7 @@ id: SPEC-saathi-requests
 kind: contract
 governs: v1; how an elder message becomes a request, which states it can reach, which timers and templates apply
 status: draft, new in the r2 set, round-3 and TRD review fixes applied, pending owner lock (see docs/LOCKS.md)
-upstream: PRD-saathi-2026-11-09-r2.md sha256 ee2a21d4115ce10d07f5fcae7567b00866e8411d2b40380f12c03450b4e16c8d; RECORD-saathi-decisions-2026-11-09.md sha256 41bbe3270e83e1a23535f8903d7e5b60edeea9dae846b0b6feb4c3b152ff82d9
+upstream: PRD-saathi-2026-11-09-r2.md sha256 141b677d217017de6973d67f2f5d46eb549b2b40464d4f7426f4ee83d0ed15ec; RECORD-saathi-decisions-2026-11-09.md sha256 41bbe3270e83e1a23535f8903d7e5b60edeea9dae846b0b6feb4c3b152ff82d9
 sources: docs/design/RECORD-saathi-decisions-2026-11-09.md (D-nn); RQ-20, RQ-39, RQ-74, RQ-77 and RQ-78 as written in PRD-saathi-2026-11-09-r1.md (sha256 021742ba14e4d154f291d059aaf1add458e2e3b90c36992990d7518ffae1434a); src/saathi/pipeline.py and src/saathi/domain.py on branch phase-0/foundation at 3d46456; DOC-PHILOSOPHY.md
 checked-at: 3d46456, 2026-11-09. Code read with `git show`; nothing in this file was executed.
 ---

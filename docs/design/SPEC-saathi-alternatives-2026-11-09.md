@@ -3,7 +3,7 @@ id: SPEC-saathi-alternatives
 kind: contract
 governs: v1; the alternatives considered before any custom component is built, and the state of each comparison
 status: draft, new in the r2 set, round-3 and TRD review fixes applied, rows added for the TRD choices, pending owner lock (see docs/LOCKS.md)
-upstream: PRD-saathi-2026-11-09-r2.md sha256 ee2a21d4115ce10d07f5fcae7567b00866e8411d2b40380f12c03450b4e16c8d; SPEC-saathi-evidence-2026-11-09-r2.md sha256 8287da0716f654469c98397b8fb16bc2d8ab041fb1a94572e9dc245b95741386; RECORD-saathi-decisions-2026-11-09.md sha256 41bbe3270e83e1a23535f8903d7e5b60edeea9dae846b0b6feb4c3b152ff82d9
+upstream: PRD-saathi-2026-11-09-r2.md sha256 141b677d217017de6973d67f2f5d46eb549b2b40464d4f7426f4ee83d0ed15ec; SPEC-saathi-evidence-2026-11-09-r2.md sha256 84e320c15d8d622da37071101ab30bedccfdcaa0ce671f3d5fccb2cd44eccf3d; RECORD-saathi-decisions-2026-11-09.md sha256 41bbe3270e83e1a23535f8903d7e5b60edeea9dae846b0b6feb4c3b152ff82d9
 sources: section 4 of SPEC-saathi-evidence-2026-11-09.md (sha256 955dd4d2129090bdc3114a819282f26c777e815a54ff8cdfc797663143e6a4c1), expanded here; version and licence fields read from the Python package index JSON API (`https://pypi.org/pypi/<name>/json`) on 2026-11-09; DOC-PHILOSOPHY.md
 checked-at: 2026-11-09. Package metadata was read for every Python row below (E for the read; licence texts were not read). The aarch64 wheel file lists of sherpa-onnx and onnxruntime were read in the TRD pass. The source hosting service answered 403 in this pass, so non-Python rows are N.
 ---
@@ -120,7 +120,7 @@ No comparison has run. A comparison is BLOCKED until its prerequisite exists, be
 | Component | State | Prerequisite |
 |---|---|---|
 | Policy engine | BLOCKED | The 32 policy test functions at 3d46456 run against each candidate through an adapter, and a candidate adapter for token spend exists (not written) |
-| Radar | BLOCKED | The radar eval set exists, authored by someone other than the keyword author (assurance and safety RQ-16) |
+| Radar | BLOCKED | The radar eval set exists, written by the caregiver and never shown to the keyword author (assurance and safety RQ-16, D-95) |
 | Gateway | BLOCKED | The privacy-gate and cascade tests ported to each candidate; hosted terms read (POLICY-data PL-20) |
 | Phone agent, macros | BLOCKED | The bridge board and a dedicated phone exist (POLICY RQ-90) |
 | Approval token | BLOCKED | The `approval_tokens` table and the replay and expiry tests exist |

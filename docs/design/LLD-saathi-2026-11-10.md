@@ -3,13 +3,13 @@ id: LLD-saathi
 kind: contract
 governs: Phase 0 of the TRD at 3d46456: package layout, modules, data, flows, tests, CI and work units; Phase 1 as an outline
 status: draft, pending review (see docs/LOCKS.md)
-upstream: PRD-saathi-2026-11-09-r2.md sha256 ee2a21d4115ce10d07f5fcae7567b00866e8411d2b40380f12c03450b4e16c8d; SPEC-saathi-requests-2026-11-09.md sha256 7e0cee8a2dab273d3776eafd6d68d6a7a0f51e1d75fa7b55064136b0c4ed0e1e; SPEC-saathi-safety-2026-11-09-r2.md sha256 9c8988b2c9415f62ed6bb32b4247238e313319339e800fd9c9ef52f06b25e470; SPEC-saathi-assurance-2026-11-09-r2.md sha256 e9489fdd228d9f8fcd058108a61053ca7cba808f3b07d0775671888788d2f1c8; SPEC-saathi-evidence-2026-11-09-r2.md sha256 8287da0716f654469c98397b8fb16bc2d8ab041fb1a94572e9dc245b95741386; SPEC-saathi-alternatives-2026-11-09.md sha256 5bcbf4c859075f2908976d07509ec0e289036b7c008832d7d9184789df9167e1; SPEC-saathi-platform-2026-11-10.md sha256 8b84438c0b5167a7ba63c887285a3b8cca200d8045b9a86b462e74a93722b250; SPEC-saathi-product-2026-11-10.md sha256 b0543f42556020349f6e86f688f66e73832113fed3a67c10a69115123dd080b1; POLICY-saathi-2026-11-09-r2.md sha256 c4b26bb7e3e39eba4e83c73891040b125dfebc5872091dd742178264d3072ff1; POLICY-saathi-data-2026-11-09.md sha256 d892eb25058f315132efc589bbc515d961c8d50baa4aece3d16a63bd28aa48c1; TRD-saathi-2026-11-09.md sha256 4fa28f253d0ea99931584fde4f9ed025890200dd2fae175fb15ac16864af6bd2; TRD-saathi-checks-2026-11-09.md sha256 7d330c42037220e5a2eaf8945f55d9cbaf27304f3f5bae38431bd13c56973b91; TRD-saathi-checks-product-2026-11-10.md sha256 c6d68a965a9bb612b722e0c1252534b0453aa85374692331adddfd0934e720ef; TRD-saathi-states-2026-11-09.md sha256 9968ebcd8b7add49595cc4aebfa3ebb3ddbd2127609017273e5611939b7c9076; TRD-saathi-threats-2026-11-09.md sha256 1abc227d24b8ecacc9eb03bd2b103c8f881136211521b7f848f0f8e6f5c7f122; TRD-saathi-ports-2026-11-09.md sha256 ff04d8c694fdea9b73761416dcaf147963c9693aa450993079cc8a7c459596ca; TRD-saathi-ops-2026-11-09.md sha256 ba5fcd3d6265616d215104fec7d51709cca029a45c90622602f769285fc39743; TRD-saathi-build-2026-11-09.md sha256 c98c0a6044a1694458f961420d8fd5615961dbd57677033f7c737a5f195529f6; RECORD-saathi-decisions-2026-11-09.md sha256 41bbe3270e83e1a23535f8903d7e5b60edeea9dae846b0b6feb4c3b152ff82d9; RECORD-saathi-decisions-strategy-2026-11-10.md sha256 2d6d32e8f7f743b397f9daa4b429c009b5275b47232cb441fc4d2e6a8754d931
-parts: LLD-saathi-intake-2026-11-10.md, LLD-saathi-safety-2026-11-10.md, LLD-saathi-data-2026-11-10.md, LLD-saathi-tests-2026-11-10.md, LLD-saathi-build-2026-11-10.md
+upstream: PRD-saathi-2026-11-09-r2.md sha256 141b677d217017de6973d67f2f5d46eb549b2b40464d4f7426f4ee83d0ed15ec; SPEC-saathi-requests-2026-11-09.md sha256 0e595737a4216baecdc1ad6a1436d3b4351988e7fc8f26c4f752935930eb60b5; SPEC-saathi-safety-2026-11-09-r2.md sha256 711d673b563105b0115376a8fbb5b2fb6e9a12dfa06afdd4e60103bd53e8bc12; SPEC-saathi-assurance-2026-11-09-r2.md sha256 4d02d7a0ce53e02870ecb794d179f9863522f86df962c60489060c3e1069867a; SPEC-saathi-evidence-2026-11-09-r2.md sha256 84e320c15d8d622da37071101ab30bedccfdcaa0ce671f3d5fccb2cd44eccf3d; SPEC-saathi-alternatives-2026-11-09.md sha256 9d566412ad77d4afd845e8067b55e316074e37827730cb1dfaeb77ddae07378d; SPEC-saathi-platform-2026-11-10.md sha256 2ccd496e0116592e2461f70d0fdbe2190dd8373e11afda13b53206be1c303a99; SPEC-saathi-product-2026-11-10.md sha256 d39d13904842ec48b5cc0fc8284c06a0f863cfc23ff1dcdd044e401dc8682fb0; POLICY-saathi-2026-11-09-r2.md sha256 2ef14b0294378ff7a44be0e96e1f74a94c90614844e59f390eb29f1471bf339c; POLICY-saathi-data-2026-11-09.md sha256 907e2bd010ffdebe8e22a43fd693258be096922972c1846bf73f64593bf3f6c4; TRD-saathi-2026-11-09.md sha256 88d14bcfec16d0b6b158a0437c2f2c7dd61ab84b9ab7f1c8b1bf94c51d322075; TRD-saathi-checks-2026-11-09.md sha256 cd0d5447cdcfbbbb1c176e2c5073288295e2ef342f1a0b0d73aa6827a48c632d; TRD-saathi-checks-product-2026-11-10.md sha256 562f213cee78e14aac15e70f4628f00b19331369f4934892768a320ec55b1d1d; TRD-saathi-states-2026-11-09.md sha256 6a6843a411f59ce326c9573fe7ed14e6bb76ed19e30c1b9a5e3514b4bda25db6; TRD-saathi-threats-2026-11-09.md sha256 6dfaf781738ec782a607d934c7f24c835c49905e0a9d26251d21e6a836300d21; TRD-saathi-ports-2026-11-09.md sha256 993e28969a4c98164e04767cd324f88930b1e73dbc2a854f74a725be1163ec3c; TRD-saathi-ops-2026-11-09.md sha256 4ee243846c99ce3fe67dc9ebe4dc783e2a4ab6363ba425c069f374ee75dfd1f1; TRD-saathi-build-2026-11-09.md sha256 6bed289223a9cd46d5e9af197f79dae293a6199e807403d3d668c8017452fe94; RECORD-saathi-decisions-2026-11-09.md sha256 41bbe3270e83e1a23535f8903d7e5b60edeea9dae846b0b6feb4c3b152ff82d9; RECORD-saathi-decisions-strategy-2026-11-10.md sha256 8fa8da2c82c49bdee5900b977dd29c721b20ce53afe10ef9cea7c14e86d4c2b8
+parts: LLD-saathi-intake-2026-11-10.md, LLD-saathi-safety-2026-11-10.md, LLD-saathi-data-2026-11-10.md, LLD-saathi-grants-2026-11-10.md, LLD-saathi-tests-2026-11-10.md, LLD-saathi-build-2026-11-10.md
 sources: the contracts in upstream; src/, tests/, scripts/, infra/ and .github/ on branch phase-0/foundation at 3d46456; DOC-PHILOSOPHY.md; the owner's LLD exemplar for its shape (built, proposed, mapping)
 checked-at: 3d46456, 2026-11-10. Code read with `git show origin/phase-0/foundation:<path>`; nothing was run in this pass. Checks run on this set are in section 6.
 ---
 
-Read section 2 for what happens to each existing file, section 3 to find the part that specifies a module, section 4 for where this LLD departs from or adds to the TRD, and the build part for the work units and their order.
+Read section 2 for what happens to each existing file, section 3 to find the part that specifies a module, section 4 for how each departure from the TRD was resolved, and the build part for the work units and their order.
 
 # Saathi LLD: Phase 0 design and the Phase 1 outline
 
@@ -24,13 +24,14 @@ Marks follow PRD section 2. A code fact is E at 3d46456 with file and line; ever
 | LLD-saathi-2026-11-10.md | this file: layout, disposition of existing files, module map, TRD conflicts, owner questions |
 | LLD-saathi-intake-2026-11-10.md | modules M01 to M13: types, ports, store, keys, config, edge, channels, radar, redaction, worker, ASR |
 | LLD-saathi-safety-2026-11-10.md | modules M14 to M24: alerts, caregiver bot, voice, audit, traces, gateway, health, states, gate and lints, evals, admin |
-| LLD-saathi-data-2026-11-10.md | migrations 002 to 005 as SQL, roles and grants, row-level security, household keys and their rotation |
+| LLD-saathi-data-2026-11-10.md | migrations 002 to 005 as SQL, row-level security, household keys and their rotation |
+| LLD-saathi-grants-2026-11-10.md | the init script that creates roles, security-definer functions, policies, table, function and sequence grants, and the module-to-grant check |
 | LLD-saathi-tests-2026-11-10.md | test files and names per module, crash, isolation and canary tests, the Phase 0 gate rows |
-| LLD-saathi-build-2026-11-10.md | four flows with transaction boundaries, CI jobs, work units WU-01 to WU-23, the Phase 1 outline |
+| LLD-saathi-build-2026-11-10.md | four flows with transaction boundaries, CI jobs, work units WU-01 to WU-26 with their order, the Phase 1 outline |
 
 ## 2. Package layout for Phase 0
 
-Two processes share one image: the edge (`saathi-edge`, a web app that only inserts) and the worker (`saathi-worker`, one asyncio process that runs the request worker, the escalation service, the caregiver bot polling and the heartbeat). Phase 0 compose runs them as services `edge` and `worker` (C-3). The model worker, adapters and egress arrive in Phase 1.
+Two processes share one image: the edge (`saathi-edge`, a web app that only inserts) and the worker (`saathi-worker`, one asyncio process that runs the request worker, the escalation service, the caregiver bot polling and the heartbeat). Phase 0 compose runs them as services `edge` and `worker` (C-3, D-92). The model worker, adapters and egress arrive in Phase 1.
 
 ```
 src/saathi/
@@ -88,7 +89,7 @@ Disposition of every file at 3d46456 (K kept, C changed, R removed). Change numb
 | `scripts/license_audit.py`, `license_exceptions.toml` | C, K | modes for image manifests and Dockerfiles | 22 |
 | `.github/workflows/ci.yml` | C | jobs of the build part section 2 | 23, 25 |
 | `infra/sql/schema/001_init.sql` | K | never edited; forward-only migrations change it | 19 |
-| `infra/sql/00-create-databases.sh` | C | roles and logins; owner is `saathi_migrator` | 19 |
+| `infra/sql/00-create-databases.sh` | C | every role and login, created as superuser (no migration creates a role); the database is owned by `saathi_migrator`; it no longer runs 001 | 19 |
 | `infra/docker-compose.yml` | C | services `edge` and `worker`; Langfuse behind a profile | 28 |
 | `infra/Caddyfile`, `infra/Dockerfile` | C | health route and webhook routes; two commands | 27 |
 | ASR image Dockerfile under `infra/` | C | no ffmpeg, no `--convert` | 22 |
@@ -99,76 +100,94 @@ Not Phase 0 (TRD changes 13 to 18, 21, 24, 26): cache keys, tokens, caps, ride T
 
 ## 3. Module map (module to requirement)
 
-Ids are the Phase 0 requirement ids of PRD section 8. Every Phase 0 id appears in at least one row here and in at least one test row of the tests part; `scripts/design_check.py` checks both (section 6).
+Ids are the Phase 0 requirement ids of PRD section 8. Imports lists the modules a module imports; a module never imports one created by a later work unit. Every Phase 0 id appears in at least one row here and in at least one test row of the tests part; `scripts/design_check.py` checks both (section 6).
 
-| Id | Module | Serves | TQ | Part |
-|---|---|---|---|---|
-| M01 | `domain.py`, `errors.py`, `ids.py` | RQ-105, 109; PL-01 | TQ-67 | intake |
-| M02 | `config.py`, `hosts.py` | RQ-43, 110; PL-04, 12, 13, 14 | TQ-46, 47, 72 | intake |
-| M03 | `ports.py`, `clock.py` | RQ-105, 18 | TQ-67 | intake |
-| M04 | `store/` db, scan, repos, migrate | RQ-79, 109, 38, 56a, 35 | TQ-71 | intake |
-| M05 | `store/keys.py` | RQ-111a, 56a | TQ-73 | intake |
-| M06 | `householdcfg.py`, config and consent repos | RQ-110; PL-05, 33, 34 | TQ-72, 81 | intake |
-| M07 | `edge/`, `app.py` | RQ-79, 81, 16, 18, 104 | TQ-01, 02, 08 | intake |
-| M08 | `channels/whatsapp.py` | RQ-105, 81 | TQ-02, 67 | intake |
-| M09 | `channels/telegram_elder.py` | RQ-105 | TQ-67 | intake |
-| M10 | `guards/radar.py` | RQ-16, 17, 18 | TQ-08 | intake |
-| M11 | `guards/pii.py` | RQ-41, 44; PL-03 | TQ-14 | intake |
-| M12 | `worker/` | RQ-79, 36, 97 | TQ-03, 06 | intake |
-| M13 | `perception/asr.py`, `voice/codec.py`, `media.py` | RQ-16 | TQ-12 | intake |
-| M14 | `alerts/` | RQ-18, 95a; PL-26 | TQ-09, 10, 11 | safety |
-| M15 | `channels/telegram.py` | RQ-97, 18 | TQ-15, 53 | safety |
-| M16 | `voice/`, `replies.py` | RQ-17, 116 | TQ-13, 78 | safety |
-| M17 | `audit/` | RQ-56a, 95a; PL-07 | TQ-39, 41 | safety |
-| M18 | `trace/` | RQ-44, 57, 97; PL-07 | TQ-16 | safety |
-| M19 | `llm/` | RQ-40, 45, 46, 47, 48, 49, 50, 96; PL-02 | TQ-17 to 20 | safety |
-| M20 | `health.py` | RQ-104 | TQ-66 | safety |
-| M21 | `states/` | RQ-36, 35, 39 | TQ-04 | safety |
-| M22 | `scripts/` gate, rule index, doc lint, CI lint, licence audit, leak scan, commit check, repo settings, pilot counts, fault recorder | RQ-62, 63, 71, 72a, 100, 101, 117, 118, 119; PL-08, 09, 10, 11, 12, 15, 16, 17, 18, 19, 21, 22, 31 | TQ-57 to 61, 63, 79 | safety |
-| M23 | `evals/` | RQ-58, 59, 60, 61, 99 | TQ-56 | safety |
-| M24 | `admin.py` | RQ-95a, 110, 111a; PL-32, 33 | TQ-41, 80 | safety |
-| M25 | `policy/` (kept) | RQ-63; PL-36 | TQ-28, 82 | safety |
-| M26 | `scripts/design_check.py` | RQ-103; PL-24 | TQ-59 | safety |
+| Id | Module | Serves | TQ | Part | Imports |
+|---|---|---|---|---|---|
+| M01 | `domain.py`, `errors.py`, `ids.py` | RQ-105, 109; PL-01 | TQ-67 | intake | - |
+| M02 | `config.py`, `hosts.py` | RQ-43, 110; PL-04, 12, 13, 14 | TQ-46, 47, 72 | intake | M01 |
+| M03 | `ports.py`, `clock.py` | RQ-105, 18 | TQ-67 | intake | M01 |
+| M04 | `store/` db, scan, repos | RQ-79, 109, 38, 56a, 35 | TQ-71 | intake | M01, M03, M21 |
+| M05 | `store/keys.py` | RQ-111a, 56a | TQ-73 | intake | M01, M03, M04 |
+| M06 | `householdcfg.py`, config and consent repos | RQ-110; PL-05, 33, 34 | TQ-72, 81 | intake | M01, M03, M04 |
+| M07 | `edge/`, `app.py` | RQ-79, 81, 16, 18, 104 | TQ-01, 02, 08 | intake | M01, M02, M03, M04, M05, M08, M09, M10, M20 |
+| M08 | `channels/whatsapp.py` | RQ-105, 81 | TQ-02, 67 | intake | M01, M03 |
+| M09 | `channels/telegram_elder.py` | RQ-105 | TQ-67 | intake | M01, M03 |
+| M10 | `guards/radar.py` | RQ-16, 17, 18 | TQ-08 | intake | M01, M03 |
+| M11 | `guards/pii.py` | RQ-41, 44; PL-03 | TQ-14 | intake | M01 |
+| M12 | `worker/` | RQ-79, 36, 97 | TQ-03, 06 | intake | M01, M03, M04, M06, M10, M13, M16, M17 |
+| M13 | `perception/asr.py`, `voice/codec.py`, `media.py` | RQ-16 | TQ-12 | intake | M01, M03 |
+| M14 | `alerts/` | RQ-18, 95a; PL-26 | TQ-09, 10, 11 | safety | M01, M03, M04, M06, M16, M17 |
+| M15 | `channels/telegram.py` | RQ-97, 18 | TQ-15, 53 | safety | M01, M03, M04, M05, M06, M14, M17 |
+| M16 | `voice/`, `replies.py` | RQ-17, 116 | TQ-13, 78 | safety | M01, M03, M04, M17 |
+| M17 | `audit/` | RQ-56a, 95a; PL-07 | TQ-39, 41 | safety | M01, M03, M04, M05 |
+| M18 | `trace/` | RQ-44, 57, 97; PL-07 | TQ-16 | safety | M01, M03, M11 |
+| M19 | `llm/` gateway, roster, routing; `understand/router.py` | RQ-40, 45, 46, 47, 48, 49, 50, 96; PL-02 | TQ-17 to 20 | safety | M01, M03, M11 |
+| M20 | `health.py` | RQ-104 | TQ-66 | safety | M01, M03, M04 |
+| M21 | `states/` | RQ-36, 35, 39 | TQ-04 | safety | M01 |
+| M22 | `scripts/` gate, rule index, doc lint, CI lint, licence audit, leak scan, commit check, repo settings, pilot counts, fault recorder | RQ-62, 63, 71, 72a, 100, 101, 117, 118, 119; PL-08, 09, 10, 11, 12, 15, 16, 17, 18, 19, 21, 22, 31 | TQ-57 to 61, 63, 79 | safety | - |
+| M23 | `evals/` | RQ-58, 59, 60, 61, 99 | TQ-56 | safety | M10, M11 |
+| M24 | `admin.py` | RQ-95a, 110, 111a; PL-32, 33 | TQ-41, 80 | safety | M01, M02, M04, M05, M06, M16, M17 |
+| M25 | `policy/` (kept) | RQ-63; PL-36 | TQ-28, 82 | safety | - |
+| M26 | `scripts/design_check.py` | RQ-103; PL-24 | TQ-59 | safety | - |
+| M27 | `store/migrate.py`, the init script and migrations 002 to 005 | RQ-38, 109, 56a, 95a, 111a | TQ-71 | data, grants | - |
+| M28 | `llm/ledger.py` | RQ-48 | TQ-19 | safety | M01, M03, M04 |
+| M29 | `faults.py` | RQ-79 | TQ-01 | tests | - |
 
-M25 and M26 have no section of their own: M25 is unchanged code whose tests gain `@rule` markers and the no-money tests (LT-32, LT-33); M26 is the check of section 6; its check 8 reads the PRD Phase 0 row, the rows above and the `LT-` rows of the tests part.
+M27 to M29 are the migrator with the init script and migrations (data and grants parts), the Postgres ledger (safety part, M19) and the fault hooks (tests part, rule 4). M25 and M26 have no section of their own: M25 is unchanged code whose tests gain `@rule` markers and the no-money tests (LT-32, LT-33); M26 is the check of section 6; its check 8 reads the PRD Phase 0 row, the rows above and the `LT-` rows of the tests part, and its check 9 reads the Imports column and the Modules and After columns of the work units (build part section 3).
 
-## 4. Where this LLD departs from or adds to the TRD
+## 4. TRD and SPEC conflicts, resolved
 
-None of these changes a TRD file. Each is a proposal the owner can reverse by editing the named part.
+The first LLD pass found twelve places where the design set did not agree. Each is now resolved by an edit to the TRD or SPEC file named, so the documents say the same thing. The ids stay as labels in the other parts.
 
-| Id | Finding | LLD handling |
+| Id | Finding | Resolution and where it was made |
 |---|---|---|
-| C-1 | The edge may only insert (build step 2), yet the rate limit of RQ-81c counts earlier rows and reads the config | security-definer function `control.rate_state(now, elder)` returns the `not_before` time, no content |
-| C-2 | RQ-105's check runs a contract suite on the Telegram implementation in Phase 0, while the platform spec and PRD phase 1 place the Telegram bot in Phase 1 and build step 3 lists WhatsApp and a fake | Phase 0 builds the `TelegramElderChannel` class and its rows of the suite against a fake client (WU-06); the live bot, start codes and switch stay Phase 1 |
-| C-3 | Ops part section 3: Phase 0 runs one `saathi` service | two services of one image, `edge` and `worker`: the kill tests stop each alone and the edge pool holds the public key only; the zone split stays Phase 1 |
-| C-4 | RQ-81 stores an HMAC of the sender, but the household key cannot be used before the household is known | `SENDER_HMAC_KEY`, a deployment secret in the PL-14 class, used for sender lookup only |
-| C-5 | `001_init.sql` holds personal values in plain columns (`elders.wa_phone_e164`, `display_name`, `addresses`, `profile_facts.value`, E: lines 15, 31-39, 41-47); RQ-111a covers `raw_text` and hashes; `elder_identities` is listed in 012 though the edge needs it for RQ-81 | 002 creates `elder_identities` with a sealed address and drops the plain phone column; the other columns stay under row-level security and are an owner question (Q22) |
-| C-6 | A sender not yet known has no household, so `rejected_inbound` cannot satisfy RQ-38 | the table is tenantless, insert-only for the edge, read through `rejected_digest()`; the schema test lists it as the one exception with `voice_clips` |
-| C-7 | `saathi_owner` is reachable from no container (ports part section 5) but key commands need the key-encryption key | `saathi-admin` runs on the host shell where `KEK_FILE` is readable, never in a container |
-| C-8 | No migration holds a heartbeat row, yet RQ-104 needs one and the edge may not write tables other than its four | `control.heartbeats` (tenantless) and `control.beat()`, added to 005 and called by edge and worker |
-| C-9 | RQ-16's radar set must be written by someone other than the keyword author; no agent can supply that author | WU-20 commits a labelled fixture set and the harness; the real set is an owner action and the RQ-16 row reports `unavailable` until it exists |
-| C-10 | RQ-110 says agent roles only read `household_config`; the Phase 1 `/channel` switch writes a version for an approver | the core gets an insert guarded by `created_by LIKE 'approver:%'` in Phase 1; no Phase 0 role can write |
-| C-11 | The ports part makes `provider_message_id` unique and `tg_updates.update_id` the key | unique per `(household_id, provider_message_id)` and key `(bot, update_id)`: no cross-household existence signal, and ids repeat across two bots |
-| C-12 | Build change 26 and TQ-12 place the opus decode path and RQ-82 in Phase 1 | Phase 0 builds the `ASR` and `AudioCodec` ports with fakes only; the `unscanned` alert and audio forward cover audio (A11) |
+| C-1 | The edge may only insert, yet the rate limit of RQ-81c counts earlier rows and reads the config | the edge calls three security-definer functions that return an id, a time or the core heartbeat (`resolve_sender`, `rate_state`, `beat`): TRD ports section 5 edge row, TRD build step 2, SPEC safety RQ-81 |
+| C-2 | RQ-105's suite runs on the Telegram class in Phase 0, while the phase table put the Telegram bot in Phase 1 | the class is Phase 0 against a fake client; the live bot, start codes and switch are Phase 1 (D-93): PRD phase rows 0 and 1, TRD build change 30 and step 3, SPEC platform order of work |
+| C-3 | Ops part section 3 ran one `saathi` service in Phase 0 | two services of one image, `edge` and `worker` (D-92): TRD ops section 3 text and table, TRD build changes 21 and 31 and step 8, PRD Phase 0 row |
+| C-4 | RQ-81 stores an HMAC of the sender, but a household key cannot be used before the household is known | a deployment key `SENDER_HMAC_KEY` in the PL-14 class: SPEC safety RQ-81, POLICY PL-14, TRD ports 002 row |
+| C-5 | `001_init.sql` holds personal values in plain columns, and `elder_identities` was listed in 012 though the edge needs it in 002 | `elder_identities` is created in 002 with a sealed address and `elders.wa_phone_e164` is dropped; the other personal columns are sealed in the first Phase 1 migration before any real row (D-91): TRD ports 002, 010 and 012 rows, SPEC platform RQ-111b |
+| C-6 | A sender not yet known has no household, so `rejected_inbound` cannot satisfy RQ-38 | the tables with no household column are `rejected_inbound`, `voice_clips` and `heartbeats`, an exact list in the schema test: TRD ports section 4, SPEC platform RQ-109 |
+| C-7 | `saathi_owner` was reachable from no container, but key commands need the key-encryption key | `saathi-admin` runs on the host shell where `KEK_FILE` is readable, never in a container: TRD ports section 5 owner row |
+| C-8 | No migration held a heartbeat row, and the edge may not write other tables | `control.heartbeats` (tenantless) and `control.beat()`, in 005: TRD ports 005 row and edge row |
+| C-9 | RQ-16's radar set needs an author other than the keyword author | the caregiver writes about 100 Hindi and Hinglish phrases as a manual receipt (D-95): SPEC safety RQ-16, SPEC product G-6, SPEC evidence suite registry, SPEC alternatives, TRD build step 4 |
+| C-10 | RQ-110 says agent roles only read `household_config`, but the Phase 1 `/channel` switch writes | in Phase 1 the core may insert a version for the switch alone, guarded by `created_by` naming an approver; no Phase 0 role can write: SPEC platform RQ-110 |
+| C-11 | The ports part made `provider_message_id` unique and `update_id` the key | unique per `(household_id, provider_message_id)` and key `(bot, update_id)`: TRD ports 002 and 003 rows, SPEC safety RQ-79 |
+| C-12 | Change 26 and TQ-12 place the opus decode path in Phase 1 | Phase 0 builds the `ASR` and `AudioCodec` ports with fakes and the `unscanned` alert and audio forward cover audio (A11): TRD build change 3, TQ-12 |
 
-New tables and functions beyond the ports part section 4 list: `elder_identities` (early), `control.heartbeats`, functions `rate_state`, `beat`, `resolve_approver`, `unscanned_audio`, `reap_inbox`, `unacked_inbox`, `rejected_digest`, and the `schema_migrations` table of the migrator.
+Functions beyond the TRD ports part: `rate_state`, `beat`, `resolve_approver`, `unscanned_audio`, `reap_inbox`, `unacked_inbox`, `rejected_digest`; and the `schema_migrations` table of the migrator.
 
-## 5. Owner questions
+## 5. Owner decisions applied
 
-Each has a recommendation; none blocks WU-01 to WU-07.
+The five owner questions of the first LLD pass are decided and recorded in RECORD-saathi-decisions-strategy-2026-11-10.md.
 
-| Id | Question | Recommendation |
+| Id | Decision | Applied in |
 |---|---|---|
-| Q22 | Seal `addresses`, `profile_facts.value` and the display names (C-5) before the first real household row, or leave them readable under row-level security | seal them in a Phase 1 migration 014 item and keep Phase 0 synthetic-only; the consent gate already blocks real data |
-| Q23 | Accept two compose services in Phase 0 (C-3) | accept |
-| Q24 | Accept the Telegram elder class in Phase 0 with the live bot in Phase 1 (C-2), or move RQ-105 to Phase 1 | accept, so RQ-105 keeps its phase |
-| Q25 | Accept the index form that lists paths under `docs/design/` by file name only (index limit 2 KB, section 6) | accept; the other way is to move the LLD parts under one listed hub |
-| Q26 | Who writes the radar set of RQ-16, 100 positives per class (C-9) | the caregiver, in Hinglish, before WU-20 ends |
+| D-91 (Q22) | addresses and profile values are sealed with per-household keys in the first Phase 1 migration, before any real data; Phase 0 is synthetic only | data part section 3, TRD ports 010 row, SPEC platform RQ-111b |
+| D-92 (Q23) | two compose services, `edge` and `worker` | TRD ops, TRD build, PRD, work unit WU-22 |
+| D-93 (Q24) | the Telegram elder channel class is Phase 0 | PRD phase table, TRD build, SPEC platform, WU-08 |
+| D-94 (Q25) | a name with no slash in the index is a file in `docs/design/` | SPEC evidence RQ-101 and RQ-103, `scripts/design_check.py` |
+| D-95 (Q26) | the caregiver writes the radar set, about 100 phrases, as a manual receipt | SPEC safety RQ-16, SPEC product G-6, SPEC evidence registry, tests part section 4 |
 
-Decision recorded with this LLD: D-90, in RECORD-saathi-decisions-strategy-2026-11-10.md: `saathi` is a working codename; the public name follows the first stable test, after a private shortlist and a trademark registry search; the elder-facing persona name is private config and never the codename.
+Decision recorded with the first LLD pass: D-90, in the same record: `saathi` is a working codename; the public name follows the first stable test, after a private shortlist and a trademark registry search; the elder-facing persona name is private config and never the codename.
 
 ## 6. Checks run on this design set
 
-`python3 scripts/design_check.py` gains check 8: every Phase 0 id of the PRD phase table appears in the Serves cell of a module row (`| M` rows of the hub) and of a test row (`| LT-` rows of the tests part), and every id in those cells exists in a contract. Result on this set, run 2026-11-10: `lld: 68 Phase 0 ids; 26 module rows and 48 test rows; 0 without a module, 0 without a test`, `result: OK`. Deliberate faults, each on a scratch copy with pins, index and locks recomputed so that only check 8 failed: removing RQ-104 from the M07 and M20 rows printed `lld: Phase 0 ids with no module row: RQ-104`; replacing RQ-117, 118, 119 in LT-45 with RQ-300 printed `no test row: RQ-117, RQ-118, RQ-119` and `test rows name ids no contract defines: RQ-300`; a changed hex digit in a pin printed `pin of ... is stale`. The index lists paths under `docs/design/` by file name only, as its first line says. Pins: every part pins this hub and the contracts it relies on; this file pins all 20 upstream contracts.
+`python3 scripts/design_check.py` has check 8 (every Phase 0 id has a module row and a test row) and check 9 (work unit order: each unit's After numbers are lower than its own, every module is created by one unit, and every module a unit creates imports only modules created by that unit or by a unit it depends on). It also size-checks `docs/LOCKS.md` and the files of `docs/archive/`. Result, run 2026-11-10 after the final review fixes:
 
-Skipped or not checked: no code, SQL or test ran; the result block in the TRD checks part is older (23 index rows, no check 8) and was not edited; the TRD was read in full but the threats part only by search; hosted terms and licences were not read; the module signatures were not type-checked; the work unit sizes were not estimated; the reader check of this LLD did not run.
+```
+coverage: 117 RQ ids and 37 PL ids in the contracts; 83 TQ rows; 154 mapped, 0 unmapped, 0 unknown
+pins: 156 upstream pins checked
+index: 30 rows checked
+sizes, closing lines, dashes: checked
+figure: 26 edges match the edge table; 20 of 22 components drawn; not drawn: C19, C20
+lld: 68 Phase 0 ids; 29 module rows and 51 test rows; 0 without a module, 0 without a test
+order: 26 work units; 29 modules; 80 import edges; 0 violations
+result: OK
+```
+
+Deliberate faults, each on a scratch copy with pins, index and locks recomputed so that only the named check failed. Check 8: removing RQ-104 from the M07 and M20 rows printed `lld: Phase 0 ids with no module row: RQ-104`. Check 9: moving the creation of M01, M03 and M21 from WU-03 to WU-09, which reproduces the review I blocker, printed 19 violations, the first `M04 (WU-06) imports M01, created later in WU-09`; deleting the arrow 03 from the After cell of WU-06 printed 15, the first `M04 (WU-06) imports M01 from WU-03, which WU-06 does not depend on`. Size: padding `docs/LOCKS.md` to 28924 bytes printed `LOCKS.md: 28924 bytes over 16000` (before this pass the script skipped that file, which had no front matter). A changed hex digit in a pin printed `pin of ... is stale`.
+
+Database run. The role section of the grants part ran as the PostgreSQL superuser, then 001 to 005 with their appends ran as `saathi_migrator` (a non-superuser) on PostgreSQL 16.15 in a scratch instance, which was stopped and removed afterwards. A smoke test of 46 assertions passed. The edge inserted into `inbox` (a repeat inserted nothing), `raw_text`, `rejected_inbound` and `alert_events`, and called `resolve_sender`, `rate_state` and `beat`; it could not read `inbox` or `raw_text`, call `lease_next` or `audit_append`, or write the core heartbeat. `saathi_scan` listed all households. `lease_next` leased one row and a second call returned none for the busy elder; the other scan functions ran and left the household setting as they found it. `audit_append` worked for core and owner and raised `TenantNotSet` with no household; `UPDATE` and `DELETE` on `audit_log` were denied to core, owner, readonly and audit. The owner created a household, elder, approver, identity and keys, rotated and rewrapped a key, granted and revoked a sign-off, and wrote consent, config and an audit row. No function held `EXECUTE` through `PUBLIC`, and only `saathi_readonly` had `BYPASSRLS`. Without the sequence grant the edge insert on `rejected_inbound` failed with `permission denied for sequence rejected_inbound_id_seq`; with it the insert passed. The run found three traps now written into the grants part: a schema-level default privilege cannot remove `PUBLIC` execute, grants must come before the ownership transfer, and the transfer needs `CREATE` on the schema for the new owner.
+
+Skipped or not checked: no Python, test or script of the LLD ran, because none exists yet; the SQL ran with `psql` and not through `saathi.store.migrate`; two concurrent workers on `lease_next` were not run; the Phase 1 outline interfaces were not compared with the alternatives records; unit sizes were not estimated or timed; the reader check of this LLD did not run.

@@ -1,16 +1,16 @@
 ---
 id: LLD-saathi-data
 kind: contract
-governs: Phase 0 migrations 002 to 005, roles, row-level security and household keys; part of LLD-saathi-2026-11-10.md
+governs: Phase 0 migrations 002 to 005 (tables), row-level security and household keys; part of LLD-saathi-2026-11-10.md; roles, functions and grants are in LLD-saathi-grants-2026-11-10.md
 status: draft, pending review
-upstream: TRD-saathi-ports-2026-11-09.md sha256 ff04d8c694fdea9b73761416dcaf147963c9693aa450993079cc8a7c459596ca; SPEC-saathi-platform-2026-11-10.md sha256 8b84438c0b5167a7ba63c887285a3b8cca200d8045b9a86b462e74a93722b250; POLICY-saathi-data-2026-11-09.md sha256 d892eb25058f315132efc589bbc515d961c8d50baa4aece3d16a63bd28aa48c1; LLD-saathi-2026-11-10.md sha256 a4217aeeee13ff47e529f8e567012358e2efe65b32b23f4f482d06470c3ba482
+upstream: TRD-saathi-ports-2026-11-09.md sha256 993e28969a4c98164e04767cd324f88930b1e73dbc2a854f74a725be1163ec3c; SPEC-saathi-platform-2026-11-10.md sha256 2ccd496e0116592e2461f70d0fdbe2190dd8373e11afda13b53206be1c303a99; POLICY-saathi-data-2026-11-09.md sha256 907e2bd010ffdebe8e22a43fd693258be096922972c1846bf73f64593bf3f6c4; LLD-saathi-2026-11-10.md sha256 bda71cce7ddb7c9fe5b18223d08d360f881cfc660c1d3befaf70294488692309
 sources: infra/sql/schema/001_init.sql and 00-create-databases.sh at 3d46456; the TRD ports part sections 4 and 5
-checked-at: 3d46456, 2026-11-10. 001 read with `git show`; no SQL ran.
+checked-at: 3d46456, 2026-11-10. 001 read with `git show`; the SQL of sections 2 ran on PostgreSQL 16.15 in a scratch instance on 2026-11-10 (hub section 6).
 ---
 
-Read section 1 for the table rules, 2 for the four migrations, 3 for roles and grants, 4 for keys.
+Read section 1 for the table rules, 2 for the four migrations, 3 for where roles and grants moved, 4 for keys.
 
-# Saathi LLD data: Phase 0 schema, roles, row-level security and keys
+# Saathi LLD data: Phase 0 schema, row-level security and keys
 
 ## 1. Rules for every table
 
@@ -173,16 +173,7 @@ SELECT control.apply_tenant_rls(t) FROM unnest(ARRAY['control.signoffs','control
   'control.household_keys']::regclass[]) AS t;
 ```
 
-`household_config.values` is validated by `HouseholdConfig` (M06). Section 3 lists the roles, functions and grants that 004 also creates, in this form:
-
-```sql
-DO $r$ DECLARE n text; BEGIN
-  FOREACH n IN ARRAY ARRAY['saathi_edge','saathi_core','saathi_model','saathi_audit','saathi_scan','saathi_owner','saathi_readonly']
-  LOOP IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = n) THEN EXECUTE format('CREATE ROLE %I NOLOGIN', n); END IF; END LOOP;
-END $r$;
-ALTER ROLE saathi_readonly BYPASSRLS;
-REVOKE ALL ON ALL TABLES IN SCHEMA public, control FROM PUBLIC;
-```
+`household_config.values` is validated by `HouseholdConfig` (M06). Migration 004 also appends the policies, functions and grants of LLD-saathi-grants-2026-11-10.md section 2; no migration creates a role.
 
 ### 005_ledger_voice_flags.sql (RQ-48, 32, 38; D-69, D-71)
 
@@ -208,65 +199,13 @@ ALTER TABLE llm_spend ALTER COLUMN household_id SET NOT NULL;
 SELECT control.apply_tenant_rls(t) FROM unnest(ARRAY['approvals','llm_spend','llm_reservations']::regclass[]) AS t;
 ```
 
-`voice_clips` holds no household data (a clip holds no name or number, D-69), so it has no policy and joins `TENANTLESS` in the schema test. The loader refuses a row with `reviewed_by` NULL (`ClipUnreviewed`); only `saathi_owner`, after a receipt exists, sets the review columns.
+`voice_clips` holds no household data (a clip holds no name or number, D-69), so it has no policy and joins `TENANTLESS` in the schema test. The loader refuses a row with `reviewed_by` NULL (`ClipUnreviewed`); only `saathi_owner`, after a receipt exists, sets the review columns. Migration 005 also appends `control.beat` and the grants of its tables (grants part, section 3).
 
-## 3. Roles, functions and grants (in 004; 005 grants its own tables)
+## 3. Roles, functions and grants
 
-Roles are created `NOLOGIN` by 004 if absent; `infra/sql/00-create-databases.sh` gives each a login and the password from its own variable (E: it creates one role `saathi` today, lines 6-7; a one-off `REASSIGN OWNED BY saathi TO saathi_migrator` serves old databases). None has `BYPASSRLS` except `saathi_readonly`.
+They moved to LLD-saathi-grants-2026-11-10.md so that each file stays under its size limit. Role creation is in the superuser init script, never in a migration. Migrations 004 and 005 append the functions, policies, table grants and sequence grants of that file, each in the same transaction as the tables they cover. No role has `BYPASSRLS` except `saathi_readonly`. The cross-tenant suite (TQ-71) covers every table and role.
 
-Security-definer functions, schema `control`, owner `saathi_scan` unless noted:
-
-| Function | Returns | Rule |
-|---|---|---|
-| `resolve_sender(p_hmac text)` | `(household_id, elder_id)` of an active `elder_identities` row, or none | policy `scan_ident` (`FOR SELECT TO saathi_scan USING (true)`) |
-| `resolve_approver(p_telegram_id bigint)` | `(household_id, approver_id)` | policy `scan_appr` on `approvers` |
-| `lease_next(p_now timestamptz, p_lease_s int)` | at most one `(household_id, inbox_id, elder_id, lease_token)` | loops households with `app.household_id` set locally and applies the lease rules of the states part, section 5 (body below) |
-| `reap_inbox(p_now timestamptz)` | ids of rows set `dead` | a row `leased` past `lease_until` with `attempts >= 5` becomes `dead` (N10) |
-| `unacked_inbox(p_now timestamptz, p_limit int)` | `(household_id, inbox_id)` | rows with `acked_at` null, state `received` or `leased` (RQ-74 pass) |
-| `rate_state(p_now timestamptz, p_elder text)` | `not_before timestamptz` or NULL | in the caller's household: reads the newest `household_config` (`rate_limit_msgs`, `rate_limit_window_s`, defaults 20 and 600) and counts the elder's `inbox` rows in the window; at the limit returns the time the window frees (C-1) |
-| `beat(p_component text, p_now timestamptz, p_status text)` | `(core_at, core_status)` | upserts one `heartbeats` row and returns the newest `core` row; the edge route and the worker loop call it (C-8) |
-| `due_alerts(p_now timestamptz, p_limit int)` | `(household_id, event_id)` | open events with `next_due_at <= p_now` |
-| `unscanned_audio(p_now timestamptz, p_max_s int)` | `(household_id, inbox_id)` | audio rows with no transcript part and `received_at + p_max_s < p_now` (A11) |
-| `rejected_digest(p_since timestamptz)` | `(distinct_senders int, total int)` | counts `rejected_inbound` through policy `rej_dig` (`FOR SELECT TO saathi_scan USING (true)`) |
-| `audit_append(p_run, p_actor, p_event, p_subject, p_payload_hmac, p_key_id, p_detail)` | `seq bigint` | owner `saathi_audit`; raises `TenantNotSet` with no household set; inserts under that household |
-
-`lease_next` core:
-
-```sql
-FOR r IN
-  SELECT DISTINCT ON (i.elder_id) i.id, i.elder_id FROM inbox i
-  WHERE (i.state = 'received' OR (i.state = 'leased' AND i.lease_until < p_now))
-    AND (i.not_before IS NULL OR i.not_before <= p_now) AND i.attempts < 5
-    AND NOT EXISTS (SELECT 1 FROM inbox l WHERE l.elder_id = i.elder_id
-                    AND l.state = 'leased' AND l.lease_until >= p_now)
-  ORDER BY i.elder_id, i.received_at, i.id
-LOOP
-  CONTINUE WHEN NOT pg_try_advisory_xact_lock(hashtextextended(r.elder_id, 0));
-  UPDATE inbox SET state = 'leased', lease_until = p_now + make_interval(secs => p_lease_s),
-         lease_token = gen_random_uuid(), attempts = attempts + 1
-   WHERE id = r.id AND (state = 'received' OR lease_until < p_now) RETURNING ... INTO row;
-  IF FOUND THEN RETURN NEXT; RETURN; END IF;
-END LOOP;
-```
-
-Grants; `-` is none. Columns not named in an UPDATE grant cannot change. `saathi_scan` holds what its functions need: SELECT on `households`, `inbox`, `alert_events`, `raw_text`, `household_config`; UPDATE on the lease columns of `inbox`; INSERT and UPDATE on `heartbeats`.
-
-| Table or function | edge | core | model | audit | owner | readonly |
-|---|---|---|---|---|---|---|
-| `inbox` | INSERT | SELECT; UPDATE (state, attempts, lease_until, lease_token, acked_at, radar_at, not_before) | - | - | - | SELECT |
-| `raw_text` | INSERT | SELECT, INSERT | - | - | - | SELECT |
-| `rejected_inbound` | INSERT | - | - | - | - | SELECT |
-| `alert_events` | INSERT | SELECT, INSERT; UPDATE (state, stage, next_due_at, acked_by, acked_at, false_alarm, blocked_reason, followup_due_at, last_elder_clip_at) | - | - | - | SELECT |
-| `alert_attempts`, `tg_updates` | - | SELECT, INSERT, UPDATE (status, sent_at, provider_ref_hmac) | - | - | - | SELECT |
-| `requests`, `quotes`, `commits`, `approvals`, `elders`, `approvers`, `addresses`, `profile_facts`, `runtime_flags`, `elder_identities` | - | SELECT, INSERT, UPDATE (request path columns); no DELETE | - | - | SELECT | SELECT |
-| `llm_reservations`, `llm_spend` | - | - | SELECT, INSERT, UPDATE (state, settled_inr) on reservations only | - | - | SELECT |
-| `audit_log` | - | none | - | INSERT, SELECT (seq) | - | SELECT |
-| `control.signoffs`, `consent_events`, `household_config` | - | SELECT | - | - | INSERT | SELECT |
-| `control.household_keys` | SELECT (household_id, purpose, key_id, public_key, retired_at) | SELECT | - | - | INSERT | SELECT |
-| `voice_clips` | - | SELECT | - | - | INSERT, UPDATE (reviewed_by, reviewed_at, receipt_ref) | SELECT |
-| EXECUTE | `resolve_sender`, `rate_state`, `beat` | every function of this section | - | - | - | - |
-
-The cross-tenant suite (TQ-71) covers every table and role above.
+Sealed personal columns (D-91). Phase 0 holds synthetic data only. Before any real row, the first Phase 1 migration seals `addresses` (label, formatted, lat, lng), `profile_facts.value` and the display names of `elders`, `approvers` and `households` with the household `content` key, as `elder_identities.person_ref_enc` already is. Until then these columns stay readable by their roles under row-level security, and the consent gate blocks real data (C-5).
 
 ## 4. Household keys (RQ-111a)
 
@@ -286,11 +225,11 @@ Formats, all in `saathi/store/keys.py`:
 5. The KEK is the file `KEK_FILE`, mounted into the worker only; the database, the edge and `saathi_model` never see it (PL-14).
 
 Procedures, owner commands of `saathi-admin` on the host shell where `KEK_FILE` is readable (C-7):
-1. `keys init <household>` generates the three keys, wraps them, inserts them and prints the `key_id`s.
-2. Rotate `content` or `audit`: in one transaction set `retired_at` on the active row, then insert the new row (the unique index allows one active key). New rows use the new key; old rows stay readable by their `key_id`. The 30 day expiry retires old `raw_text`; the Phase 1 job (RQ-111b) re-encrypts media and identities.
-3. Rotate the KEK: `keys rewrap --old-file F1 --new-file F2` re-wraps every `wrapped_key`; then `KEK_FILE` points at F2. A read before and after gives the same plaintext.
+1. `keys init <household>` (after `household create`) generates the three keys, wraps them, inserts them and prints the `key_id`s.
+2. `keys rotate <household> <purpose>` for `content` or `audit`: in one transaction (owner holds `UPDATE (retired_at)` and `INSERT`) set `retired_at` on the active row, then insert the new row (the unique index allows one active key). New rows use the new key; old rows stay readable by their `key_id`. The 30 day expiry retires old `raw_text`; the Phase 1 job (RQ-111b) re-encrypts media and identities.
+3. Rotate the KEK: `keys rewrap --old-file F1 --new-file F2` re-wraps every `wrapped_key` (owner holds `SELECT` and `UPDATE (wrapped_key)`, and reads all households through policy `owner_hh`); then `KEK_FILE` points at F2. A read before and after gives the same plaintext.
 4. Erase a household (Phase 1, RQ-111b): destroy its three key rows after the erasure record exists.
 
 Limits: the backup role and a holder of the KEK see every household (L-11); `SENDER_HMAC_KEY` is shared by households; `raw_text` expiry waits for the Phase 1 retention job (RQ-42).
 
-Skipped or not checked: no SQL ran; `lease_next` rests on recalled Postgres behaviour (a `FOR UPDATE` lock may need a subquery, settled by `tests/test_lease.py`); column grants and role order in 004 were not tried.
+Skipped or not checked: the key procedures and the sealed formats of section 4 are not code and did not run; the Phase 1 sealing migration is not written; the Python migrator was not run, the SQL files were applied with `psql`.

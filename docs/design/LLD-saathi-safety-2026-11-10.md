@@ -3,7 +3,7 @@ id: LLD-saathi-safety
 kind: contract
 governs: Phase 0 modules M14 to M24: escalation, caregiver bot, voice, audit, traces, gateway and ledger, health, state tables, gate, lints, evals, admin; part of LLD-saathi-2026-11-10.md
 status: draft, pending review
-upstream: TRD-saathi-2026-11-09.md sha256 4fa28f253d0ea99931584fde4f9ed025890200dd2fae175fb15ac16864af6bd2; TRD-saathi-states-2026-11-09.md sha256 9968ebcd8b7add49595cc4aebfa3ebb3ddbd2127609017273e5611939b7c9076; SPEC-saathi-evidence-2026-11-09-r2.md sha256 8287da0716f654469c98397b8fb16bc2d8ab041fb1a94572e9dc245b95741386; LLD-saathi-2026-11-10.md sha256 a4217aeeee13ff47e529f8e567012358e2efe65b32b23f4f482d06470c3ba482
+upstream: TRD-saathi-2026-11-09.md sha256 88d14bcfec16d0b6b158a0437c2f2c7dd61ab84b9ab7f1c8b1bf94c51d322075; TRD-saathi-states-2026-11-09.md sha256 6a6843a411f59ce326c9573fe7ed14e6bb76ed19e30c1b9a5e3514b4bda25db6; SPEC-saathi-evidence-2026-11-09-r2.md sha256 84e320c15d8d622da37071101ab30bedccfdcaa0ce671f3d5fccb2cd44eccf3d; LLD-saathi-2026-11-10.md sha256 bda71cce7ddb7c9fe5b18223d08d360f881cfc660c1d3befaf70294488692309
 sources: src/saathi/, scripts/, tests/, evals/ on branch phase-0/foundation at 3d46456; the TRD components table, ports, states and build parts; DOC-PHILOSOPHY.md
 checked-at: 3d46456, 2026-11-10. Code read with `git show`. Nothing below was run in this pass.
 ---
@@ -99,7 +99,7 @@ def traced(name: str, exporter: TraceExporter): ...  # decorator; records ids an
 Files `trace-<YYYY-MM-DD>.jsonl`, one line per span, rotated by `clock`, pruned at 30 days. A string value over 64 characters, or one failing `assert_clean`, is replaced by `"<dropped>"` and `dropped` is counted. `span` catches every exception (unwritable file, full disk), counts `export_errors` and returns. E: `pipeline.py:128-135` traces whole node outputs and `observability.py:26-33` masks ID patterns only; both go, and the Langfuse client moves behind the Phase 1 exporter (changes 7, 28).
 - Serves: RQ-57, 44; TQ-16. Never: export text, prompts or whole node outputs; fail a request; stand in for the audit trail.
 
-## M19 `saathi/llm/` (gateway.py, ledger.py, roster.py, routing.py)
+## M19 `saathi/llm/` (gateway.py, ledger.py, roster.py, routing.py) and `saathi/understand/router.py`
 
 ```python
 class Sensitivity(StrEnum): PERSONAL="personal"; PUBLIC="public"        # E: personal: bool, gateway.py:177-186
@@ -124,7 +124,7 @@ class Roster:
     def load(cls, entries: Sequence[RosterEntry]) -> Roster: ...    # RosterEntry carries receipts per data class and media class
     def tiers(self, grade: Grade, sensitivity: Sensitivity, media: frozenset[MediaClass]) -> list[TierSpec]: ...
 ```
-Rules in code. `complete` defaults sensitivity to PERSONAL and calls `assert_clean` on text before a hosted tier; tier F takes only a `PublicPayload`; fallback goes up one grade on schema failure, low confidence or outage and never down; a refusal is a result field and is never retried; `cascade` raises `NoAcceptedResult` and never returns an unaccepted result (E: it returns the last result, `gateway.py:278-280`); one schema retry at the same grade then `SchemaFailure`. `reserve` raises `BudgetExceeded` when `cap` is None, a price is missing, or the month total plus the reservation passes the cap; the 80% alert is a returned flag the caller sends. T4 leaves the router cascade (change 12). `Roster.load` raises `ReceiptMissing` for an entry with no receipt on a class; `tiers` omits a tier with no receipt for any media class in the request.
+Rules in code. `complete` defaults sensitivity to PERSONAL and calls `assert_clean` on text before a hosted tier; tier F takes only a `PublicPayload`; fallback goes up one grade on schema failure, low confidence or outage and never down; a refusal is a result field and is never retried; `cascade` raises `NoAcceptedResult` and never returns an unaccepted result (E: it returns the last result, `gateway.py:278-280`); one schema retry at the same grade then `SchemaFailure`. `reserve` raises `BudgetExceeded` when `cap` is None, a price is missing, or the month total plus the reservation passes the cap; the 80% alert is a returned flag the caller sends. T4 leaves the router cascade (change 12). `understand/router.py` (E, kept for Phase 1) is adapted in the gateway unit to call `Gateway.complete` so that the package compiles; no Phase 0 path calls it. `Roster.load` raises `ReceiptMissing` for an entry with no receipt on a class; `tiers` omits a tier with no receipt for any media class in the request.
 - Errors: `PrivacyViolation`, `BudgetExceeded`, `ReceiptMissing`, `SchemaFailure`, `NoAcceptedResult`. Serves: RQ-40, 45 to 50, 96; PL-02, 03; TQ-17 to 20. Never: default to PUBLIC; send personal data to tier F; retry a refusal on another tier; return an unaccepted result; call a paid tier with the cap unset or a price missing; hold a provider key.
 
 ## M20 `saathi/health.py`
@@ -135,7 +135,7 @@ async def disk_probe(path: Path, warn_free_pct: float = 20, fail_free_pct: float
 async def skew_probe(store: Store, clock: Clock, warn_s: float = 5, refuse_s: float = 15) -> ProbeResult: ...
 def decide(core_beat_at: datetime | None, core_status: str, now: datetime, max_age_s: int = 30) -> int: ...  # 200 or 503
 ```
-The edge route (M07) calls `control.beat('edge', now)` which returns the newest core beat and status, so a failed write or an old beat gives 503; the body is `ok` or empty. A probe that cannot run is `unavailable`, never ok. Data part section 2 adds the table and function (C-8).
+The edge route (M07) imports `decide` and calls `control.beat('edge', now)` which returns the newest core beat and status, so a failed write or an old beat gives 503; the body is `ok` or empty. A probe that cannot run is `unavailable`, never ok. Data part section 2 adds the table and function (C-8).
 - Serves: RQ-104; TQ-66. Never: answer `ok` on a stale heartbeat, a failed write or a full disk.
 
 ## M21 `saathi/states/` (tables.py, machine.py)
@@ -191,7 +191,13 @@ CLI `python -m evals.run <suite>|--all`. It exits 1 when a dataset is missing, n
 
 ## M24 `saathi/admin.py` (entry `saathi-admin`)
 
-Commands, each opening the `saathi_owner` pool from `SAATHI_DB_URL_OWNER` and writing an audit row `system:owner_cli`: `keys init <household>`, `keys rewrap`, `signoff grant SO-1 --days 90 | revoke`, `consent record --file <json>`, `config set <household> --file <json>`, `clips review <key> <version> --receipt <path>`, `elder register <household> <elder> --channel <name>` (refuses `whatsapp` without a valid allowing terms receipt, PL-32). The command reads no secret from a container environment that holds a model client.
-- Serves: RQ-95a, 110, 111a; PL-05, 32, 33, 34; D-71. Never: run from a container; write on behalf of an agent role.
+Each command opens the `saathi_owner` pool from `SAATHI_DB_URL_OWNER`, sets `app.household_id` to the household it names, and writes an audit row `system:owner_cli` through `audit_append` (the owner role holds `EXECUTE` on it). Commands, in the order a new household needs them:
+1. `household create <household> --name <text>`, `elder add <household> <elder> --name <text> --lang hi`, `approver add <household> <approver> --telegram-id <n> [--primary]`: inserts into `households`, `elders`, `approvers`.
+2. `keys init <household>`, `keys rotate <household> <purpose>`, `keys rewrap --old-file F1 --new-file F2` (data part section 4).
+3. `identity add <household> <elder> --channel <name> --sender <id>`: computes `sender_hmac` under `SENDER_HMAC_KEY`, seals the platform address with the content key and inserts `elder_identities`; refuses `whatsapp` without a valid allowing terms receipt (PL-32). It needs step 2 first.
+4. `signoff grant SO-1 --days 90 | revoke`, `consent record --file <json>`, `config set <household> --file <json>`, `clips review <key> <version> --receipt <path>`.
+
+The grants in the grants part give the owner exactly these writes: insert on the four identity tables, keys, sign-offs, consent and config; update of `retired_at` and `wrapped_key` on keys, of `revoked_at` on sign-offs, of `active` on identities, of the review columns on clips. The command reads no secret from a container environment that holds a model client.
+- Serves: RQ-95a, 110, 111a; PL-05, 32, 33, 34; D-71; TQ-41, 80. Never: run from a container; write on behalf of an agent role; create an identity before the household has keys.
 
 Skipped or not checked: no signature was run; the cadence constants are the SPEC defaults and were not measured; stage b and c providers are not designed here (Phase 1); `AlertView`, `SummarySlots` and `Probe` fields are left to the work unit; the licence of each library named is read by the audit, not here.
