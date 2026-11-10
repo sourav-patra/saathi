@@ -5,7 +5,7 @@ revision: r2
 governs: v1 (phases 0 to 4); phase 5 items are marked P
 status: draft r2, round-3 and TRD review fixes applied, pending owner lock (see docs/LOCKS.md)
 supersedes: PRD-saathi-2026-11-09-r1.md sha256 021742ba14e4d154f291d059aaf1add458e2e3b90c36992990d7518ffae1434a, which had replaced a first draft with sha256 a784aba1ef15c35c41f01a04e0d94248a008f416c9307f2462190187f27e4b29
-upstream: RECORD-saathi-decisions-2026-11-09.md sha256 62594515dd94e4441da30ab0752cad3867eb2982bf61e0c89156f76400cc540a
+upstream: RECORD-saathi-decisions-2026-11-09.md sha256 c04a9cf5bcf98fc95fe4715ef8ed40b800522aac020463262e88ccc307e5fce4
 sources: docs/design/RECORD-saathi-decisions-2026-11-09.md (cited as D-nn); docs/ARCHITECTURE.md, docs/DECISIONS.md, docs/ROADMAP.md, evals/README.md, src/, tests/ and infra/sql/schema/001_init.sql on branch phase-0/foundation at 3d46456; DOC-PHILOSOPHY.md
 checked-at: 3d46456, 2026-11-09. Code read with `git show`; the test, lint and licence commands ran in a scratch export of that commit (section 2).
 companions: SPEC-saathi-requests-2026-11-09.md, SPEC-saathi-safety-2026-11-09-r2.md, SPEC-saathi-assurance-2026-11-09-r2.md, SPEC-saathi-evidence-2026-11-09-r2.md, SPEC-saathi-alternatives-2026-11-09.md, POLICY-saathi-2026-11-09-r2.md, POLICY-saathi-data-2026-11-09.md; each lists the RQ and PL ids it holds in its section 1

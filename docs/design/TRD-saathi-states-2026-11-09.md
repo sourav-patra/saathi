@@ -3,7 +3,7 @@ id: TRD-saathi-states
 kind: contract
 governs: the transitions of the request, commit_intent, alert event, inbox and approval token machines; part of TRD-saathi-2026-11-09.md
 status: draft, review F fixes applied, pending owner lock (see docs/LOCKS.md)
-upstream: PRD-saathi-2026-11-09-r2.md sha256 faf5563fa2374f14571010c04a17d4b4da0dc833bc296d55994250ad201f25a1; SPEC-saathi-requests-2026-11-09.md sha256 84794db4026741ed712f86a25d82d7f9238f739d98bab27ea01dc68d3e084fbe; SPEC-saathi-safety-2026-11-09-r2.md sha256 5a1fdcfeef1f4d78480fd36cec3757dda7d2023e672d90cc8ad13b078589ef5f; SPEC-saathi-assurance-2026-11-09-r2.md sha256 ec44a491c809e537ad7e28f4bd0d3dcfb6bcbc1b99e2b223fdf1d8663b3cdf89; POLICY-saathi-2026-11-09-r2.md sha256 d10cdb5a86e1ac3a83f1b02d4265982d1fb1759188f54847905e0f2008ba1430; RECORD-saathi-decisions-2026-11-09.md sha256 62594515dd94e4441da30ab0752cad3867eb2982bf61e0c89156f76400cc540a
+upstream: PRD-saathi-2026-11-09-r2.md sha256 d5f23838159bf7e481bb3f5650dd9e7047e579f20e219a7b6c944416953d8466; SPEC-saathi-requests-2026-11-09.md sha256 b3124736dbdb5527c9b4e1cd8c13b53f4fb62fcd2ef76c4cb7aaa42e02d43154; SPEC-saathi-safety-2026-11-09-r2.md sha256 cef42d1851c3bbc6d13af7386151c07fc4c2efa83a917622ae11d6665b2cd659; SPEC-saathi-assurance-2026-11-09-r2.md sha256 8bbb8f00e17c11f76799b64bbefc95801d248d690185aead5bd13063ad4d90c2; POLICY-saathi-2026-11-09-r2.md sha256 14e25c3e892ca189728c304c40c05f9e95539ae25ed6ba5c2dce8218f76c43dd; RECORD-saathi-decisions-2026-11-09.md sha256 c04a9cf5bcf98fc95fe4715ef8ed40b800522aac020463262e88ccc307e5fce4
 figures: figures/commit-sequence.svg
 sources: SPEC-saathi-requests section 3 (the only state table); safety RQ-18, RQ-21, RQ-22, RQ-79, RQ-80, RQ-83; requests RQ-20, RQ-39, RQ-74; POLICY PL-27; src/saathi/app.py, pipeline.py, channels/telegram.py at 3d46456
 checked-at: 3d46456, 2026-11-09. Code read with `git show`; nothing was executed. Revised after review F.
@@ -43,7 +43,7 @@ An emergency or scam flag opens an alert event (section 4) and creates no reques
 | R11 | quoting | `evaluate` returns deny | blocked `policy_denied` | none | summary with reasons |
 | R12 | quoting | no access, no `find_order`, phone offline, or macro checkpoint failed | handoff with that reason | one of the four | card with cart text and a deep link, or the failed step |
 | R13 | awaiting_approval | approve tap | approved | registered approver; card hash equals current hash; no cap needs a second code | token `approve` inserted; audit `decided`; card edited |
-| R14 | awaiting_approval | approve tap over a cap | awaiting_approval | registered approver; hash matches | token `approve` inserted; code prompt; the code window is 300 s and the token expiry caps it (section 6) |
+| R14 | awaiting_approval | approve tap over a cap | awaiting_approval | registered approver; hash matches | token `approve` inserted; code prompt; the code window is the token expiry: 300 s for a cart, 180 s for a ride (section 6) |
 | R15 | awaiting_approval | valid second code | approved | `approve` token unspent and unexpired; step greater than `last_step` | token `confirm2` inserted; `last_step` set; audit |
 | R16 | awaiting_approval | reject tap | rejected | registered approver | reason chip stored; tokens voided; audit |
 | R17 | awaiting_approval | edit tap with text | quoting | registered approver | tokens voided; new quote and hash; new card |
@@ -102,14 +102,16 @@ The `stage` field holds the highest stage started; earlier stages keep their cad
 | A01 | new | radar flag persisted | open, stage a | emergency or scam | the edge inserts the event in the inbox transaction (text, caption) or the worker inserts it (ASR or OCR text), `next_due_at` = t0; C14 writes the attempt rows on its next poll and sends Telegram to primary and backup with the original audio, and the stored clip to the elder, keyed by the event id |
 | A02 | open | cadence due | open | no acknowledgement; stage a under 20 sends per approver | attempt row with key; sends at 0, 60, 120, 180, 240 s, then every 5 min |
 | A03 | open | t0 plus 2 min | open, stage b | emergency; no acknowledgement; SO-1 valid; WhatsApp not down | template T-01 per approver, every 2 min, 3 at most |
-| A04 | open | t0 plus 4 min | open, stage c | emergency; no acknowledgement; SO-1 valid | call primary, backup 60 s later; every 3 min; 3 per approver and `voice_calls_per_event` per event |
+| A04 | open | t0 plus 4 min | open, stage c | emergency; no acknowledgement; SO-1 valid | call primary, backup 60 s later; every 3 min; 3 per approver and `voice_calls_per_event` per event; the call plays the fixed message and waits for the key press |
 | A05 | open | t0 plus 2 or 4 min with SO-1 missing or expired | open | none | stages b and c send nothing; owner alerted; stage a continues |
-| A06 | open | Acknowledge tap (Telegram callback, rule 6) | acknowledged | registered approver; update id not seen before | unsent attempts cancelled; a ringing call may finish; follow-up at 15 min. A call, answered or not, is not an acknowledgement (T-33) |
+| A06 | open | Acknowledge tap (Telegram callback, rule 6) | acknowledged | registered approver; update id not seen before | unsent attempts cancelled; a ringing call may finish; follow-up at 15 min. An answered call with no key press is not an acknowledgement (A12, A13; T-33) |
 | A07 | open | every cap spent with no acknowledgement | blocked `no_human_reached` | none | ops chat record; audit row |
 | A08 | acknowledged | false-alarm tap | acknowledged | registered approver | flag set; counted per approver when stage b or c had started |
 | A09 | open | t0 plus 10 min with no acknowledgement | open | emergency | the 108 and 112 clip sent to the elder again |
 | A10 | any non-terminal | restart | unchanged | none | resume by `next_due_at` |
 | A11 | new | audio row not scanned: rate limited, `not_before` in the future, `dead`, or no ASR text after `radar_audio_max_s` (config, default 120 s) | open, kind `unscanned`, stage a | audio rows only | the edge (rate limit, `not_before`) or C14 (dead, overdue) inserts the event with the audio attached; no stages b or c; not counted in the false-alarm budget; ends on an Acknowledge tap |
+| A12 | open, stage c | key press of 1 on a stage c call (provider callback) | acknowledged | signature valid; call id matches an attempt row of this event; callback not seen before; the digit is 1 | unsent attempts cancelled; a ringing call may finish; audit row `ack_voice` naming the approver of that attempt; follow-up at 15 min (T-33, T-40) |
+| A13 | open, stage c | call answered with no key press, voicemail, another key, hang up or no answer | open, stage c | none | the attempt is marked `answered_no_ack`, `voicemail` or `failed`; the cadence and caps continue; audit row `call_no_ack` |
 
 A scam alert and an `unscanned` alert use stage a only (A01, A02, A06, A07, A11).
 
@@ -117,7 +119,7 @@ A scam alert and an `unscanned` alert use stage a only (A01, A02, A06, A07, A11)
 
 | Id | From | Event | To | Guard | Side effect |
 |---|---|---|---|---|---|
-| N01 | new | valid webhook | received | signature valid; sender registered; body within the size limit; `provider_message_id` unique | insert, commit, then 200; a unique conflict inserts nothing and still returns 200 |
+| N01 | new | valid webhook | received | signature valid; sender registered; body within the size limit; `provider_message_id` unique | insert the `inbox` row and its `raw_text` rows in one transaction, commit, then 200; a unique conflict inserts nothing and still returns 200 |
 | N02 | new | invalid signature | no row | none | 401; counter plus 1 |
 | N03 | new | unregistered sender | no row | none | `rejected_inbound` row with a keyed hash; no reply; weekly digest count |
 | N04 | new | sender over the rate limit | received | 20 messages in 10 min | row has `not_before`; one acknowledgement; the edge keyword match still runs on text and captions, and an audio row opens A11 |
@@ -154,17 +156,17 @@ Stored columns: `spent_at`, `voided_at`, `expires_at`. The states are read from 
 
 | Id | From | Event | To | Guard | Side effect |
 |---|---|---|---|---|---|
-| K01 | new | R13 or R14 (approve tap) | issued | registered approver; request in awaiting_approval | `expires_at` is the tap time plus 300 s for a cart or 60 s for a ride |
+| K01 | new | R13 or R14 (approve tap) | issued | registered approver; request in awaiting_approval | `expires_at` is the tap time plus 300 s for a cart, 180 s for a ride that needs the second confirmation (D-77) or 60 s for any other ride |
 | K02 | new | R15 (valid code) | issued, action `confirm2` | `approve` token unspent | `expires_at` equals that of the `approve` token |
 | K03 | issued | commit step 1 | spent | request id, quote hash, approver and action match; unexpired; not voided; one `UPDATE ... WHERE spent_at IS NULL` changes one row | audit `token_spent` |
 | K04 | issued | supersede, edit, reject, cancel, withdrawal, refresh, step 1 denial, revocation runbook | voided | none | `voided_at` set; audit `token_voided` naming the request |
 | K05 | issued | clock passes `expires_at` | expired | none | none |
 | K06 | spent, voided, expired | any use | unchanged | none | audit `deny`; no effect |
 
-Two clocks run from the first tap. The code window is 300 s. The class expiry of the `approve` token is 300 s for a cart and 60 s for a ride. The `confirm2` token never outlives the `approve` token, so the earlier governs: a ride over a cap has 60 s to enter the code, and a later code gets the expired reply and needs a new tap. The SPEC wording "a card is out; the token is unspent" is read here as: a token exists only after a tap, because the timers table counts expiry from the tap.
+One clock runs from the first tap: the expiry of the `approve` token. It is 300 s for a cart, 180 s for a ride over a cap (D-77) and 60 s for any other ride. The code window equals it, and the `confirm2` token never outlives it, so a code typed after 180 s on a ride gets the expired reply and needs a new tap. The live re-read at commit step 1 still guards the price. The SPEC wording "a card is out; the token is unspent" is read here as: a token exists only after a tap, because the timers table counts expiry from the tap.
 
 ## 7. Tests
 
 A table-driven test loads sections 2 to 6, runs one case per row, and asserts that every (from, event) pair absent from a table is refused and leaves the row unchanged. A row added with no case fails the test. The test is shown to fail by deleting one row (TQ-04). A resume test (TQ-65) starts a request in each non-terminal state, kills the process, restarts it with no in-memory state, delivers the answer or the tap through its entry path (rule 6) and asserts the same end state as an uninterrupted run. A lease test covers per-elder order, renewal of a slow step, a stalled worker that wakes after expiry and a replayed Telegram update id.
 
-Skipped or not checked: figure 2 rendered and inspected by the drafting agent, reader check not run, and its note lines were edited after the inspection, which was not repeated; no machine exists in code; the tables were compared with SPEC-saathi-requests section 3 by reading, not by a script; the Hindi phrases are examples; timings are config defaults from the SPEC and were not measured.
+Skipped or not checked: figure 2 rendered and inspected by the drafting agent, reader check not run, and its viewBox grew to 790 and two note lines were wrapped after review G, and the rendering was not inspected again; no machine exists in code; the tables were compared with SPEC-saathi-requests section 3 by reading, not by a script; the Hindi phrases are examples; timings are config defaults from the SPEC and were not measured.

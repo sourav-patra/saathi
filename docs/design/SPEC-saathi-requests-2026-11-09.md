@@ -3,7 +3,7 @@ id: SPEC-saathi-requests
 kind: contract
 governs: v1; how an elder message becomes a request, which states it can reach, which timers and templates apply
 status: draft, new in the r2 set, round-3 and TRD review fixes applied, pending owner lock (see docs/LOCKS.md)
-upstream: PRD-saathi-2026-11-09-r2.md sha256 faf5563fa2374f14571010c04a17d4b4da0dc833bc296d55994250ad201f25a1; RECORD-saathi-decisions-2026-11-09.md sha256 62594515dd94e4441da30ab0752cad3867eb2982bf61e0c89156f76400cc540a
+upstream: PRD-saathi-2026-11-09-r2.md sha256 d5f23838159bf7e481bb3f5650dd9e7047e579f20e219a7b6c944416953d8466; RECORD-saathi-decisions-2026-11-09.md sha256 c04a9cf5bcf98fc95fe4715ef8ed40b800522aac020463262e88ccc307e5fce4
 sources: docs/design/RECORD-saathi-decisions-2026-11-09.md (D-nn); RQ-20, RQ-39, RQ-74, RQ-77 and RQ-78 as written in PRD-saathi-2026-11-09-r1.md (sha256 021742ba14e4d154f291d059aaf1add458e2e3b90c36992990d7518ffae1434a); src/saathi/pipeline.py and src/saathi/domain.py on branch phase-0/foundation at 3d46456; DOC-PHILOSOPHY.md
 checked-at: 3d46456, 2026-11-09. Code read with `git show`; nothing in this file was executed.
 ---
@@ -88,8 +88,9 @@ Timers (RQ-20):
 | Cart (food, groceries, shopping) | 5 min | 15 min | 60 min | 30 min | 300 s |
 | Ride | 2 min | 3 min | 60 min | none | 60 s |
 | Urgent ride | 2 min | 3 min | none; `handoff` after the last refresh | none | 60 s |
+| Ride or urgent ride over a cap | as the ride | as the ride | as the ride | none | 180 s (D-77) |
 
-The code window of the second confirmation (safety RQ-26) is 300 s after the first tap. A `confirm2` token never outlives the approval token, so the earlier expiry governs: a cart has 300 s to enter the code, a ride has 60 s.
+The code window of the second confirmation (safety RQ-26) is the expiry of the approval token, counted from the first tap: 300 s for a cart and 180 s for a ride over a cap (D-77); a ride under every cap needs no code and keeps 60 s. A `confirm2` token never outlives the approval token. The longer ride token does not widen the price guard: the live re-read at commit step 1 and the fare tolerance (safety RQ-29) still apply.
 
 WhatsApp template inventory (RQ-77). Category is proposed; the platform decides. Lead time is N: the template registry records submission and approval times.
 

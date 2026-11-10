@@ -5,7 +5,7 @@ status: current
 sources: the owner's requirements interview of 2026-11-09 and the owner's instructions of the same day, in sanitized form; personal values, names and places are left out on purpose and live in private config
 ---
 
-Cite a decision here by its D number. Each line is one fact with its date and mark. The marks E, R, P, N and decided are defined once, in PRD-saathi-2026-11-09-r2.md section 2. In this file the source of every R line is the owner, named in the sources line above.
+Cite a decision here by its D number. Each line is one fact with its date and mark. The marks are defined once, in PRD-saathi-2026-11-09-r2.md section 2. The source of every R line is the owner.
 
 ## Interview decisions (scope, channels, money, safety)
 
@@ -55,48 +55,50 @@ Cite a decision here by its D number. Each line is one fact with its date and ma
 - 2026-11-09 D-42 decision: v1 defers the self-improvement agent. @mark=R
 - 2026-11-09 D-43 decision: v1 defers model-graded evals. Code checks and human review only, until at least 20 human labels exist. @mark=R
 - 2026-11-09 D-44 decision: the approvals and commits audit log is a separate append-only Postgres store whether or not Langfuse runs. @mark=R
-- 2026-11-09 D-45 decision: debunk in v1 is a Hindi voice note plus a FACT CHECK image card with cited sources. No video, so no FFmpeg and no LGPL exception. Video is a later phase that re-enters when a licence-compliant encoder is identified. @mark=R
+- 2026-11-09 D-45 decision: debunk in v1 is a Hindi voice note plus a FACT CHECK image card with cited sources. No video, so no FFmpeg and no LGPL exception; video re-enters when a licence-compliant encoder is identified. @mark=R
 - 2026-11-09 D-46 decision: the LGPL carve-out is deleted and the ban on LGPL stands without exception. @mark=R
 - 2026-11-09 D-47 decision: emergency escalation runs in order: Telegram alerts to both approvers; after 2 minutes without an acknowledgement a WhatsApp alert template to the approvers' personal numbers; then an automated voice call through a telephony API whose provider is named only in private config. @mark=R
 - 2026-11-09 D-48 decision: audio that fails ASR is forwarded to the caregiver as audio flagged "could not understand" and is never dropped silently. @mark=R
-- 2026-11-09 D-49 decision: public files may name commerce integration targets (Swiggy, Instamart, Zepto, Zomato, Blinkit, Amazon, Flipkart, Uber, Rapido) and open-source infrastructure. They never name cities or languages tied to the family. The rule on model and provider names is POLICY PL-12. @mark=R
+- 2026-11-09 D-49 decision: public files may name commerce integration targets (Swiggy, Instamart, Zepto, Zomato, Blinkit, Amazon, Flipkart, Uber, Rapido) and open-source infrastructure. They never name cities or languages tied to the family. Model and provider names: POLICY PL-12. @mark=R
 - 2026-11-09 D-50 decision: the owner accepts, pending lock, the reviewers' recommendations on PRD questions 2, 4, 5, 7, 8, 9, 10, 12, 14, 15, 16 and 17 and POLICY questions 2, 3, 4 and 5. @mark=R
 - 2026-11-09 D-51 decision: PRD question 11 is resolved by D-47, question 13 by D-42, and POLICY question 1 by D-46. @mark=R
 - 2026-11-09 D-52 decision: PRD questions 1, 3 and 6 stay open for the owner, with new questions only where the review fixes create a real choice. @mark=R
 
 ## Revision decisions of round 2 (review findings C and D, owner decisions of the same day)
 
-- 2026-11-09 D-53 decision: the phone agent and the commerce adapters read untrusted text, see address and order data and can tap, which breaks the two-of-three rule. The owner accepts this as a standing exception for cart and ride commits only, on the conditions in PRD section 6 (final-screen verification, hostile-screen suite, shadow mode first). It lapses while a condition fails. PRD question 1 is closed. @mark=R
+- 2026-11-09 D-53 decision: the phone agent and the commerce adapters read untrusted text, see address and order data and can tap, which breaks the two-of-three rule. The owner accepts this as a standing exception for cart and ride commits only, on the conditions in PRD section 6; it lapses while a condition fails. PRD question 1 is closed. @mark=R
 - 2026-11-09 D-54 decision: debunk auto-send needs 60 held-out claims passed and an ended preview period (the later of 4 weeks or 20 previewed debunks); only health and scam claims rated FALSE qualify; the sign-off expires after 15 days. PRD question 3 is closed. @mark=R
-- 2026-11-09 D-55 decision: the number of quote refreshes of an urgent ride before handoff is configurable, default 5. Urgent is a rule in the profile table evaluated by code. The handoff after the last refresh is the expiry of an urgent request. PRD question 6 is closed. @mark=R
+- 2026-11-09 D-55 decision: urgent ride quote refreshes before handoff are configurable, default 5. Urgent is a profile rule evaluated by code. The handoff after the last refresh is the expiry of an urgent request. PRD question 6 is closed. @mark=R
 - 2026-11-09 D-56 decision: the emergency false-alarm budget is configurable. Defaults: 2 false alarms per approver per week reaching stage b or c, and 6 voice calls per event. A counter test covers both. PRD question 18 is closed. @mark=R
 - 2026-11-09 D-57 decision: the words Hindi and Hinglish may be named in public files because they are the product's language. An additional regional language stays generic. This narrows D-49. @mark=R
 - 2026-11-09 D-58 decision: commit messages and pull request text carry no AI attribution lines, no co-author trailer and no session link. The rule sits in the contribution part of POLICY. @mark=R
 - 2026-11-09 D-59 decision: bugs in the Phase 0 code are listed in the PRD and are not fixed in the design work. @mark=R
 - 2026-11-09 D-60 decision: the automatic voice call (stage c) and the template alert to approvers' personal numbers (T-01, stage b) are a standing sign-off by the owner, with scope and expiry (PRD section 6, SPEC assurance RQ-95a). The expiry of 90 days is accepted (D-65). @mark=decided
-- 2026-11-09 D-61 decision: the issue taxonomy moves to Phase 5, which changes the "from day one" part of D-11. The facts table and the elder-reaction classifier wait for Phase 3 or later; the semantic claim cache (part of D-27), automated macro repair and sentinels for roles not in use are deferred, each with a re-entry condition in SPEC evidence section 5. Reminders move to Phase 1. @mark=R
+- 2026-11-09 D-61 decision: the issue taxonomy moves to Phase 5, which changes the "from day one" part of D-11. The facts table, elder-reaction classifier, semantic claim cache (part of D-27), automated macro repair and unused-role sentinels are deferred (re-entry: SPEC evidence section 5). Reminders move to Phase 1. @mark=R
 - 2026-11-09 D-62 decision: if no food or grocery MCP access is granted by 2026-12-21, the owner chooses a fallback (PRD section 8). The date is accepted (D-66). @mark=decided
 - 2026-11-09 D-63 decision: superseded drafts are not kept in the public tree. They are held privately, and each file that replaces one records the old sha256 in its `supersedes:` line. @mark=R
-- 2026-11-09 D-64 decision: the pilot consent record (POLICY-data PL-05) is required in Phase 0, and the Phase 0 gate shrinks to arrival, radar, the emergency path with fake providers for stages b and c, redaction, the gateway with a durable ledger, and the eval harness on synthetic data. @mark=R
+- 2026-11-09 D-64 decision: the pilot consent record (POLICY-data PL-05) is required in Phase 0; the Phase 0 gate shrinks to arrival, radar, the emergency path (fake providers for stages b and c), redaction, the gateway with a durable ledger and the eval harness on synthetic data. @mark=R
 - 2026-11-09 D-65 decision: standing sign-off SO-1 (emergency voice call and WhatsApp alert T-01) is accepted for 90 days, with a renewal reminder 14 days ahead. After expiry stages b and c send nothing, stage a continues and the owner is alerted. This settles D-60. @mark=decided
-- 2026-11-09 D-66 decision: the MCP access decision date is 2026-12-21. If Swiggy or Zomato MCP access is not granted by then, Phase 1 falls back to a deep link plus human handoff only. This settles D-62 and replaces its choice between two fallbacks. @mark=decided
+- 2026-11-09 D-66 decision: the MCP access decision date is 2026-12-21. Without Swiggy or Zomato MCP access by then, Phase 1 falls back to a deep link plus human handoff only. This settles D-62. @mark=decided
 
 ## Revision decisions of round 3 (review E)
 
-- 2026-11-09 D-67 decision: Phase 0 gains the audit write path (RQ-56a), the SO-1 sign-off row (RQ-95a) and the secret scan (PL-15), which the emergency stages, show-raw and the leak scan need. RQ-56 and RQ-95 split into a and b parts; the b parts (chain, head export, other sign-off classes) stay in Phase 1. @mark=P
-- 2026-11-09 D-68 decision: the history of the code repository was rewritten on 2026-11-09 for privacy. Commit ids from before the rewrite are retired and are not cited; every file in this set cites 3d46456 on branch phase-0/foundation, a tree that differs from the retired one only in removed personal and model-name values. @mark=R
+- 2026-11-09 D-67 decision: Phase 0 gains the audit write path (RQ-56a), the SO-1 sign-off row (RQ-95a) and the secret scan (PL-15), which the emergency stages, show-raw and the leak scan need. RQ-56 and RQ-95 split into a and b; the b parts stay in Phase 1. @mark=P
+- 2026-11-09 D-68 decision: the code repository history was rewritten on 2026-11-09 for privacy. Earlier commit ids are retired and not cited; this set cites 3d46456 on phase-0/foundation, which differs only in removed personal and model-name values. @mark=R
 
 ## Decisions after round 3 (design pass for the TRD)
 
-- 2026-11-09 D-69 decision: Hindi voice replies are hybrid. Fixed safety and system replies (emergency, scam, acknowledgement, "caregiver ko bata diya", channel-down notices) are generated once and stored as audio files with hashes, so they work with every model service down. Dynamic replies (order details, driver name, ETA) use a local open-weight Hindi speech model named only in private config. Hosted speech is a fallback only after its PL-20 receipt. If speech fails, the reply goes as Hindi text; a reply is never skipped. @mark=decided
+- 2026-11-09 D-69 decision: Hindi voice replies are hybrid. Fixed safety and system replies (emergency, scam, acknowledgement, "caregiver ko bata diya", channel-down notices) are stored audio files with hashes and work with every model service down. Dynamic replies (order details, driver name, ETA) use a local open-weight Hindi speech model named only in private config; hosted speech is a fallback after its PL-20 receipt. If speech fails the reply goes as Hindi text; no reply is skipped. @mark=decided
 
 ## Decisions after the TRD review (review F)
 
-- 2026-11-09 D-70 decision: no LangGraph checkpointer. `requests.state` and the intent, slots, quote and plan-step columns are the only durable run state; each step loads the row, runs the next idempotent step and writes it. TRD owner question 1 is closed. @mark=decided
+- 2026-11-09 D-70 decision: no LangGraph checkpointer. `requests.state` and the intent, slots, quote and plan-step columns are the only durable run state; each step loads the row, runs the next idempotent step and writes it. TRD question 1 is closed. @mark=decided
 - 2026-11-09 D-71 decision: the caregiver listens to and signs each fixed voice clip version, one dated manual receipt per version; a clip without a receipt cannot ship. TRD owner question 2 is closed. @mark=decided
 - 2026-11-09 D-72 decision: PSF-2.0 joins the PL-09 allowed licences, matching `scripts/license_audit.py`. TRD owner question 3 is closed. @mark=decided
 - 2026-11-09 D-73 decision: `scripts/design_check.py` stays and runs in CI (SPEC evidence RQ-103); the CI file is on the code branch and changes during build. @mark=decided
-- 2026-11-09 D-74 decision: the self-hosted Langfuse stack moves from Phase 0 to Phase 1. Phase 0 writes traces as JSON-lines files with the same field allowlist and masking (assurance RQ-57, RQ-97); Phase 1 swaps the exporter. Langfuse stays in v1 (D-40). @mark=decided
-- 2026-11-09 D-75 decision: an external heartbeat: a free uptime-monitor service, named only in private config, requests a health URL every minute and pages the approvers when requests stop. The URL exposes no personal data (POLICY RQ-104, Phase 0). @mark=decided
+- 2026-11-09 D-74 decision: the self-hosted Langfuse stack moves from Phase 0 to Phase 1. Phase 0 writes traces as JSON-lines files with the same allowlist and masking (RQ-57, RQ-97); Phase 1 swaps the exporter. Langfuse stays in v1 (D-40). @mark=decided
+- 2026-11-09 D-75 decision: an external heartbeat: a free uptime-monitor service, named only in private config, requests a health URL every minute and pages the approvers when requests stop. The URL exposes no personal data (RQ-104, Phase 0). @mark=decided
+- 2026-11-10 D-76 decision: the stage c call is acknowledged by pressing 1 (DTMF). It plays, in Hindi or English: "Saathi emergency for <elder label>. Press 1 to acknowledge." The label is a configured alias. A press writes an audit row naming the approver and stops escalation. No key press or voicemail is not an acknowledgement and escalation continues. The provider stays private. @mark=decided
+- 2026-11-10 D-77 decision: a ride over a cap has 180 s from the first tap to enter the second-confirmation code, so its approval token lasts 180 s. The live re-read at commit step 1 still guards the price. Other rides keep 60 s, carts 300 s. @mark=decided
 
 Skipped or not checked: no decision here was checked against a live service, price list or licence text. The interview details that name people, places, amounts or providers were left out by design.

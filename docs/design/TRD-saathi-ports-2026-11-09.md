@@ -3,7 +3,7 @@ id: TRD-saathi-ports
 kind: contract
 governs: the Protocol ports, the data model migration plan and the database roles; part of TRD-saathi-2026-11-09.md
 status: draft, review F fixes applied, pending owner lock (see docs/LOCKS.md)
-upstream: PRD-saathi-2026-11-09-r2.md sha256 faf5563fa2374f14571010c04a17d4b4da0dc833bc296d55994250ad201f25a1; SPEC-saathi-requests-2026-11-09.md sha256 84794db4026741ed712f86a25d82d7f9238f739d98bab27ea01dc68d3e084fbe; SPEC-saathi-safety-2026-11-09-r2.md sha256 5a1fdcfeef1f4d78480fd36cec3757dda7d2023e672d90cc8ad13b078589ef5f; SPEC-saathi-assurance-2026-11-09-r2.md sha256 ec44a491c809e537ad7e28f4bd0d3dcfb6bcbc1b99e2b223fdf1d8663b3cdf89; POLICY-saathi-2026-11-09-r2.md sha256 d10cdb5a86e1ac3a83f1b02d4265982d1fb1759188f54847905e0f2008ba1430; POLICY-saathi-data-2026-11-09.md sha256 dd847a31804b3900d8020414ae7b565d0ef14773483e7b60f1a6f30ec133958d; RECORD-saathi-decisions-2026-11-09.md sha256 62594515dd94e4441da30ab0752cad3867eb2982bf61e0c89156f76400cc540a
+upstream: PRD-saathi-2026-11-09-r2.md sha256 d5f23838159bf7e481bb3f5650dd9e7047e579f20e219a7b6c944416953d8466; SPEC-saathi-requests-2026-11-09.md sha256 b3124736dbdb5527c9b4e1cd8c13b53f4fb62fcd2ef76c4cb7aaa42e02d43154; SPEC-saathi-safety-2026-11-09-r2.md sha256 cef42d1851c3bbc6d13af7386151c07fc4c2efa83a917622ae11d6665b2cd659; SPEC-saathi-assurance-2026-11-09-r2.md sha256 8bbb8f00e17c11f76799b64bbefc95801d248d690185aead5bd13063ad4d90c2; POLICY-saathi-2026-11-09-r2.md sha256 14e25c3e892ca189728c304c40c05f9e95539ae25ed6ba5c2dce8218f76c43dd; POLICY-saathi-data-2026-11-09.md sha256 95a69ebd2ee261341cc37ed7d57ea9a20704f598c26a9359e334dc58f3952bdb; RECORD-saathi-decisions-2026-11-09.md sha256 c04a9cf5bcf98fc95fe4715ef8ed40b800522aac020463262e88ccc307e5fce4
 sources: the contracts in upstream; infra/sql/schema/001_init.sql, infra/sql/00-create-databases.sh, src/saathi/pipeline.py (ports at lines 33-44), channels/*.py, perception/asr.py, llm/gateway.py and policy/*.py on branch phase-0/foundation at 3d46456
 checked-at: 3d46456, 2026-11-09. Code read with `git show`; nothing was executed. Signatures are P. Revised after review F.
 ---
@@ -44,6 +44,8 @@ class Escalator(Protocol):                          # one implementation per sta
     stage: Literal["a", "b", "c"]                   # Telegram, WhatsApp template T-01, voice call
     async def notify(self, event: AlertEventRef, approver: ApproverId,
                      *, key: IdemKey) -> AttemptResult: ...   # delivered | failed
+    async def on_dtmf(self, cb: VoiceCallback) -> VoiceAckResult: ...  # stage c only: digit 1 acknowledges;
+    # signature, timestamp, call id and replay are checked first; the result names the approver acknowledged
 
 class ASR(Protocol):                                # local G1; C03
     async def transcribe(self, audio: AudioBlob, *, hint: str = "hi") -> Transcript: ...
@@ -116,7 +118,7 @@ class Store(Protocol):                              # X1; repos below take a Tx
 |---|---|---|
 | ElderChannel | `WindowClosed`, `TemplateMissing`, `ChannelDown`, `MediaExpired`, `RateLimited(retry_after)`, `SendRejected(code)` | `WindowClosed` with no template ends the request `blocked`, reason `window_closed` (RQ-77); `MediaExpired` sets `media_lost` (RQ-79) |
 | CaregiverChannel | `ChannelDown`, `RateLimited`, `SendRejected` | the alert path switches to stages b and c at once (RQ-78) |
-| Escalator | `SignoffMissing` (stages b, c; raised before any send), `ChannelDown`, `ProviderRejected` | `SignoffMissing` alerts the owner and sends nothing (RQ-95a) |
+| Escalator | `SignoffMissing` (stages b, c; raised before any send), `ChannelDown`, `ProviderRejected`, `CallbackRejected` (bad signature, unknown call id, repeat) | `SignoffMissing` alerts the owner and sends nothing (RQ-95a); `CallbackRejected` changes no state and writes an audit row `deny` |
 | ASR, AudioCodec | `AsrUnavailable`, `AudioUndecodable`, `DecodeTimeout` | audio forward to the caregiver (RQ-82); a decode error never drops the row |
 | TTS, VoiceStore | `TtsUnavailable`, `TtsTimeout`, `ReceiptMissing` (hosted), `ClipMissing`, `ClipHashMismatch` | the reply goes as Hindi text; a clip error also alerts the owner (D-69) |
 | Vision | `ReceiptMissing`, `VisionUnavailable` | handoff with the original media and a summary (RQ-96) |
@@ -132,7 +134,7 @@ E at 3d46456: `001_init.sql` creates 11 tables (`households`, `elders`, `approve
 
 | Phase | Migration | New or changed tables and key columns | Serves |
 |---|---|---|---|
-| 0 | 002 inbox and raw text | `inbox` (id, household_id, `provider_message_id` unique, source, sender_ref, elder_id, kind, payload_sha256, media_ref, state, attempts, lease_until, lease_token, not_before, acked_at, radar_at, received_at); `rejected_inbound` (sender_hmac, reason, at); `raw_text` (inbox_id, text, expires_at). `requests`: drop `provider_message_id` unique (`:60`) and `transcript_redacted` (`:62`); add inbox_id, state, state_reason, questions_asked, urgent, expires_at, superseded_by and the resume columns `intent`, `slots` jsonb, `quote_id` and `plan_step` (states part, rule 5); `radar` keeps rule ids and flags only; `outcome` is replaced by `state` | RQ-79, 81, 97, 39, 35 |
+| 0 | 002 inbox and raw text | `inbox` (id, household_id, `provider_message_id` unique, source, sender_ref, elder_id, kind, payload_sha256, media_ref, state, attempts, lease_until, lease_token, not_before, acked_at, radar_at, received_at); `rejected_inbound` (sender_hmac, reason, at); `raw_text` (inbox_id, part, text, expires_at; primary key inbox_id and part). `requests`: drop `provider_message_id` unique (`:60`) and `transcript_redacted` (`:62`); add inbox_id, state, state_reason, questions_asked, urgent, expires_at, superseded_by and the resume columns `intent`, `slots` jsonb, `quote_id` and `plan_step` (states part, rule 5); `radar` keeps rule ids and flags only; `outcome` is replaced by `state` | RQ-79, 81, 97, 39, 35 |
 | 0 | 003 alerts | `alert_events` (kind, state, stage, t0, next_due_at, acked_by, acked_at, false_alarm, audio_ref); `alert_attempts` (event_id, stage, approver_id, channel, idem_key unique, status, due_at); `tg_updates` (update_id primary key, household_id, kind, received_at) | RQ-18, 23 |
 | 0 | 004 audit, sign-offs, consent | `audit_log` (seq identity, ts, run_id, actor, event, subject, payload_hmac, prev_hash null, row_hash null); schema `control`: `signoffs` (scope, granter, granted_at, expires_at, revoked_at), `consents` (scope[], language, how, text_version, recorded_by, recorded_at, withdrawn_at); roles (section 5) | RQ-56a, 95a; PL-05 |
 | 0 | 005 ledger, voice, flags | `llm_reservations` (run_id, tier, reserved_inr, state, settled_inr); `llm_spend` gains household_id (`:107-114` lacks it) and reservation_id; `runtime_flags` gains paused_by and reason; `voice_clips` (reply_key, version, language, text, sha256, path, reviewed_by, reviewed_at, receipt_ref; a row without the review fields is not loadable, D-71); `approvals` gains household_id (`:83-92` lacks it) | RQ-48, 32, 38; D-69, D-71 |
@@ -153,7 +155,7 @@ E: one role `saathi` owns the database and runs the application (`00-create-data
 | Role | Used by | May | May not |
 |---|---|---|---|
 | `saathi_migrator` | the migration job | DDL; owns tables | run at runtime |
-| `saathi_edge` | C01 | insert `inbox`, `rejected_inbound`, `alert_events`; read sender registration | any other table; update or delete |
+| `saathi_edge` | C01 | insert `inbox`, `raw_text`, `rejected_inbound`, `alert_events`; read sender registration | read `raw_text`; any other table; update or delete |
 | `saathi_core` | C02, C07, C11 to C15, C18 | read and write the request-path tables; execute `audit_append()` | update or delete `audit_log`; write `control.*` |
 | `saathi_audit` | owns `audit_append()` (a security-definer function) | insert `audit_log`; use its sequence | update, delete, truncate |
 | `saathi_model` | C03, C06, C08, C16 | read and write its own `model_jobs` rows (from the split); reserve and settle `llm_reservations`; insert `llm_spend` | write approvals, tokens, flags, `control.*` or audit |
