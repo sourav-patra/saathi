@@ -69,6 +69,35 @@ def test_permissive_packages_pass():
     assert la.audit_packages(dists, {}) == []
 
 
+def test_mit_plus_gpl_or_later_classifiers_fail():
+    dist = FakeDist("mix")
+    dist.metadata["Classifier"] = "License :: OSI Approved :: MIT License"
+    dist.metadata["Classifier"] = "License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)"
+    assert la.audit_packages([dist], {})
+
+
+def test_mit_or_gpl_classifiers_still_pass():
+    dist = FakeDist("dual", License="MIT OR GPL-2.0-only")
+    assert la.audit_packages([dist], {}) == []
+
+
+def test_exception_applies_only_to_its_own_licence():
+    exc = {"weak": {"licence": "MPL-2.0", "reason": "unmodified wheel", "date": "2026-11-10"}}
+    other = FakeDist("weak", License_Expression="EUPL-1.2")
+    assert la.audit_packages([other], exc)
+    assert la.audit_packages([FakeDist("weak", License_Expression="MPL-2.0")], exc) == []
+
+
+def test_cc0_is_public_domain():
+    assert la.audit_packages([FakeDist("n", License_Expression="CC0-1.0")], {}) == []
+    assert la.audit_packages([FakeDist("n", License="CC0 1.0 Universal")], {}) == []
+
+
+def test_ofl_fails_for_packages_but_passes_in_manifest(tmp_path):
+    assert la.audit_packages([FakeDist("f", License_Expression="OFL-1.1")], {})
+    assert la.audit_manifest(manifest(tmp_path, "somefont.ttf | OFL-1.1")) == []
+
+
 def test_exception_never_lgpl():
     # Listing an LGPL package as an exception neither rescues it nor passes the exception check.
     exc = {"lg": {"licence": "LGPL-3.0-only", "reason": "needed", "date": "2026-11-10"}}
@@ -161,6 +190,34 @@ def test_dockerfile_ffmpeg_base_image_fails(tmp_path):
 
 def test_dockerfile_opusinfo_fails(tmp_path):
     assert la.audit_dockerfiles(dockerfile(tmp_path, "FROM debian\nRUN opusinfo x.opus\n"))
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "RUN apt-get install -y gstreamer1.0-libav",
+        "RUN apt-get install -y --no-install-recommends gst-libav foo",
+        "RUN apt-get install -y libav-tools",
+        "RUN pip install av",
+        "RUN pip3 install --no-cache-dir numpy av==12.0",
+        "RUN uv pip install PyAV",
+    ],
+)
+def test_dockerfile_libav_and_pyav_fail(tmp_path, line):
+    assert la.audit_dockerfiles(dockerfile(tmp_path, f"FROM debian:bookworm-slim\n{line}\n"))
+
+
+@pytest.mark.parametrize("line", ["RUN pip install avro", "RUN pip install pytest-av-x==1", "RUN pip install numpy"])
+def test_dockerfile_similar_names_pass(tmp_path, line):
+    assert la.audit_dockerfiles(dockerfile(tmp_path, f"FROM debian:bookworm-slim\n{line}\n")) == []
+
+
+def test_final_image_has_no_downloader():
+    """F1: the final stage installs only opus-tools; no wget or curl (wget is GPL-3.0+)."""
+    text = (ROOT / "infra" / "whisper" / "Dockerfile").read_text()
+    final = text.split("FROM debian:bookworm-slim", 3)[-1]
+    assert "wget" not in final and "curl" not in final
+    assert "COPY --from=build" in final and "/models/" in final
 
 
 def test_clean_dockerfile_passes(tmp_path):

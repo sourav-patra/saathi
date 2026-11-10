@@ -3,8 +3,8 @@
 
 Policy (POLICY PL-09, PL-10, PL-11; evidence RQ-71):
   ALLOW  MIT, Apache-2.0, BSD-2/3-Clause, ISC, PSF, PostgreSQL, Unlicense, 0BSD,
-         Zlib, HPND, public domain, OFL (fonts), and anything carrying one of
-         these as an option
+         Zlib, HPND, CC0 and public domain, and anything carrying one of
+         these as an option. OFL (fonts) is allowed in --manifest mode only.
   DENY   GPL, LGPL, AGPL, SSPL, ELv2/Elastic, BUSL, RSAL, Commons Clause,
          non-commercial. No exception, ever.
   REVIEW anything else (e.g. MPL-2.0) and any missing licence. A missing
@@ -38,12 +38,16 @@ EXCEPTIONS_FILE = Path(__file__).with_name("license_exceptions.toml")
 
 ALLOW = re.compile(
     r"\b(MIT|Apache|BSD|ISC|PSF|Python Software Foundation|PostgreSQL|Unlicense|0BSD|Zlib|HPND|CMU"
-    r"|OFL|SIL Open Font|public domain)\b",
+    r"|CC0(-1\.0)?|CC0 1\.0|public domain)\b",
     re.I,
 )
+# Fonts only: an image manifest may list OFL fonts; a Python package may not carry OFL.
+FONT_ALLOW = re.compile(r"\b(OFL|SIL Open Font)\b", re.I)
+# "or later" / "or any later version" is a version clause, not a dual-licence choice.
+OR_LATER = re.compile(r"\bor (any )?later\b", re.I)
 DENY = re.compile(
     r"(\bA?GPL|\bLGPL|GNU (Lesser |Affero )?General Public|SSPL|Server Side Public|Elastic|\bELv2|"
-    r"\bBUSL|Business Source|Commons Clause|Non[- ]?Commercial|\bNC\b|RSAL|Redis Source Available)",
+    r"\bBUSL|Business Source|Commons Clause|Non[- ]?Commercial|\bNC\b|\bRSAL\b|Redis Source Available)",
     re.I,
 )
 SELF = {"saathi"}
@@ -52,7 +56,8 @@ SELF = {"saathi"}
 # and opusinfo (the voice path uses opusdec and opusenc only).
 FORBIDDEN_BINARIES = re.compile(
     r"(ffmpeg|ffprobe|ffplay|\blibav(codec|format|util|filter|device|resample)|\blibsw(scale|resample)|"
-    r"\blibpostproc|\bopusinfo)",
+    r"\blibpostproc|\blibav-|\bopusinfo|[\w.+-]*-libav[\w.+-]*|\bgstreamer[\w.+-]*libav|\bpyav\b|"
+    r"\b(pip3?|uv pip)\s+install\b[^#\n]*(?<![\w.-])av(?![\w.-]))",
     re.I,
 )
 CONVERT_FLAG = re.compile(r"(^|[\s\"',\[])--convert\b")
@@ -87,7 +92,11 @@ def _split_top_level(expr: str, op: str) -> list[str]:
     return [p for p in parts if p]
 
 
-def spdx_verdict(expr: str) -> str:
+def _ok(option: str, fonts: bool) -> bool:
+    return bool((ALLOW.search(option) or (fonts and FONT_ALLOW.search(option))) and not DENY.search(option))
+
+
+def spdx_verdict(expr: str, fonts: bool = False) -> str:
     """SPDX: every AND-term must be satisfiable; an OR-group needs one allowed option."""
     results = []
     for term in _split_top_level(expr, "AND"):
@@ -95,7 +104,7 @@ def spdx_verdict(expr: str) -> str:
         if term.startswith("(") and term.endswith(")"):
             term = term[1:-1]
         options = _split_top_level(term, "OR")
-        if any(ALLOW.search(o) and not DENY.search(o) for o in options):
+        if any(_ok(o, fonts) for o in options):
             results.append("allow")
         elif any(DENY.search(o) for o in options):
             results.append("deny")
@@ -107,15 +116,17 @@ def spdx_verdict(expr: str) -> str:
     return "allow"
 
 
-def verdict(strings: list[str], expression: str | None = None) -> str:
+def verdict(strings: list[str], expression: str | None = None, fonts: bool = False) -> str:
     if expression:
-        return spdx_verdict(expression)
+        return spdx_verdict(expression, fonts)
     joined = " | ".join(strings)
     if not strings:
         return "review"
     # A dual license such as "MIT OR GPL" passes, because we may choose MIT.
-    if ALLOW.search(joined):
-        if DENY.search(joined) and " OR " not in joined.upper() and "/" not in joined:
+    # "GPLv2 or later" is not a choice between licences, so strip it first.
+    choice = OR_LATER.sub("", joined)
+    if ALLOW.search(joined) or (fonts and FONT_ALLOW.search(joined)):
+        if DENY.search(joined) and " OR " not in choice.upper() and "/" not in joined:
             return "deny"
         return "allow"
     if DENY.search(joined):
@@ -145,6 +156,16 @@ def check_exceptions(exceptions: Mapping[str, Mapping[str, str]]) -> list[str]:
     return problems
 
 
+def _norm(lic: str) -> str:
+    return re.sub(r"\s+", " ", lic).strip().lower()
+
+
+def _exception_matches(entry: Mapping[str, str], strings: Sequence[str]) -> bool:
+    """An exception covers a package only for the licence it names."""
+    want = _norm(str(entry.get("licence", "")))
+    return bool(want) and any(want == _norm(s) or want in _norm(s) for s in strings)
+
+
 def _has_allowed_option(expr: str) -> bool:
     return spdx_verdict(expr) == "allow"
 
@@ -166,7 +187,7 @@ def audit_packages(
         v = verdict(strings, dist.metadata.get("License-Expression"))
         # Only a weak-copyleft ("review") package with some licence metadata may be
         # excepted. A banned licence and a missing licence always fail.
-        if v == "review" and strings and name in exceptions:
+        if v == "review" and strings and name in exceptions and _exception_matches(exceptions[name], strings):
             v = "excepted"
         if verbose or v not in ("allow", "excepted"):
             print(f"{v:9} {name}=={dist.version}  [{'; '.join(strings) or 'no license metadata'}]")
@@ -214,7 +235,7 @@ def audit_manifest(manifest: Path) -> list[str]:
         if not sep or not lic or lic.upper() in {"UNKNOWN", "NONE", "N/A"}:
             failures.append(f"{where}: missing or unknown licence")
             continue
-        v = verdict([lic], lic)
+        v = verdict([lic], lic, fonts=True)
         if v != "allow":
             failures.append(f"{where}: {v} licence [{lic}]")
     if not seen:
