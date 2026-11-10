@@ -47,6 +47,8 @@ EMERGENCY_ROMAN: tuple[str, ...] = (
     "ambulence", "embulance", "doctor bulao", "hospital le chalo", "bp bahut high",
     "sugar bahut low", "haart attack", "attack aaya", "hosh nahi", "bol nahi pa",
     "haath pair sunn", "i have fallen", "fell in", "help", "bachaao",
+    # added in WU-23 (append only)
+    "seene mein bahut dard", "sine mein bahut dard",
 )
 EMERGENCY_DEVANAGARI: tuple[str, ...] = (
     "सीने में दर्द", "सीने मे दर्द", "छाती में दर्द", "छाती मे दर्द", "दिल में दर्द",
@@ -57,6 +59,8 @@ EMERGENCY_DEVANAGARI: tuple[str, ...] = (
     # added in the WU-09 fix pass (append only)
     "सांस नही", "सांस फूल", "ऐम्बुलेंस", "एंबुलैंस", "दिल का दौरा", "मदद करो",
     "डॉक्टर बुलाओ", "अस्पताल ले चलो",
+    # added in WU-23 after the synthetic radar fixture showed two misses (append only)
+    "सीने में बहुत दर्द", "सुन्न हो",
 )
 
 SCAM_ROMAN: tuple[str, ...] = (

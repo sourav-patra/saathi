@@ -82,6 +82,15 @@ jobs:
           sed -E 's/^([A-Z0-9_]+)=( *#.*)?$/\1=placeholder/' .env.example > .env
           docker compose --env-file .env -f infra/docker-compose.yml config --quiet
 
+  evals:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+      - run: uv python install 3.12
+      - run: uv sync --frozen
+      - run: uv run python -m evals.run --all
+
   # Report mode never fails the build; it becomes required at the Phase 0 exit (WU-23).
   gate-report:
     runs-on: ubuntu-latest

@@ -101,6 +101,16 @@ def redact(text: str | None) -> RedactionResult:
 
     out = _OTP_RE.sub(_sub_otp, out)
 
+    def _sub_card(m: re.Match[str]) -> str:
+        digits = re.sub(r"\D", "", m.group(0))
+        if 13 <= len(digits) <= 19 and luhn_valid(digits):
+            found.append("CARD_NUMBER")
+            return "<CARD>"
+        return m.group(0)
+
+    # cards first: a grouped 16-digit card must not lose its first 12 digits to a chance Aadhaar match
+    out = _CARD_RE.sub(_sub_card, out)
+
     def _sub_aadhaar(m: re.Match[str]) -> str:
         digits = "".join(m.groups())
         if verhoeff_valid(digits):
@@ -109,15 +119,6 @@ def redact(text: str | None) -> RedactionResult:
         return m.group(0)
 
     out = _AADHAAR_RE.sub(_sub_aadhaar, out)
-
-    def _sub_card(m: re.Match[str]) -> str:
-        digits = re.sub(r"\D", "", m.group(0))
-        if 13 <= len(digits) <= 19 and luhn_valid(digits):
-            found.append("CARD_NUMBER")
-            return "<CARD>"
-        return m.group(0)
-
-    out = _CARD_RE.sub(_sub_card, out)
 
     for pattern, label, token in (
         (_PAN_RE, "IN_PAN", "<PAN>"),

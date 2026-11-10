@@ -418,3 +418,24 @@ def test_review_probes_emergency(text):
 @pytest.mark.parametrize("text", PROBES_SCAM)
 def test_review_probes_scam(text):
     assert radar.scan(text).scam
+
+
+@pytest.mark.parametrize("card", ["6230 9811 1914 4525", "5182 2879 7621 1963"])
+def test_grouped_card_is_not_split_by_an_aadhaar_match(card):
+    # the first 12 digits of these pass the Verhoeff check by chance; the whole number must go as one card
+    out = pii.redact(f"card {card} expiry soon")
+    assert out.text == "card <CARD> expiry soon" and out.entities == ["CARD_NUMBER"]
+
+
+# Added in WU-23 (append only, ruling 3): pinned so that none can leave the module unnoticed.
+PHRASES_WU23 = {
+    "EMERGENCY_ROMAN": ("seene mein bahut dard", "sine mein bahut dard"),
+    "EMERGENCY_DEVANAGARI": ("सीने में बहुत दर्द", "सुन्न हो"),
+}
+
+
+def test_wu23_phrases_are_present_and_fire():
+    for attr, phrases in PHRASES_WU23.items():
+        for phrase in phrases:
+            assert phrase in getattr(radar, attr)
+            assert radar.scan(f"{phrase} hai").emergency

@@ -1,0 +1,10 @@
+{
+  "suite": "redaction",
+  "author": "seeded canary generator",
+  "author_role": "builder, synthetic",
+  "keyword_author": "redaction pattern author",
+  "sha256": "04243774eb0bc4af68d139f4a991306b887960a36aeacb508df6fdc419da0bbf",
+  "n": 270,
+  "seed": 20261110,
+  "per_type": 30
+}

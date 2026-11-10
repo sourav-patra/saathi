@@ -1,0 +1,8 @@
+{
+  "suite": "radar",
+  "author": "fixture writer (regression set)",
+  "author_role": "builder, synthetic regression set",
+  "keyword_author": "keyword list author",
+  "sha256": "bb5b560f95b555860301551102d5581ba6617c7e31d3abea0e454d3e560c39bb",
+  "n": 137
+}
