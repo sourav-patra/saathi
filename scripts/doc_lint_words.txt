@@ -1,0 +1,32 @@
+# Filler and promotional words (DOC-PHILOSOPHY writing rules, RQ-101). One word or phrase per line, matched
+# case-insensitively on word boundaries outside code. Lines starting with # are comments.
+# "etc." is left out on purpose: DOC-PHILOSOPHY.md quotes it as a rule and the lint must pass on that file.
+seamless
+seamlessly
+leverage
+leverages
+leveraging
+robust
+cutting-edge
+state-of-the-art
+game-changing
+game changer
+revolutionary
+groundbreaking
+world-class
+best-in-class
+blazing
+blazing-fast
+delve
+delves
+tapestry
+testament
+pivotal
+vibrant
+holistic
+synergy
+supercharge
+unlock the power
+next-generation
+effortless
+effortlessly
