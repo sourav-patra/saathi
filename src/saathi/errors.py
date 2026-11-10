@@ -95,6 +95,11 @@ class SchemaFailure(SaathiError): ...
 class NoAcceptedResult(SaathiError): ...
 
 
+# Guards (M11): not a port error; the gateway maps it to PrivacyViolation
+class RestrictedDataLeft(SaathiError):  # noqa: N818
+    """Text still matches a restricted pattern, or the input is not text."""
+
+
 # CommerceAdapter (Phase 1 port; the errors are shared now)
 class AdapterUnavailable(SaathiError): ...
 
