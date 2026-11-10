@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from saathi.errors import SaathiError
@@ -72,6 +74,8 @@ class Settings(BaseSettings):
     t4_model: str = ""
 
     roster_path: str = ""           # private TOML roster (schema: infra/roster.example.toml); empty = no model tier
+    ledger_scope: Literal["global", "household"] = "global"   # global = one cap across all households
+    ledger_tz: str = "Asia/Kolkata"                            # the month of the cap follows this zone
     usd_to_inr: float = 88.0
 
     # --- ASR ----------------------------------------------------------------
@@ -82,6 +86,15 @@ class Settings(BaseSettings):
     langfuse_host: str = "http://langfuse-web:3000"
     langfuse_public_key: str = ""
     langfuse_secret_key: SecretStr = SecretStr("")
+
+    @field_validator("ledger_tz")
+    @classmethod
+    def _known_zone(cls, value: str) -> str:
+        try:
+            ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError) as exc:
+            raise ValueError(f"unknown time zone {value!r}") from exc
+        return value
 
 
 def read_secret_file(path: str) -> bytes:

@@ -335,8 +335,12 @@ async def test_edge_can_call_only_resolve_sender_rate_state_beat(pg_db: PgDb):
         )
         assert {r["proname"] for r in rows if r["ok"]} == EDGE_FUNCTIONS
         assert {r["proname"] for r in rows} >= EDGE_FUNCTIONS | {"lease_next", "audit_append", "due_alerts"}
-        # model and readonly call none of them
-        for role in (MODEL, READONLY):
+        # readonly calls none of them; model calls only the global ledger total (006)
+        assert {r["proname"] for r in await conn.fetch(
+            f"""SELECT p.proname FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+                 WHERE n.nspname = 'control' AND has_function_privilege('{MODEL}', p.oid, 'EXECUTE')""")
+        } == {"ledger_month_total"}
+        for role in (READONLY,):
             assert [r for r in await conn.fetch(
                 f"""SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
                      WHERE n.nspname = 'control' AND has_function_privilege('{role}', p.oid, 'EXECUTE')""")] == [], role
@@ -533,7 +537,7 @@ EXPECTED: dict[str, dict[str, dict[str, set[str]]]] = {
         "table": {"llm_spend": {"SELECT", "INSERT"}, "llm_reservations": {"SELECT", "INSERT"}},
         "column": {"llm_reservations.state": {"UPDATE"}, "llm_reservations.settled_inr": {"UPDATE"}},
         "seq": {"llm_spend_id_seq": {"USAGE"}, "llm_reservations_id_seq": {"USAGE"}},
-        "fn": {},
+        "fn": {"control.ledger_month_total(text)": {"EXECUTE"}},
     },
     "saathi_owner": {
         "table": {**{t: {"SELECT", "INSERT"} for t in _HOUSEHOLD_ADMIN}, "voice_clips": {"SELECT", "INSERT"}},
@@ -555,7 +559,7 @@ EXPECTED: dict[str, dict[str, dict[str, set[str]]]] = {
     "saathi_scan": {
         "table": {
             **{t: {"SELECT"} for t in ("households inbox alert_events raw_text control.household_config"
-                                       " elder_identities approvers rejected_inbound").split()},
+                                       " elder_identities approvers rejected_inbound llm_reservations").split()},
             "control.heartbeats": {"SELECT", "INSERT", "UPDATE"},
         },
         "column": {f"inbox.{c}": {"UPDATE"} for c in ("state", "attempts", "lease_until", "lease_token")},
@@ -568,8 +572,11 @@ EXPECTED: dict[str, dict[str, dict[str, set[str]]]] = {
     },
     "saathi_migrator": {"table": {}, "column": {}, "seq": {}, "fn": {}},  # the owner: nothing beyond ownership
 }
-# schema control (LLD grants 2): usage for every role that calls a function or reads a table there; model has none.
-SCHEMA_USAGE = {"saathi_edge", "saathi_core", "saathi_owner", "saathi_readonly", "saathi_scan", "saathi_audit"}
+# schema control (LLD grants 2): usage for every role that calls a function or reads a table there; model reaches
+# only control.ledger_month_total (006).
+SCHEMA_USAGE = {
+    "saathi_model", "saathi_edge", "saathi_core", "saathi_owner", "saathi_readonly", "saathi_scan", "saathi_audit",
+}
 
 _ACL_SQL = {
     "table": """SELECT CASE WHEN n.nspname = 'public' THEN c.relname ELSE n.nspname || '.' || c.relname END AS obj,
@@ -673,7 +680,7 @@ async def test_planted_grant_fails(pg_db: PgDb, name: str):
 
 DEFINER_FUNCTIONS = {
     "resolve_sender", "resolve_approver", "rejected_digest", "rate_state", "audit_append", "lease_next", "reap_inbox",
-    "unacked_inbox", "due_alerts", "unscanned_audio", "beat",
+    "unacked_inbox", "due_alerts", "unscanned_audio", "beat", "ledger_month_total",
 }
 PINNED = ["search_path=pg_catalog, public"]
 
@@ -727,11 +734,14 @@ LOOPING_CALLS = {
     "unacked_inbox": "SELECT * FROM control.unacked_inbox(now(), 10)",
     "due_alerts": "SELECT * FROM control.due_alerts(now(), 10)",
     "unscanned_audio": "SELECT * FROM control.unscanned_audio(now(), 60)",
+    "ledger_month_total": "SELECT control.ledger_month_total('2026-11')",
 }
+# the role that calls each function: the model role may call only ledger_month_total, the others are core's
+CALLER = {"ledger_month_total": MODEL}
 _RESTORE = re.compile(r"PERFORM set_config\('app\.household_id', coalesce\(saved, ''\), true\);")
 
 
-async def household_after(db: PgDb, call: str) -> str | None:
+async def household_after(db: PgDb, call: str, role: str = CORE) -> str | None:
     """Set the household to h1 in a transaction, run the call, and read the setting in the same transaction.
 
     Only h2 has anything to lease, so a function that loops to h2 and forgets to restore leaves h2 behind.
@@ -741,20 +751,20 @@ async def household_after(db: PgDb, call: str) -> str | None:
         await su.execute("UPDATE inbox SET state = 'dead' WHERE household_id = 'h1'")
     finally:
         await su.close()
-    core = await connect(db, CORE)
+    conn = await connect(db, role)
     try:
-        async with core.transaction():
-            await core.execute("SELECT set_config('app.household_id', 'h1', false)")
-            await core.fetch(call)
-            return await core.fetchval("SELECT current_setting('app.household_id', true)")
+        async with conn.transaction():
+            await conn.execute("SELECT set_config('app.household_id', 'h1', false)")
+            await conn.fetch(call)
+            return await conn.fetchval("SELECT current_setting('app.household_id', true)")
     finally:
-        await core.close()
+        await conn.close()
 
 
 @pytest.mark.parametrize("fn", sorted(LOOPING_CALLS))
 async def test_looping_function_restores_the_household_setting(pg_db: PgDb, fn: str):
     await seed(pg_db)
-    assert await household_after(pg_db, LOOPING_CALLS[fn]) == "h1"
+    assert await household_after(pg_db, LOOPING_CALLS[fn], CALLER.get(fn, CORE)) == "h1"
 
 
 @pytest.mark.parametrize("fn", sorted(LOOPING_CALLS))
@@ -768,7 +778,8 @@ async def test_function_without_the_restore_fails(pg_db: PgDb, fn: str):
         await su.execute(stripped)  # CREATE OR REPLACE keeps the owner and the grants
     finally:
         await su.close()
-    assert await household_after(pg_db, LOOPING_CALLS[fn]) == "h2"  # the setting leaked from the last household
+    leaked = await household_after(pg_db, LOOPING_CALLS[fn], CALLER.get(fn, CORE))
+    assert leaked == "h2"  # the setting leaked from the last household
 
 
 async def test_lease_next_without_its_early_return_restore_fails(pg_db: PgDb):
