@@ -1,5 +1,5 @@
 # Phase gate registry (RQ-100). One row per id; an id with no receipt or a command whose program or file does not exist yet is reported unavailable.
-# Source: LLD tests part section 4. Rows for later phases are added with their phase gate.
+# Source: LLD tests part section 4. Rows for Phases 1 to 5 are manual rows (unavailable until an owner receipt exists); only rows at or below --phase N are run or printed.
 
 [[row]]
 id = "RQ-16"
@@ -476,3 +476,591 @@ phase = 0
 kind = "auto"
 command = ["uv", "run", "pytest", "tests/test_no_money.py", "-q"]
 receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-01"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-02"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-03"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-06"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-07"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-14"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-19"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-20"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-21"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-22"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-23"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-24"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-25"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-26"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-27"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-28"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-29"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-30"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-31"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-32"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-33"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-35"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-37"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-38"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-39"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-42"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-51"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-54"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-55"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-56b"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-64"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-65"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-66"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-68"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-70"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-72b"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-74"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-77"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-78"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-80"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-82"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-83"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-91"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-92"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-93"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-94"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-95b"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-98"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-102"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-106"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-107"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-108"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-111b"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-112"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-113"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-115"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "PL-06"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "PL-20"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "PL-23"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "PL-25"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "PL-26"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "PL-27"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "PL-28"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "PL-29"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "PL-30"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "PL-35"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "PL-37"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-04"
+phase = 2
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-05"
+phase = 2
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-34"
+phase = 2
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-53"
+phase = 2
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-87"
+phase = 2
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-88"
+phase = 2
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-89"
+phase = 2
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-90"
+phase = 2
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-09"
+phase = 3
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-10"
+phase = 3
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-11"
+phase = 3
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-12"
+phase = 3
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-15"
+phase = 3
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-08"
+phase = 4
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-13"
+phase = 4
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-73"
+phase = 5
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-114"
+phase = 5
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90

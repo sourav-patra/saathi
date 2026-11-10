@@ -6,7 +6,7 @@ Saathi is a working codename; the public name is chosen later (D-90).
 
 The elder sends a WhatsApp voice note, photo or video in Hindi or everyday English. Saathi works out what they want and does everything up to the final step. A caregiver approves that step with one tap in Telegram.
 
-| Saathi can… | How |
+| Saathi will… | How |
 |---|---|
 | Book rides (auto / cab), choosing the ride type by policy | Deep links + Android phone agent |
 | Order groceries and food | Official commerce MCP servers where available, otherwise the phone agent |
@@ -14,6 +14,8 @@ The elder sends a WhatsApp voice note, photo or video in Hindi or everyday Engli
 | Debunk viral forwards with a short Hindi explainer video | Fact-check search → script → TTS → code-rendered video |
 | Answer "how do I…" and phone-help questions, set reminders, book appointments | Voice-note replies |
 | Flag emergencies and scams immediately | Keyword radar + model check; never handled alone |
+
+Saathi is not an emergency service; it alerts your family; call 112 or 108.
 
 ## Principles
 

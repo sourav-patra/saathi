@@ -28,7 +28,7 @@ HEX40 = re.compile(r"^[0-9a-f]{40}$")
 PATH_PREFIXES = ("tests/", "scripts/", ".github/", "evals/", "infra/", "docs/", "src/")
 PATH_SUFFIXES = (".py", ".toml", ".txt", ".md", ".sh", ".yml", ".json")
 
-Runner = Callable[[Sequence[str]], int]
+Runner = Callable[[Sequence[str]], "int | tuple[int, str]"]
 
 
 class Row(BaseModel):
@@ -45,9 +45,27 @@ class Receipt(BaseModel):
     fields: dict[str, str]
 
 
-def subprocess_runner(argv: Sequence[str]) -> int:
-    """Run argv with no shell and return its exit code. A missing program raises FileNotFoundError."""
-    return subprocess.run(list(argv), cwd=ROOT, capture_output=True, text=True, timeout=1800, check=False).returncode
+def subprocess_runner(argv: Sequence[str]) -> tuple[int, str]:
+    """Run argv with no shell and return (exit code, stdout). A missing program raises FileNotFoundError."""
+    done = subprocess.run(list(argv), cwd=ROOT, capture_output=True, text=True, timeout=1800, check=False)
+    return done.returncode, done.stdout
+
+
+def _with_skip_report(argv: list[str]) -> list[str]:
+    """Pytest rows run with -rs so that skipped tests show in the output."""
+    if "pytest" in argv and "-rs" not in argv:
+        i = argv.index("pytest")
+        return [*argv[: i + 1], "-rs", *argv[i + 1 :]]
+    return argv
+
+
+def _pytest_all_ran(argv: Sequence[str], stdout: str) -> bool:
+    """False when a pytest run skipped any test or passed none: a skipped test proves nothing (RQ-100)."""
+    if "pytest" not in argv:
+        return True
+    if re.search(r"\b\d+ skipped\b", stdout):
+        return False
+    return re.search(r"\b[1-9]\d* passed\b", stdout) is not None
 
 
 def load_registry(path: Path) -> list[Row]:
@@ -66,7 +84,7 @@ def load_registry(path: Path) -> list[Row]:
 def parse_receipt(path: Path) -> Receipt:
     """First line a plain sentence, then `key: value` lines."""
     lines = path.read_text(encoding="utf-8").splitlines()
-    if not lines or not lines[0].strip() or re.match(r"^[a-z_0-9]+:", lines[0]):
+    if not lines or not lines[0].strip() or lines[0].startswith("#") or re.match(r"^[a-z_0-9]+:", lines[0]):
         raise ValueError(f"{path.name}: first line must be one plain sentence")
     fields: dict[str, str] = {}
     for line in lines[1:]:
@@ -92,9 +110,11 @@ def _evaluate_manual(row: Row, receipts: Path, today: date) -> State:
         when = date.fromisoformat(rec.fields.get("date", ""))
     except ValueError:
         return "invalid"
+    f = rec.fields
+    if path.name != f"RECEIPT-{row.id.lower()}-{when.isoformat()}.md" or not f.get("command"):
+        return "invalid"
     if (today - when).days > row.valid_days or when > today:
         return "unavailable"
-    f = rec.fields
     if f.get("id", "").lower() != row.id.lower() or not HEX40.match(f.get("revision", "")):
         return "invalid"
     if not f.get("signer"):
@@ -136,11 +156,17 @@ def evaluate(
     if not argv or _prerequisite_missing(argv, root, env):
         return "unavailable"
     argv = [env.get(t.lstrip("${").rstrip("}"), t) if t.startswith("$") else t for t in argv]
+    argv = _with_skip_report(argv)
     try:
-        code = run(argv)
+        result = run(argv)
     except FileNotFoundError:
         return "unavailable"
-    return "verified" if code == 0 else "invalid"
+    code, stdout = result if isinstance(result, tuple) else (result, "")
+    if code != 0:
+        return "invalid"
+    if isinstance(result, tuple) and not _pytest_all_ran(argv, stdout):
+        return "unavailable"
+    return "verified"
 
 
 def prd_phase_table(root: Path = ROOT) -> dict[str, int]:

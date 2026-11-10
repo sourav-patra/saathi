@@ -1,5 +1,6 @@
 """LT-34: the phase gate (RQ-100). Fake runners and temp registries only; no row of the real registry is run."""
 
+import re
 import sys
 from datetime import date, timedelta
 from pathlib import Path
@@ -53,8 +54,7 @@ def _run(tmp: Path, rows: str, *extra: str, runner=lambda argv: 0) -> int:
 def test_registry_matches_prd_phase_table():
     prd = gate.prd_phase_table(gate.ROOT)
     reg = {r.id: r.phase for r in gate.load_registry(gate.ROOT / "scripts" / "gate_registry.toml")}
-    phase0 = {k for k, v in prd.items() if v == 0}
-    assert phase0 <= set(reg), f"registry misses {sorted(phase0 - set(reg))}"
+    assert set(prd) == set(reg), f"missing {sorted(set(prd) - set(reg))}, extra {sorted(set(reg) - set(prd))}"
     for rid, phase in reg.items():
         assert prd.get(rid) == phase, f"{rid}: registry phase {phase}, PRD {prd.get(rid)}"
     assert (gate.ROOT / "PHASE").read_text().strip() == "0"
@@ -108,7 +108,7 @@ def test_list_prints_all_ids(tmp_path, capsys):
     out = capsys.readouterr().out
     assert "RQ-1 phase 0 auto" in out and "RQ-2 phase 3 manual" in out
     ids = {r.id for r in gate.load_registry(gate.ROOT / "scripts" / "gate_registry.toml")}
-    assert len(ids) == 68
+    assert len(ids) == len(gate.prd_phase_table(gate.ROOT))
 
 
 def test_not_applicable_needs_reason(tmp_path):
@@ -126,6 +126,82 @@ def test_report_mode_exits_zero_and_prints_every_row(tmp_path, capsys):
     assert "unavailable" in capsys.readouterr().out
 
 
-@pytest.mark.parametrize("text", ["RQ-16 to RQ-18", "PL-01 to PL-05"])
-def test_expand_ids_ranges(text):
-    assert len(gate.expand_ids(text)) == 3 or len(gate.expand_ids(text)) == 5
+@pytest.mark.parametrize(("text", "count"), [("RQ-16 to RQ-18", 3), ("PL-01 to PL-05", 5)])
+def test_expand_ids_ranges(text, count):
+    assert len(gate.expand_ids(text)) == count
+
+
+PYTEST_ROW = _row("RQ-12", 0, "auto", '["pytest", "tests/test_gate.py"]')
+
+
+@pytest.mark.parametrize(
+    ("stdout", "state"),
+    [
+        ("5 skipped in 0.01s", "unavailable"),
+        ("3 passed, 2 skipped in 0.02s", "unavailable"),
+        ("no tests ran in 0.01s", "unavailable"),
+        ("5 passed in 0.02s", "verified"),
+    ],
+)
+def test_pytest_row_skips_not_verified(tmp_path, stdout, state):
+    seen = []
+
+    def runner(argv):
+        seen.append(list(argv))
+        return 0, stdout
+
+    row = gate.load_registry(_registry(tmp_path, PYTEST_ROW))[0]
+    assert gate.evaluate(row, tmp_path / "rc", TODAY, run=runner, root=gate.ROOT) == state
+    assert "-rs" in seen[0]
+
+
+def test_all_skipped_pytest_row_unavailable(tmp_path, capsys):
+    assert _run(tmp_path, PYTEST_ROW, "--phase", "0", runner=lambda a: (0, "4 skipped in 0.01s")) == 1
+    assert "RQ-12 phase 0 auto unavailable" in capsys.readouterr().out
+
+
+def test_mixed_skip_pytest_row_unavailable(tmp_path, capsys):
+    assert _run(tmp_path, PYTEST_ROW, "--phase", "0", runner=lambda a: (0, "3 passed, 1 skipped")) == 1
+    assert "RQ-12 phase 0 auto unavailable" in capsys.readouterr().out
+
+
+def _manual_state(tmp_path, name_date, body):
+    row = gate.load_registry(_registry(tmp_path, _row("RQ-13", 0, "manual")))[0]
+    rc = tmp_path / "rc"
+    rc.mkdir()
+    (rc / f"RECEIPT-rq-13-{name_date}.md").write_text(body)
+    return gate.evaluate(row, rc, TODAY)
+
+
+def _body(first="This receipt proves a check.", date_="2026-11-10", command="command: read the page\n"):
+    return (
+        f"{first}\n\nid: RQ-13\nrevision: {REV}\ndate: {date_}\n{command}result: verified\nsigner: owner role\n"
+    )
+
+
+def test_receipt_valid_baseline(tmp_path):
+    assert _manual_state(tmp_path, "2026-11-10", _body()) == "verified"
+
+
+def test_receipt_filename_date_mismatch_invalid(tmp_path):
+    assert _manual_state(tmp_path, "2026-11-09", _body()) == "invalid"
+
+
+def test_receipt_missing_command_invalid(tmp_path):
+    assert _manual_state(tmp_path, "2026-11-10", _body(command="")) == "invalid"
+
+
+def test_receipt_heading_first_line_invalid(tmp_path):
+    assert _manual_state(tmp_path, "2026-11-10", _body(first="# Receipt")) == "invalid"
+
+
+def test_rule_phase_equals_prd_phase_of_requirement():
+    import tomllib
+
+    prd = gate.prd_phase_table(gate.ROOT)
+    rules = tomllib.loads((gate.ROOT / "scripts" / "rules.toml").read_text())["rule"]
+    assert rules
+    for r in rules:
+        rid = re.search(r"\b(?:RQ|PL)-\d+[a-z]?", r["implements"])
+        assert rid, f"{r['id']}: implements names no requirement"
+        assert prd[rid.group(0)] == r["phase"], f"{r['id']}: rule phase {r['phase']}, PRD {prd[rid.group(0)]}"
