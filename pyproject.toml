@@ -36,6 +36,7 @@ dev = [
 saathi-api = "saathi.app:main_edge"
 saathi-bot = "saathi.channels.telegram:run"
 saathi-worker = "saathi.worker.loop:main"
+saathi-admin = "saathi.admin:main"
 
 [build-system]
 requires = ["hatchling"]
