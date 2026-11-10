@@ -1,27 +1,79 @@
 name: ci
+# Every `uses:` ends in a 40 hex commit digest with the tag as a comment (RQ-72a, build part section 2); scripts/ci_lint.py
+# re-checks that in the lint job. To refresh a pin: git ls-remote https://github.com/<owner>/<repo> refs/tags/<tag> 'refs/tags/<tag>^{}'
+# and use the dereferenced (^{}) commit when the tag is annotated.
 on:
   push:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
-  test:
+  lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
       - run: uv python install 3.12
       - run: uv sync --frozen
       - run: uv run ruff check src tests scripts
+      - run: uv run python scripts/ci_lint.py .github/workflows
+
+  test:
+    runs-on: ubuntu-latest
+    env:
+      CI: "true"
+    # WU-04 adds here: services.postgres (image pinned by @sha256 digest, postgres:16 family), SAATHI_TEST_DSN,
+    # and `sudo apt-get install -y strace`. Placeholder only: no service is started at this stage.
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+      - run: uv python install 3.12
+      - run: uv sync --frozen
       - run: uv run pytest -q
+
+  license-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+      - run: uv python install 3.12
+      - run: uv sync --frozen
       - name: License audit (MIT/Apache + permissive only)
         run: uv run python scripts/license_audit.py
+
+  design-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: python3 scripts/design_check.py
+
+  doc-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+      - run: uv python install 3.12
+      - run: uv sync --frozen
+      - run: uv run python scripts/doc_lint.py 00-INDEX.md README.md docs
 
   compose:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Validate docker compose with placeholder env
         run: |
           sed -E 's/^([A-Z0-9_]+)=( *#.*)?$/\1=placeholder/' .env.example > .env
           docker compose --env-file .env -f infra/docker-compose.yml config --quiet
+
+  # Report mode never fails the build; it becomes required at the Phase 0 exit (WU-23).
+  gate-report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+      - run: uv python install 3.12
+      - run: uv sync --frozen
+      - run: uv run python scripts/gate.py --phase 0 --report

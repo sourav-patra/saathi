@@ -3,7 +3,7 @@
 
 A PATH is a markdown file or a directory searched for *.md files. Rules (names as in LLD M22):
 filename_date, filename_space, dash, filler, size, index_row, record_shape, closing_line, bullet_bold, names.
-Exit 1 when any rule fires. The names rule needs --names-file; without it the rule reports unavailable and does not fail.
+Exit 1 when any rule fires. The names rule needs --names-file; without it that rule is unavailable and does not fail.
 
 Scope and exemptions, kept next to the code so the lint and the design agree:
 - kind comes from front matter `kind:`, else the 00-INDEX.md row, else the file name prefix. A file with no kind is
@@ -165,7 +165,8 @@ def rule_index_row(path: Path, text: str) -> list[Finding]:
             continue
         target = resolve_index_path(root, m.group(2))
         if not target.is_file():
-            out.append(Finding("index_row", path, n, f"path {m.group(2)} does not resolve to {target.relative_to(root)}"))
+            where = target.relative_to(root)
+            out.append(Finding("index_row", path, n, f"path {m.group(2)} does not resolve to {where}"))
         elif hashlib.sha256(target.read_bytes()).hexdigest()[:12] != m.group(3):
             out.append(Finding("index_row", path, n, f"hash prefix of {m.group(2)} does not match the file"))
     return out
@@ -230,7 +231,9 @@ def collect(paths: Sequence[Path]) -> list[Path]:
     return files
 
 
-def lint(paths: Sequence[Path], names_file: Path | None = None, words_file: Path = DEFAULT_WORDS) -> tuple[list[Finding], list[str]]:
+def lint(
+    paths: Sequence[Path], names_file: Path | None = None, words_file: Path = DEFAULT_WORDS
+) -> tuple[list[Finding], list[str]]:
     """Return (findings, notes). A note is a warning or an unavailable rule; neither fails the run."""
     words = load_words(words_file)
     names = load_names(names_file) if names_file else None
