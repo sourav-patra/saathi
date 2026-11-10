@@ -5,7 +5,7 @@ revision: r2
 governs: v1; applies to every phase in PRD-saathi-2026-11-09-r2.md
 status: draft r2, round-3, TRD review and strategy fold applied, pending owner lock (see docs/LOCKS.md)
 supersedes: SPEC-saathi-safety-2026-11-09.md sha256 ae3b61c97130022e8ce1b957bdc3e0d0fe73842816fd427cf91976b936e91dd4
-upstream: PRD-saathi-2026-11-09-r2.md sha256 6fec2edf126fb45918af05e81e44ff177beb96ae376cb1cba34ab979073f2e29; SPEC-saathi-requests-2026-11-09.md sha256 1df11fbbf1d3360656e326232b33ba54a9f0a3439fa009f8ab0904c9e00cc63f; RECORD-saathi-decisions-2026-11-09.md sha256 41bbe3270e83e1a23535f8903d7e5b60edeea9dae846b0b6feb4c3b152ff82d9
+upstream: PRD-saathi-2026-11-09-r2.md sha256 ee2a21d4115ce10d07f5fcae7567b00866e8411d2b40380f12c03450b4e16c8d; SPEC-saathi-requests-2026-11-09.md sha256 7e0cee8a2dab273d3776eafd6d68d6a7a0f51e1d75fa7b55064136b0c4ed0e1e; RECORD-saathi-decisions-2026-11-09.md sha256 41bbe3270e83e1a23535f8903d7e5b60edeea9dae846b0b6feb4c3b152ff82d9
 sources: docs/design/RECORD-saathi-decisions-2026-11-09.md (D-nn); src/saathi/app.py, channels/whatsapp.py, channels/telegram.py, guards/radar.py, policy/engine.py, policy/quote.py, pipeline.py and infra/sql/schema/001_init.sql on branch phase-0/foundation at 3d46456; DOC-PHILOSOPHY.md
 checked-at: 3d46456, 2026-11-09. Code read with `git show`; nothing executed in this pass except the commands in PRD section 2.
 ---

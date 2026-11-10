@@ -8,6 +8,9 @@
 5. sizes and closing line: contract under 24000 bytes (warn at 22500), record 16000, index 2000
 6. dashes: no em or en dash in a design file
 7. figure: edges of figures/architecture.svg equal the edge table, endpoints exist
+8. lld: every Phase 0 id of the PRD phase table is in the Serves cell of a module row (`| M01 |`) and of a test row
+   (`| LT-01 |`) of the LLD files, and every id in those cells exists in a contract
+Index paths: a name with a slash is relative to the repository root; a name without one is in docs/design/.
 Exit 0 only when every check passes.
 """
 from __future__ import annotations
@@ -44,6 +47,37 @@ def parse_ids(cell: str) -> set[str]:
         out.add(f"{prefix}-{num}")
         last, rng = num, False
     return out
+
+
+def wide_ids(cell: str) -> set[str]:
+    """Like parse_ids, but keeps zero padding: PL-01 to PL-05 gives PL-01 .. PL-05."""
+    out: set[str] = set()
+    prefix, last, width, rng = None, None, 0, False
+    for m in re.finditer(r"(RQ|PL)-(\d+[ab]?)|\b(\d+[ab]?)\b|\bto\b", cell):
+        if m.group(0) == "to":
+            rng = True
+            continue
+        if m.group(1):
+            prefix, num = m.group(1), m.group(2)
+        else:
+            if prefix is None:
+                continue
+            num = m.group(3)
+        if rng and last is not None and num.isdigit() and last.isdigit():
+            for n in range(int(last) + 1, int(num)):
+                out.add(f"{prefix}-{n:0{width}d}")
+        out.add(f"{prefix}-{num}")
+        width = len(num) if num.isdigit() else width
+        last, rng = num, False
+    return out
+
+
+def cells(line: str) -> list[str]:
+    return [c.strip() for c in line.strip().strip("|").split("|")]
+
+
+def resolve(root: Path, name: str) -> Path:
+    return root / name if "/" in name else root / "docs" / "design" / name
 
 
 def main() -> int:
@@ -111,9 +145,10 @@ def main() -> int:
     for line in idx.read_text().splitlines():
         m = re.match(r"^\| (\w+) \| (\S+) \| ([0-9a-f]{12}) \|", line)
         if m:
-            listed[m.group(2)] = m.group(3)
-            kinds[m.group(2)] = m.group(1)
-            p = root / m.group(2)
+            full = resolve(root, m.group(2)).relative_to(root).as_posix()
+            listed[full] = m.group(3)
+            kinds[full] = m.group(1)
+            p = root / full
             if not p.exists():
                 fail(f"index path missing: {m.group(2)}")
             elif sha(p)[:12] != m.group(3):
@@ -183,6 +218,42 @@ def main() -> int:
             fail("outside parties line missing")
     else:
         fail("core TRD or architecture.svg missing")
+
+    # 8 lld coverage
+    prd = next((f for f in files if f.name.startswith("PRD-")), None)
+    lld = [f for f in files if f.name.startswith("LLD-")]
+    if prd and lld:
+        phase0: set[str] = set()
+        for line in prd.read_text().splitlines():
+            if line.startswith("| 0 Foundation |"):
+                phase0 = wide_ids(cells(line)[2])
+        mod: set[str] = set()
+        tst: set[str] = set()
+        nm = nt = 0
+        for f in lld:
+            for line in f.read_text().splitlines():
+                if re.match(r"^\| M\d+ \|", line):
+                    nm += 1
+                    mod |= wide_ids(cells(line)[2])
+                elif re.match(r"^\| LT-\d+ \|", line):
+                    nt += 1
+                    tst |= wide_ids(cells(line)[5])
+        if not phase0:
+            fail("lld: no Phase 0 row found in the PRD phase table")
+        for what, got in (("module", mod), ("test", tst)):
+            miss = sorted(phase0 - got, key=lambda i: (i[:2], i))
+            if miss:
+                fail(f"lld: Phase 0 ids with no {what} row: " + ", ".join(miss))
+            bad = sorted(got - req)
+            if bad:
+                fail(f"lld: {what} rows name ids no contract defines: " + ", ".join(bad))
+        bad0 = sorted(phase0 - req)
+        if bad0:
+            fail("lld: the PRD Phase 0 row names ids no contract defines: " + ", ".join(bad0))
+        print(f"lld: {len(phase0)} Phase 0 ids; {nm} module rows and {nt} test rows; "
+              f"{len(phase0 - mod)} without a module, {len(phase0 - tst)} without a test")
+    elif lld:
+        fail("lld files exist but the PRD is missing")
 
     for w in warns:
         print("warn:", w)

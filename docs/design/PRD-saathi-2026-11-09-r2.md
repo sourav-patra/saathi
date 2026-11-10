@@ -5,7 +5,7 @@ revision: r2
 governs: v1 (phases 0 to 4); phase 5 items are marked P
 status: draft r2, round-3, TRD review and strategy fold applied, pending owner lock (see docs/LOCKS.md)
 supersedes: PRD-saathi-2026-11-09-r1.md sha256 021742ba14e4d154f291d059aaf1add458e2e3b90c36992990d7518ffae1434a, which had replaced a first draft with sha256 a784aba1ef15c35c41f01a04e0d94248a008f416c9307f2462190187f27e4b29
-upstream: RECORD-saathi-decisions-2026-11-09.md sha256 41bbe3270e83e1a23535f8903d7e5b60edeea9dae846b0b6feb4c3b152ff82d9; RECORD-saathi-decisions-strategy-2026-11-10.md sha256 183c28fa2840ae37acd9675e61025ca4b520822ad477bab1f824e3ad49731496
+upstream: RECORD-saathi-decisions-2026-11-09.md sha256 41bbe3270e83e1a23535f8903d7e5b60edeea9dae846b0b6feb4c3b152ff82d9; RECORD-saathi-decisions-strategy-2026-11-10.md sha256 2d6d32e8f7f743b397f9daa4b429c009b5275b47232cb441fc4d2e6a8754d931
 sources: docs/design/RECORD-saathi-decisions-2026-11-09.md and docs/design/RECORD-saathi-decisions-strategy-2026-11-10.md (cited as D-nn); docs/ARCHITECTURE.md, docs/DECISIONS.md, docs/ROADMAP.md, evals/README.md, src/, tests/ and infra/sql/schema/001_init.sql on branch phase-0/foundation at 3d46456; DOC-PHILOSOPHY.md
 checked-at: 3d46456, 2026-11-09. Code read with `git show`; the test, lint and licence commands ran in a scratch export of that commit (section 2).
 companions: SPEC-saathi-requests-2026-11-09.md, SPEC-saathi-safety-2026-11-09-r2.md, SPEC-saathi-assurance-2026-11-09-r2.md, SPEC-saathi-evidence-2026-11-09-r2.md, SPEC-saathi-alternatives-2026-11-09.md, SPEC-saathi-platform-2026-11-10.md, SPEC-saathi-product-2026-11-10.md, POLICY-saathi-2026-11-09-r2.md, POLICY-saathi-data-2026-11-09.md; each lists the RQ and PL ids it holds in its section 1

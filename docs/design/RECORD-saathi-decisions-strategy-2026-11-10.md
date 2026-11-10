@@ -28,4 +28,8 @@ Continues RECORD-saathi-decisions-2026-11-09.md, which holds D-01 to D-77. Cite 
 - 2026-11-10 D-88 decision: product direction: an open reference implementation under Apache-2.0; a published consent-to-commit spec with a conformance suite later; certification for adapters and deployers; no consumer subscription; the commons are protected with trademark and a Developer Certificate of Origin, never with copyleft (POLICY PL-37; deferrals in SPEC evidence section 5). @mark=decided
 - 2026-11-10 D-89 decision: permanent invariant: Saathi never holds, routes or initiates money movement. Payment stays cash on delivery or a wallet chosen inside the merchant's own flow (POLICY PL-36). This extends D-12 from a v1 limit to a standing rule. @mark=decided
 
+## Name
+
+- 2026-11-10 D-90 decision: "saathi" is the internal codename of the repository, package and identifiers. The public name is chosen after the first stable test (Stage A). Candidates are vetted privately, and a trademark search on the registry is required before any name is adopted. The elder-facing persona name is a private config value and is never the codename. @mark=decided
+
 Skipped or not checked: no decision here was checked against a live service, platform term or legal text; the strategy report's claims about outside parties were not copied and were not re-verified.

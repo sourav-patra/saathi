@@ -3,7 +3,7 @@ id: POLICY-saathi-data
 kind: contract
 governs: personal data in Saathi: classes, routes out of the server, consent per use, erasure and the law
 status: draft, new in the r2 set, round-3, TRD review and strategy fold applied, pending owner lock (see docs/LOCKS.md)
-upstream: PRD-saathi-2026-11-09-r2.md sha256 6fec2edf126fb45918af05e81e44ff177beb96ae376cb1cba34ab979073f2e29; SPEC-saathi-safety-2026-11-09-r2.md sha256 48a9ed8e7f581bdb18422f3474eb1c11b693e778884470e179ade38d72266e0f; SPEC-saathi-assurance-2026-11-09-r2.md sha256 d00fd79913c6a1fdb3c3a542f940adc7d1a71bb4540505c8baf61e5fbff0bbae; RECORD-saathi-decisions-2026-11-09.md sha256 41bbe3270e83e1a23535f8903d7e5b60edeea9dae846b0b6feb4c3b152ff82d9
+upstream: PRD-saathi-2026-11-09-r2.md sha256 ee2a21d4115ce10d07f5fcae7567b00866e8411d2b40380f12c03450b4e16c8d; SPEC-saathi-safety-2026-11-09-r2.md sha256 9c8988b2c9415f62ed6bb32b4247238e313319339e800fd9c9ef52f06b25e470; SPEC-saathi-assurance-2026-11-09-r2.md sha256 e9489fdd228d9f8fcd058108a61053ca7cba808f3b07d0775671888788d2f1c8; RECORD-saathi-decisions-2026-11-09.md sha256 41bbe3270e83e1a23535f8903d7e5b60edeea9dae846b0b6feb4c3b152ff82d9
 sources: docs/design/RECORD-saathi-decisions-2026-11-09.md (D-nn); sections 2, 3 and 6 of POLICY-saathi-2026-11-09-r1.md (sha256 72906ab9911d42af0645f9c72a9f01b2998209ab3184cf333ac47310fe26e35b), revised here; src/saathi/channels/telegram.py and src/saathi/channels/whatsapp.py on branch phase-0/foundation at 3d46456; the Digital Personal Data Protection Act, 2023 as recalled, text not re-read (R); DOC-PHILOSOPHY.md
 checked-at: 3d46456, 2026-11-09. Files read with `git show`. No leak scan, network capture or legal review was run; no platform terms were read.
 ---

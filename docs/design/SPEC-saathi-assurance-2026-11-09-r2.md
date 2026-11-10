@@ -5,7 +5,7 @@ revision: r2
 governs: v1; applies to every phase in PRD-saathi-2026-11-09-r2.md
 status: draft r2, round-3, TRD review and strategy fold applied, pending owner lock (see docs/LOCKS.md)
 supersedes: SPEC-saathi-assurance-2026-11-09-r1.md sha256 cd948b6b8c4a112f66350d4bddd3483a08980b97c7ab9737e2913b70a95e548a, which had replaced a first draft with sha256 78c70b97ae17979a73ea3c484a2fc8e7a6fe0410d93ee15c297227c8b63517eb
-upstream: PRD-saathi-2026-11-09-r2.md sha256 6fec2edf126fb45918af05e81e44ff177beb96ae376cb1cba34ab979073f2e29; SPEC-saathi-requests-2026-11-09.md sha256 1df11fbbf1d3360656e326232b33ba54a9f0a3439fa009f8ab0904c9e00cc63f; RECORD-saathi-decisions-2026-11-09.md sha256 41bbe3270e83e1a23535f8903d7e5b60edeea9dae846b0b6feb4c3b152ff82d9
+upstream: PRD-saathi-2026-11-09-r2.md sha256 ee2a21d4115ce10d07f5fcae7567b00866e8411d2b40380f12c03450b4e16c8d; SPEC-saathi-requests-2026-11-09.md sha256 7e0cee8a2dab273d3776eafd6d68d6a7a0f51e1d75fa7b55064136b0c4ed0e1e; RECORD-saathi-decisions-2026-11-09.md sha256 41bbe3270e83e1a23535f8903d7e5b60edeea9dae846b0b6feb4c3b152ff82d9
 sources: docs/design/RECORD-saathi-decisions-2026-11-09.md (D-nn); src/, tests/, infra/sql/schema/001_init.sql and .github/workflows/ci.yml on branch phase-0/foundation at 3d46456; DOC-PHILOSOPHY.md
 checked-at: 3d46456, 2026-11-09. Code read with `git show`; nothing executed in this pass except the commands in PRD section 2.
 ---
