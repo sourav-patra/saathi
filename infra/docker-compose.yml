@@ -1,8 +1,7 @@
 # Saathi stack for a single always-on ARM64 (or x86_64) VPS.
 #
-#   caddy ─► saathi (FastAPI webhook + Telegram bot) ─► ollama (T1 models)
-#                         │                           └─► whisper (T1 ASR)
-#                         └─► langfuse-web/worker ─► postgres · clickhouse · valkey · seaweedfs
+#   caddy ─► edge (FastAPI: webhooks and health) ─► postgres
+#   ollama (T1 models) · whisper (T1 ASR) · langfuse-web/worker ─► postgres · clickhouse · valkey · seaweedfs
 #
 # Licensing: every image here is MIT/Apache, or permissive for infrastructure
 # (PostgreSQL License, BSD-3). Deliberate swaps from Langfuse's reference
@@ -10,7 +9,7 @@
 #   MinIO (AGPL) → SeaweedFS (Apache-2.0)
 #   Redis 7.4+ (RSAL/SSPL) → Valkey (BSD-3)
 #
-# Exposure: only Caddy (80/443) is public, and only for the WhatsApp webhook.
+# Exposure: only Caddy (80/443) is public, and only for the webhook paths and the health route.
 # Langfuse's UI is bound to localhost; reach it over Tailscale or an SSH tunnel.
 #
 # Secrets come from ../.env (copy .env.example). Never commit .env.
@@ -200,20 +199,24 @@ services:
       retries: 20
 
   # ------------------------------------------------------------ app
-  saathi:
+  # The public edge: persists inbound messages, scans for keywords, answers the health route. It connects as the
+  # `saathi_edge` role, holds no key-encryption key, no caregiver token and no model key, and so has no env_file.
+  edge:
     build: { context: .., dockerfile: infra/Dockerfile }
     restart: unless-stopped
-    env_file: ../.env
     environment:
-      SAATHI_DB_URL_CORE: postgresql://saathi_core:${SAATHI_DB_PASSWORD_CORE}@postgres:5432/saathi
-      SAATHI_T1_BASE_URL: http://ollama:11434/v1
-      SAATHI_WHISPERCPP_URL: http://whisper:8080
-      SAATHI_LANGFUSE_HOST: http://langfuse-web:3000
-      SAATHI_LANGFUSE_PUBLIC_KEY: ${SAATHI_LANGFUSE_PUBLIC_KEY}
-      SAATHI_LANGFUSE_SECRET_KEY: ${SAATHI_LANGFUSE_SECRET_KEY}
+      SAATHI_ENV: ${SAATHI_ENV:-prod}
+      SAATHI_DB_URL_EDGE: postgresql://saathi_edge:${SAATHI_DB_PASSWORD_EDGE}@postgres:5432/saathi
+      SAATHI_HEALTH_PATH: ${SAATHI_HEALTH_PATH:-/health}
+      SAATHI_WA_APP_SECRET: ${SAATHI_WA_APP_SECRET:-}
+      SAATHI_WA_VERIFY_TOKEN: ${SAATHI_WA_VERIFY_TOKEN:-}
+      SAATHI_WA_WEBHOOK_PATH: ${SAATHI_WA_WEBHOOK_PATH:-}
+      SAATHI_TG_ELDER_SECRET: ${SAATHI_TG_ELDER_SECRET:-}
+      SAATHI_TG_ELDER_WEBHOOK_PATH: ${SAATHI_TG_ELDER_WEBHOOK_PATH:-}
+      SAATHI_SENDER_HMAC_KEY_FILE: /run/secrets/sender_hmac_key
+    secrets: [sender_hmac_key]
     depends_on:
       postgres: { condition: service_healthy }
-      ollama: { condition: service_healthy }
     ports: ["127.0.0.1:8000:8000"]
 
   caddy:
@@ -222,10 +225,19 @@ services:
     ports: ["80:80", "443:443"]
     environment:
       SAATHI_DOMAIN: ${SAATHI_DOMAIN:?set SAATHI_DOMAIN (public DNS name pointing at this VPS)}
+      SAATHI_HEALTH_PATH: ${SAATHI_HEALTH_PATH:-/health}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
-    depends_on: [saathi]
+    depends_on: [edge]
+
+# Secret files live on the host in one directory (mode 600 each) and are mounted read-only at /run/secrets. Each service
+# lists only the files it needs. The key-encryption key goes to the worker service alone, when that service is added;
+# no edge service may list `kek`.
+secrets:
+  sender_hmac_key: { file: "${SAATHI_SECRETS_DIR:-/etc/saathi/secrets}/sender_hmac_key" }
+  approval_secret: { file: "${SAATHI_SECRETS_DIR:-/etc/saathi/secrets}/approval_secret" }
+  kek: { file: "${SAATHI_SECRETS_DIR:-/etc/saathi/secrets}/kek" }
 
 volumes:
   pg_data:

@@ -32,7 +32,7 @@ dev = [
 ]
 
 [project.scripts]
-saathi-api = "saathi.app:run"
+saathi-api = "saathi.app:main_edge"
 saathi-bot = "saathi.channels.telegram:run"
 
 [build-system]

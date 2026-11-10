@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     wa_app_secret: SecretStr = SecretStr("")      # verifies X-Hub-Signature-256
     wa_verify_token: SecretStr = SecretStr("")    # webhook verification handshake
     wa_graph_version: str = "v23.0"
+    wa_webhook_path: str = ""                     # random path segment of /wa/<segment>; empty = route not mounted
 
     # Household values (people, approvers, caps, names) are versioned `household_config` rows, never settings (RQ-110).
 
@@ -50,6 +51,7 @@ class Settings(BaseSettings):
     tg_caregiver_token: SecretStr = SecretStr("")
     tg_elder_token: SecretStr = SecretStr("")
     tg_elder_secret: SecretStr = SecretStr("")    # verifies the elder bot's webhook
+    tg_elder_webhook_path: str = ""               # random path segment of /tg/elder/<segment>; empty = not mounted
     tg_ops_chat_id: int = 0
 
     # --- Model tiers (all chat-completions-compatible HTTP endpoints) ----

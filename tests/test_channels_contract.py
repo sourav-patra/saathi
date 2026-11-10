@@ -447,9 +447,9 @@ async def test_unknown_person_ref_is_not_guessed() -> None:
 
 PLATFORM_NAMES = {"whatsapp", "telegram", "telegram_elder", "telegram_forward"}
 SOURCE_MEMBERS = {"WHATSAPP", "TELEGRAM_ELDER", "CAREGIVER_FORWARD"}
-# Not yet rewritten: WU-14 (app.py). The set may only shrink. The vocabulary modules (domain, ports, config, ids)
-# and pipeline.py, legacy.py have no hits and are checked like any other core module.
-LEGACY_PLATFORM_MODULES = {"src/saathi/app.py"}
+# Every module outside `channels/` and `edge/` is checked, the composition root `app.py` included. The vocabulary
+# modules (domain, ports, config, ids), pipeline.py and legacy.py have no hits.
+LEGACY_PLATFORM_MODULES: set[str] = set()
 ALLOWED_PREFIXES = ("src/saathi/channels/", "src/saathi/edge/")
 
 
@@ -500,7 +500,7 @@ def _violations(source: str) -> list[str]:
 def test_no_platform_name_in_core() -> None:
     modules = _core_modules()
     assert any(p.name == "ports.py" for p in modules)
-    assert not any(p.name == "app.py" for p in modules)  # the only exemption is the legacy app
+    assert any(p.name == "app.py" for p in modules)  # the composition root is checked like any core module
     bad = {}
     for path in modules:
         if hits := _violations(path.read_text()):
@@ -509,7 +509,7 @@ def test_no_platform_name_in_core() -> None:
 
 
 def test_exemption_list_only_shrinks() -> None:
-    assert LEGACY_PLATFORM_MODULES <= {"src/saathi/app.py"}
+    assert not LEGACY_PLATFORM_MODULES
 
 
 def test_platform_check_catches_planted_violations() -> None:

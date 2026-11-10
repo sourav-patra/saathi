@@ -675,7 +675,6 @@ def test_errors_of_is_keyed_by_protocol_class() -> None:
 
 # modules that import saathi.legacy today. The set may only shrink: see the removal plan in legacy.py.
 LEGACY_IMPORTERS = {
-    "src/saathi/app.py",  # WU-14
     "src/saathi/channels/telegram.py",  # WU-18
     "src/saathi/pipeline.py",  # WU-15
 }
