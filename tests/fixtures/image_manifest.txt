@@ -1,6 +1,8 @@
-# ASR image (infra/whisper/Dockerfile): one `name | licence` per shipped binary,
-# library or model file. Hand-written; the packages' copyright files were not
-# read here (see the WU-24 receipt). Replace with a list read from the built image.
+# SYNTHETIC FIXTURE for the ASR image (infra/whisper/Dockerfile). It does not list the
+# whole image: wget is gone from the final stage, but libc6 (LGPL), libstdc++6, libgcc-s1,
+# ca-certificates and the base-image tools are omitted. Image coverage is pending an owner
+# decision on the distribution base and the C/C++ runtime libraries (design-issue 3).
+# Replace with a list read from the built image.
 whisper-server       | MIT
 libwhisper.so        | MIT
 libggml.so           | MIT
