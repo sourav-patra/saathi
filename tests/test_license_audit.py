@@ -123,7 +123,13 @@ def test_documented_mpl_exceptions_kept():
     exc = la.load_exceptions()
     assert {"certifi", "orjson"} <= set(exc)
     assert la.check_exceptions(exc) == []
-    assert all("MPL" in e["licence"] for e in exc.values())
+    # Owner-approved permissive exceptions, named one by one (2026-11-10); every other entry is MPL.
+    approved_permissive = {"regex": "CNRI-Python"}
+    for name, e in exc.items():
+        if name in approved_permissive:
+            assert approved_permissive[name] in e["licence"], name
+        else:
+            assert "MPL" in e["licence"], name
 
 
 def test_banned_list_regex_covers_policy():

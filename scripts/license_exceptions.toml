@@ -1,6 +1,8 @@
 # Dependencies outside the MIT/Apache/permissive allowlist (PL-11). Each entry has
 # licence, reason and date. Only weak, file-level copyleft used UNMODIFIED as a
-# transitive dependency may be listed here. A banned licence (GPL, LGPL, AGPL, SSPL,
+# transitive dependency, or the one licence the owner has approved by name in this
+# file (currently regex: Apache-2.0 AND CNRI-Python), may be listed here. No licence
+# category is excepted. A banned licence (GPL, LGPL, AGPL, SSPL,
 # ELv2, BUSL, RSAL, non-commercial) never qualifies, and the audit refuses it.
 
 [allow.certifi]
@@ -11,4 +13,9 @@ date = "2026-11-10"
 [allow.orjson]
 licence = "MPL-2.0 AND (Apache-2.0 OR MIT)"
 reason = "A few MPL-licensed vendored source files, used unmodified as a compiled wheel. Pulled in transitively by langgraph/langsmith."
+date = "2026-11-10"
+
+[allow.regex]
+licence = "Apache-2.0 AND CNRI-Python"
+reason = "OSI-approved permissive (CNRI-Python is the historic Python licence, no copyleft). Used unmodified as a transitive dependency of the optional pii extra. Approved by the owner on 2026-11-10."
 date = "2026-11-10"
