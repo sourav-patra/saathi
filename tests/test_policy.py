@@ -190,6 +190,23 @@ def _approve(q: Quote, **kw):
     return issue_approval(q, approver_id="a1", approved_at=NOW, secret=SECRET, **kw)
 
 
+@rule("PE-31")
+def test_config_cannot_widen_payment_methods():
+    """PL-36: a setting that allows every method still denies all but COD and wallet."""
+    eng = engine(allowed_payment_methods=frozenset(PaymentMethod))
+    outside = set(PaymentMethod) - {PaymentMethod.COD, PaymentMethod.WALLET}
+    assert outside
+    for pm in outside:
+        q = cart(payment_method=pm)
+        d = eng.evaluate(q, CTX, NOW)
+        assert d.verdict == Verdict.DENY, pm
+        assert any("payment method" in r for r in d.reasons)
+        auth = eng.authorize_commit(approved_quote=q, live_quote=q, token=_approve(q), ctx=CTX, now=NOW)
+        assert not auth.allowed, pm
+    for pm in (PaymentMethod.COD, PaymentMethod.WALLET):
+        assert eng.evaluate(cart(payment_method=pm), CTX, NOW).allowed
+
+
 @rule("PE-17")
 def test_commit_happy_path():
     q = cart()
@@ -311,4 +328,4 @@ def test_rule_markers_name_existing_rules():
     assert markers, "no @rule markers found"
     assert set(markers) <= known
     policy = {t.split("::")[1] for tests in markers.values() for t in tests if t.startswith("test_policy.py")}
-    assert len(policy) == 32
+    assert len(policy) == 33

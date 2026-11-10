@@ -1,0 +1,14 @@
+#!/bin/sh
+# Runs the doc lint on staged markdown (PL-19, RQ-101). Set SAATHI_NAMES_FILE to also run the private-name rule.
+# Limit: it lints the working-tree copy of each staged file, not the staged blob (a partly staged file is read whole).
+root=$(git rev-parse --show-toplevel) || exit 1
+cd "$root" || exit 1
+files=$(git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMR -- '*.md')
+[ -z "$files" ] && exit 0
+set -f
+IFS='
+'
+set --
+[ -n "$SAATHI_NAMES_FILE" ] && set -- --names-file "$SAATHI_NAMES_FILE"
+# shellcheck disable=SC2086
+exec python3 scripts/doc_lint.py "$@" $files

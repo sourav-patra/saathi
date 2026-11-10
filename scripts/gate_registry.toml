@@ -211,6 +211,7 @@ kind = "auto"
 command = ["uv", "run", "python", "scripts/rule_index.py", "--phase", "0"]
 receipt = "RECEIPT-v1"
 
+# Fixture-only for the image half: tests/fixtures/image_manifest.txt is synthetic; image coverage is pending an owner decision (design-issue 3). Not verified on image grounds.
 [[row]]
 id = "RQ-71"
 phase = 0
@@ -218,6 +219,7 @@ kind = "auto"
 command = ["uv", "run", "python", "scripts/license_audit.py", "--packages", "--dockerfiles", "--manifest", "tests/fixtures/image_manifest.txt"]
 receipt = "RECEIPT-v1"
 
+# Fixture-only for the image half: tests/fixtures/image_manifest.txt is synthetic; image coverage is pending an owner decision (design-issue 3). Not verified on image grounds.
 [[row]]
 id = "PL-09"
 phase = 0
@@ -404,21 +406,21 @@ receipt = "RECEIPT-v1"
 id = "PL-08"
 phase = 0
 kind = "auto"
-command = ["uv", "run", "python", "scripts/leak_scan.py", "--names-file", "$SAATHI_NAMES_FILE"]
+command = ["uv", "run", "python", "scripts/leak_scan.py", "--history"]
 receipt = "RECEIPT-v1"
 
 [[row]]
 id = "PL-12"
 phase = 0
 kind = "auto"
-command = ["uv", "run", "python", "scripts/leak_scan.py", "--names-file", "$SAATHI_NAMES_FILE"]
+command = ["uv", "run", "python", "scripts/leak_scan.py", "--names-file", "$SAATHI_NAMES_FILE", "--require-names"]
 receipt = "RECEIPT-v1"
 
 [[row]]
 id = "PL-15"
 phase = 0
 kind = "auto"
-command = ["uv", "run", "python", "scripts/leak_scan.py", "--names-file", "$SAATHI_NAMES_FILE"]
+command = ["uv", "run", "python", "scripts/leak_scan.py", "--history"]
 receipt = "RECEIPT-v1"
 
 [[row]]

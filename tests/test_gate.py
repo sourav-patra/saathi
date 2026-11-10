@@ -174,9 +174,7 @@ def _manual_state(tmp_path, name_date, body):
 
 
 def _body(first="This receipt proves a check.", date_="2026-11-10", command="command: read the page\n"):
-    return (
-        f"{first}\n\nid: RQ-13\nrevision: {REV}\ndate: {date_}\n{command}result: verified\nsigner: owner role\n"
-    )
+    return f"{first}\n\nid: RQ-13\nrevision: {REV}\ndate: {date_}\n{command}result: verified\nsigner: owner role\n"
 
 
 def test_receipt_valid_baseline(tmp_path):
@@ -205,3 +203,28 @@ def test_rule_phase_equals_prd_phase_of_requirement():
         rid = re.search(r"\b(?:RQ|PL)-\d+[a-z]?", r["implements"])
         assert rid, f"{r['id']}: implements names no requirement"
         assert prd[rid.group(0)] == r["phase"], f"{r['id']}: rule phase {r['phase']}, PRD {prd[rid.group(0)]}"
+
+
+def test_exit_two_is_unavailable_and_exit_one_is_invalid(tmp_path):
+    row = gate.load_registry(_registry(tmp_path, _row("RQ-5", 0, "auto", '["true"]')))[0]
+    assert gate.evaluate(row, tmp_path, TODAY, run=lambda a: 2) == "unavailable"
+    assert gate.evaluate(row, tmp_path, TODAY, run=lambda a: 1) == "invalid"
+    assert gate.evaluate(row, tmp_path, TODAY, run=lambda a: 0) == "verified"
+
+
+def test_registry_command_expands_env_and_gates_names(tmp_path):
+    row = gate.load_registry(_registry(tmp_path, _row("RQ-5", 0, "auto", '["true", "--names-file", "$NAMES_X"]')))[0]
+    seen: list = []
+    assert (
+        gate.evaluate(row, tmp_path, TODAY, run=lambda a: seen.append(list(a)) or 0, env={"NAMES_X": "/p/n"})
+        == "verified"
+    )
+    assert seen[0][-2:] == ["--names-file", "/p/n"]
+    assert gate.evaluate(row, tmp_path, TODAY, run=lambda a: 0, env={}) == "unavailable"
+
+
+def test_registry_leak_rows_use_history_and_require_names():
+    rows = {r.id: r.command for r in gate.load_registry(gate.ROOT / "scripts" / "gate_registry.toml")}
+    for rid in ("PL-08", "PL-15"):
+        assert "--history" in rows[rid] and "--require-names" not in rows[rid]
+    assert rows["PL-12"][-3:] == ["--names-file", "$SAATHI_NAMES_FILE", "--require-names"]

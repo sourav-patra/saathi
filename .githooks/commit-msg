@@ -1,0 +1,4 @@
+#!/bin/sh
+# Rejects AI attribution in the commit message (PL-31). Enable once per clone: git config core.hooksPath .githooks
+root=$(git rev-parse --show-toplevel) || exit 1
+exec python3 "$root/scripts/commit_msg_check.py" "$1"
