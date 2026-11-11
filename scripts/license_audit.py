@@ -17,7 +17,9 @@ Modes (several may be combined; with none given, --packages runs):
                         no `--convert` flag
   --manifest FILE       an image binary list (repeatable). One `name | licence`
                         per line, `#` starts a comment. Covers every binary,
-                        library, font and model file an image ships.
+                        library, font and model file an image ships. Packages
+                        named in scripts/image_base_allowlist.toml (base layer
+                        and C/C++ runtime only) pass with their listed licence.
 
 Usage: uv run python scripts/license_audit.py [--packages] [--dockerfiles]
        [--manifest FILE ...] [--verbose]
@@ -35,10 +37,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 EXCEPTIONS_FILE = Path(__file__).with_name("license_exceptions.toml")
+BASE_ALLOWLIST_FILE = Path(__file__).with_name("image_base_allowlist.toml")
 
 ALLOW = re.compile(
     r"\b(MIT|Apache|BSD|ISC|PSF|Python Software Foundation|PostgreSQL|Unlicense|0BSD|Zlib|HPND|CMU"
-    r"|CC0(-1\.0)?|CC0 1\.0|public domain)\b",
+    r"|Expat|CC0(-1\.0)?|CC0 1\.0|public[- ]domain)\b",
     re.I,
 )
 # Fonts only: an image manifest may list OFL fonts; a Python package may not carry OFL.
@@ -171,6 +174,55 @@ def _has_allowed_option(expr: str) -> bool:
 
 
 # --------------------------------------------------------------------------- #
+# Image base allowlist (owner decision, option (a)): --manifest mode only
+# --------------------------------------------------------------------------- #
+BASE_REASONS = frozenset(
+    {
+        "unmodified distribution base layer, not linked into or distributed as part of Saathi code",
+        "GCC runtime exception",
+    }
+)
+_BASE_FIELDS = {"name", "licence", "reason", "reported"}
+_PKG_NAME = re.compile(r"^[a-z0-9][a-z0-9.+-]*$")
+
+
+def load_base_allowlist(path: Path = BASE_ALLOWLIST_FILE) -> tuple[dict[str, dict[str, str]], list[str]]:
+    """Return (entries by package name, problems). A malformed entry is rejected, never used."""
+    if not path.exists():
+        return {}, []
+    entries: dict[str, dict[str, str]] = {}
+    problems: list[str] = []
+    for i, e in enumerate(tomllib.loads(path.read_text()).get("package", []), 1):
+        if not isinstance(e, dict):
+            problems.append(f"base allowlist entry {i}: not a table")
+            continue
+        name = str(e.get("name", "")).strip()
+        where = f"base allowlist entry {i} ({name or 'no name'})"
+        bad = [f"missing {f}" for f in ("name", "licence", "reason") if not str(e.get(f, "")).strip()]
+        bad += [f"unknown field {f}" for f in sorted(set(e) - _BASE_FIELDS)]
+        if name and not _PKG_NAME.match(name):
+            bad.append("name must be one exact package name (no pattern, no :arch)")
+        if e.get("reason") and e["reason"] not in BASE_REASONS:
+            bad.append("reason is not one of the fixed reasons")
+        if name in entries:
+            bad.append("duplicate entry")
+        if bad:
+            problems.append(f"{where}: {'; '.join(bad)}")
+            continue
+        entries[name] = {k: str(v) for k, v in e.items()}
+    return entries, problems
+
+
+def _base_listed(name: str, lic: str, base: Mapping[str, Mapping[str, str]]) -> bool:
+    """A package passes only if named exactly and the image reports the licence the entry gives."""
+    entry = base.get(name.split(":", 1)[0].lower())
+    if not entry:
+        return False
+    reported = _norm(lic or "UNKNOWN")
+    return reported in {_norm(entry["licence"]), _norm(entry.get("reported", ""))}
+
+
+# --------------------------------------------------------------------------- #
 # Modes: each returns a list of failure lines (empty means pass)
 # --------------------------------------------------------------------------- #
 def audit_packages(
@@ -218,8 +270,12 @@ def audit_dockerfiles(infra: Path) -> list[str]:
     return [f for p in files for f in audit_dockerfile(p)]
 
 
-def audit_manifest(manifest: Path) -> list[str]:
-    """Image binary list: `name | licence`. Fails on ffmpeg, opusinfo, GPL, LGPL, unknown."""
+def audit_manifest(manifest: Path, base: Mapping[str, Mapping[str, str]] | None = None) -> list[str]:
+    """Image binary list: `name | licence`. Fails on ffmpeg, opusinfo, GPL, LGPL, unknown.
+
+    `base` is the named image base allowlist; only an exact name with its listed licence passes.
+    """
+    base = base or {}
     if not manifest.is_file():
         return [f"{manifest}: manifest not found"]
     failures, seen = [], 0
@@ -232,6 +288,8 @@ def audit_manifest(manifest: Path) -> list[str]:
         where = f"{manifest}:{n}: {name}"
         if m := FORBIDDEN_BINARIES.search(name):
             failures.append(f"{where}: forbidden program or library '{m.group(0)}'")
+        if _base_listed(name, lic if sep else "", base):
+            continue
         if not sep or not lic or lic.upper() in {"UNKNOWN", "NONE", "N/A"}:
             failures.append(f"{where}: missing or unknown licence")
             continue
@@ -250,6 +308,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap.add_argument("--manifest", action="append", default=[], type=Path)
     ap.add_argument("--infra", type=Path, default=ROOT / "infra", help="directory searched by --dockerfiles")
     ap.add_argument("--exceptions", type=Path, default=EXCEPTIONS_FILE)
+    ap.add_argument("--base-allowlist", type=Path, default=BASE_ALLOWLIST_FILE)
     ap.add_argument("--verbose", action="store_true")
     args = ap.parse_args(argv)
 
@@ -259,8 +318,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         failures += audit_packages(metadata.distributions(), load_exceptions(args.exceptions), args.verbose)
     if args.dockerfiles:
         failures += audit_dockerfiles(args.infra)
-    for m in args.manifest:
-        failures += audit_manifest(m)
+    if args.manifest:
+        base, problems = load_base_allowlist(args.base_allowlist)
+        failures += problems
+        for m in args.manifest:
+            failures += audit_manifest(m, base)
 
     if failures:
         print("\n".join(f"  {f}" for f in failures))

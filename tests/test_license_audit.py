@@ -263,3 +263,56 @@ def test_cli_manifest_failure_exits_1(tmp_path, capsys):
 def test_cli_dockerfiles_failure_exits_1(tmp_path):
     infra = dockerfile(tmp_path, "FROM debian\nRUN apt-get install ffmpeg\n")
     assert la.main(["--dockerfiles", "--infra", str(infra)]) == 1
+
+
+# ------------------------------------------------------------------ image base allowlist (option a)
+BASE = {
+    "libc6": {"name": "libc6", "licence": "LGPL-2.1+", "reason": "GCC runtime exception"},
+    "libstdc++6": {"name": "libstdc++6", "licence": "GPL-3+ WITH GCC-exception-3.1", "reported": "UNKNOWN",
+                   "reason": "GCC runtime exception"},
+}
+
+
+def test_listed_base_package_passes_in_manifest_mode(tmp_path):
+    m = manifest(tmp_path, "libc6:amd64 | LGPL-2.1+", "libstdc++6:amd64 | UNKNOWN")
+    assert la.audit_manifest(m) != []
+    assert la.audit_manifest(m, BASE) == []
+
+
+def test_listed_base_package_with_other_licence_fails(tmp_path):
+    assert la.audit_manifest(manifest(tmp_path, "libc6:amd64 | GPL-3+"), BASE)
+
+
+def test_unlisted_gpl_package_fails(tmp_path):
+    out = la.audit_manifest(manifest(tmp_path, "libflac14:amd64 | GPL-2+ or LGPL-2.1+"), BASE)
+    assert out and "deny" in out[0]
+
+
+def test_base_allowlist_does_not_apply_to_packages():
+    dist = FakeDist("libc6", License_Expression="LGPL-2.1-or-later")
+    assert la.audit_packages([dist], {})
+    assert "base" not in la.audit_packages.__code__.co_varnames
+
+
+def test_repo_base_allowlist_is_well_formed():
+    entries, problems = la.load_base_allowlist()
+    assert problems == [] and "libc6" in entries
+    assert not any("opus" in n or "flac" in n for n in entries)
+
+
+@pytest.mark.parametrize(
+    "entry",
+    [
+        'name = "libc6"\nreason = "GCC runtime exception"',
+        'name = "lib*"\nlicence = "GPL-2+"\nreason = "GCC runtime exception"',
+        'name = "libc6"\nlicence = "LGPL-2.1+"\nreason = "needed"',
+        'name = "libc6"\nlicence = "LGPL-2.1+"\nreason = "GCC runtime exception"\ncategory = "GPL"',
+    ],
+)
+def test_malformed_base_entry_is_rejected(tmp_path, entry):
+    p = tmp_path / "base.toml"
+    p.write_text(f"[[package]]\n{entry}\n")
+    entries, problems = la.load_base_allowlist(p)
+    assert entries == {} and problems
+    m = manifest(tmp_path, "libc6:amd64 | LGPL-2.1+")
+    assert la.main(["--manifest", str(m), "--base-allowlist", str(p)]) == 1
