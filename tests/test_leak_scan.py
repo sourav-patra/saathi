@@ -341,3 +341,12 @@ def test_malformed_exception_is_rejected(tmp_path: Path) -> None:
     write(tmp_path, "e.toml", body)
     with pytest.raises(ValueError):
         leak_scan.load_exceptions(tmp_path / "e.toml")
+
+
+def test_platform_merge_committer_is_allowed_exactly(tmp_path: Path) -> None:
+    """A pull request run checks out the merge commit GitHub builds, whose committer is the platform address."""
+    assert leak_scan.scan_text("GitHub <" + "noreply" + "@" + "github.com>", "meta", None) == []
+    at = "@"
+    others = ("someone" + at + "github.com", "noreply" + at + "github.com.evil.test", "x.noreply" + at + "github.com")
+    for other in others:
+        assert [f.rule for f in leak_scan.scan_text(other, "meta", None)] == ["email"], other

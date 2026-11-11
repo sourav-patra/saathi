@@ -45,6 +45,8 @@ MAX_BYTES = 2_000_000
 
 EMAIL = re.compile(r"(?<![\w.+-])[\w.+-]+@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)")
 EMAIL_OK_DOMAINS = ("users.noreply.github.com", "example.com", "example.org", "example.net")
+# Exact platform addresses, not domains: the committer of the merge commit GitHub builds for a pull request run.
+EMAIL_OK_EXACT = frozenset({"noreply" + "@" + "github.com"})  # split so the tree scan does not read it
 # RFC 2606 reserved top-level names: an address or URL userinfo under them can reach no one.
 RESERVED_TLDS = ("example", "test", "invalid", "localhost")
 # A reserved name is allowed only when no inner label is a public top-level name: an address under `mail.com.test` still
@@ -108,6 +110,8 @@ def scan_text(text: str, where: str, names: Sequence[str] | None, first_line: in
     for n, line in enumerate(text.splitlines(), first_line):
         for m in EMAIL.finditer(line):
             domain = m.group(1).lower()
+            if m.group(0).lower() in EMAIL_OK_EXACT:
+                continue  # the platform merge committer on a pull request run
             if _domain_ok(domain):
                 continue  # the owner noreply, the example domains, or an RFC 2606 reserved name
             out.append(Finding("email", where, n, "an email address outside the configured domains"))
