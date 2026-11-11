@@ -13,7 +13,7 @@ from typing import Final
 from saathi.audit.events import AuditName
 from saathi.domain import AuditEvent, SendReceipt, WavBlob
 from saathi.errors import ClipHashMismatch, ClipMissing, ClipUnreviewed
-from saathi.ids import HouseholdId, IdemKey, PersonRef, RunId, VoiceId
+from saathi.ids import HouseholdId, IdemKey, PersonRef, RunId, VoiceId, idem_key
 from saathi.ports import TTS, AudioCodec, AuditSink, ElderChannel, VoiceStore
 from saathi.voice.store import ReplyKey
 
@@ -71,6 +71,12 @@ CONSENT_NOTICE: Final[dict[str, str]] = {
     "You can stop it at any time without giving a reason. "
     f"{NOT_EMERGENCY_MARKERS['en']}. In an emergency, call 112 or 108.",
 }
+
+
+def reply_idem(inbox: str) -> IdemKey:
+    """The key of the reply to one inbox row. The worker and the alert service both send the emergency or scam clip
+    under it, so the elder hears it once whichever sends first (the channel refuses the second key)."""
+    return idem_key(inbox, "reply")
 
 
 def reply_text(key: ReplyKey, language: str = DEFAULT_LANGUAGE) -> str:

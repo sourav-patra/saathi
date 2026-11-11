@@ -1,8 +1,9 @@
 """LT-47: end-to-end flows. Flow 1.1: a voice note comes in at the edge, the worker handles it, a caregiver gets the
 summary and the elder gets an acknowledgement (M07, M12; RQ-79). Real Postgres, fakes for the platforms and models.
 
-The other flows of LT-47 (emergency, heartbeat) belong to the work units that build their parts (WU-17, WU-22).
-Synthetic values only.
+Flow 1.3, an emergency text: the edge opens the alert in the same transaction as the message, the worker sends the
+summary and the safety reply, and the alert service tells both approvers on stage a, then stage b and c (fakes), until
+a key press of 1 stops it (WU-17). The heartbeat flow belongs to WU-22. Synthetic values only.
 """
 
 from __future__ import annotations
@@ -10,12 +11,13 @@ from __future__ import annotations
 from datetime import timedelta
 
 import asyncpg
+from alert_helpers import B, P, make_rig
 from conftest import PgDb
 from edge_helpers import ELDER_NUMBER, SENDER_KEY, pg_edge, wa_body, wa_msg, wa_sign, wa_url
-from fakes import FakeClock
+from fakes import FakeClock, FakeEscalator
 from worker_helpers import NOW, Rig, Role, audio, open_store, provision, rows
 
-from saathi.ids import HouseholdId, idem_key
+from saathi.ids import ApproverId, HouseholdId, idem_key
 from saathi.store.keys import sender_hmac
 from saathi.store.repos._util import aad
 from saathi.voice.store import ReplyKey
@@ -100,3 +102,81 @@ async def test_voice_note_to_summary_and_ack(pg_db: PgDb):
         ("send_text", "ref-h1", f"{inbox}:reply:text"),
     ]
     assert rig.owner_alerts == []  # no clip error, no dead row
+
+
+EMERGENCY_TEXT = "mujhe chest pain hai"
+
+
+async def test_emergency_to_stage_a_and_fake_b_c(pg_db: PgDb):
+    rig = await make_rig(pg_db)  # two approvers, SO-1 valid, the stored emergency clip; the clock is `rig.clock`
+    clock = rig.clock
+    su = await asyncpg.connect(pg_db.dsn())
+    try:  # the edge hashes senders with its own key
+        await su.execute(
+            "UPDATE elder_identities SET sender_hmac = $1 WHERE household_id = $2 AND channel = 'whatsapp'",
+            sender_hmac(SENDER_KEY, "whatsapp", ELDER_NUMBER),
+            H,
+        )
+    finally:
+        await su.close()
+
+    # 1. The edge: the text is scanned, and the alert is opened in the same transaction as the message.
+    async with pg_edge(pg_db, clock=clock) as edge:
+        body = wa_body(wa_msg(mid="wamid.flow13", text={"body": EMERGENCY_TEXT}))
+        assert (await edge.post(wa_url(), content=body, headers=wa_sign(body))).status_code == 200
+    [alert] = await rows(pg_db, "SELECT id, kind, origin, state, stage, t0, next_due_at FROM alert_events")
+    assert (alert["kind"], alert["origin"], alert["state"], alert["stage"]) == ("emergency", "radar_edge", "open", "a")
+    assert alert["next_due_at"] == alert["t0"]  # due at once
+    event = alert["id"]
+    [inbox] = await rows(pg_db, "SELECT id FROM inbox")
+    inbox = str(inbox["id"])
+
+    # 2. The worker: summary cards to the humans and the safety reply to the elder, no alert of its own (one exists).
+    worker_rig = Rig()
+    worker_rig.elder, worker_rig.caregiver, worker_rig.voice = rig.elder, rig.caregiver, rig.voice
+    for reply in (ReplyKey.ACK, ReplyKey.TOLD_CAREGIVER):
+        rig.voice.add(reply, b"synthetic-clip-" + reply.value.encode(), "hi")
+    async with open_store(pg_db, Role.CORE, clock=clock) as store:
+        worker = Worker(store, worker_rig.deps(store, rig.ring, clock, WorkerConfig()), clock)
+        assert await worker.run_once() is True
+        assert await worker.run_once() is False
+        assert len(await rows(pg_db, "SELECT 1 FROM alert_events")) == 1  # the worker's open was a no-op repeat
+        summaries = [k for m, _to, _p, k in rig.caregiver.sent if m == "send_card"]
+        assert summaries == [idem_key(inbox, "summary", P), idem_key(inbox, "summary", B)]
+
+        # 3. The alert service. t0: stage a to both approvers; the elder's clip was already sent by the worker.
+        svc = rig.service(store)
+        await svc.tick()
+        alert_cards = [(str(to), str(k)) for to, _c, k in rig.cards() if str(k).startswith("alert:")]
+        assert alert_cards == [(P, f"alert:{event}:a:{P}:1"), (B, f"alert:{event}:a:{B}:1")]
+        for _to, card, _k in [c for c in rig.cards() if str(c[2]).startswith("alert:")]:
+            assert [b.text for b in card.buttons] == ["Acknowledge", "False alarm"]  # type: ignore[attr-defined]
+            assert EMERGENCY_TEXT not in " ".join(card.lines)  # type: ignore[attr-defined]
+
+        # the elder heard the emergency clip and text once: the worker's keys, which the alert service shared
+        reply_keys = [str(k) for _m, _to, _p, k in rig.elder.sent if str(k).startswith(f"{inbox}:reply")]
+        assert reply_keys == [f"{inbox}:reply:audio", f"{inbox}:reply:text"]
+        texts = [p for m, _to, p, _k in rig.elder.sent if m == "send_text" and str(_k).endswith("reply:text")]
+        assert "112" in texts[0] and "108" in texts[0]  # type: ignore[operator]
+
+        # stage b at 120 s and stage c at 240 s, against the fake providers
+        await rig.run(svc, 125, every=5)
+        assert [(str(a), str(k)) for _e, a, k in rig.stage_b.notified] == [
+            (P, f"alert:{event}:b:{P}:1"), (B, f"alert:{event}:b:{B}:1"),
+        ]  # fmt: skip
+        assert rig.stage_c.notified == []
+        await rig.run(svc, 120, every=5)
+        assert [str(a) for _e, a, _k in rig.stage_c.notified] == [P]  # the primary's call at 240 s
+
+        # 4. The primary presses 1 on the call: the event ends acknowledged and nothing more goes out.
+        call = rig.stage_c.call_id_of(rig.stage_c.keys[0])
+        assert await svc.on_voice_callback(HouseholdId(H), event, FakeEscalator.callback(call)) is True
+        done = (await rows(pg_db, "SELECT state, acked_by, followup_due_at - acked_at AS gap FROM alert_events"))[0]
+        assert (done["state"], done["acked_by"], done["gap"]) == ("acknowledged", P, timedelta(seconds=900))
+        before = (len(rig.caregiver.sent), len(rig.stage_b.notified), len(rig.stage_c.notified), len(rig.elder.sent))
+        await rig.run(svc, 3000, every=100)
+        assert (len(rig.caregiver.sent), len(rig.stage_b.notified), len(rig.stage_c.notified),
+                len(rig.elder.sent)) == (before[0] + 1, *before[1:])  # fmt: skip
+        follow = [(str(to), str(k)) for m, to, _p, k in rig.caregiver.sent if m == "send_text"]
+        assert follow == [(P, f"alert:{event}:followup")]  # the one new message: the 15 minute follow-up
+        assert [e.actor for e in rig.audit.events if e.event == "ack_voice"] == [f"approver:{ApproverId(P)}"]

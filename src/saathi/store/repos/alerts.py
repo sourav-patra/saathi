@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from datetime import datetime, timedelta
 from typing import Any, Literal
 
-from saathi.domain import AlertOpen
+from saathi.domain import AlertOpen, AlertView
 from saathi.ids import ApproverId, ElderId, EventId, InboxId, derive_id
 from saathi.ports import Tx
 from saathi.states import ALERT, Machine
@@ -48,13 +48,81 @@ class AlertRepo:
         return dict(rows[0]) if rows else None
 
     @staticmethod
-    async def add_attempt(
-        tx: Tx, event_id: EventId, stage: str, approver: ApproverId, channel: str, idem_key: str, due_at: datetime
-    ) -> bool:
-        """One row per idempotency key: a repeat returns False."""
+    async def lock(tx: Tx, event_id: EventId) -> AlertView | None:
+        """The event row, locked for this transaction, whatever its state (the caller checks `open`). None if absent."""
+        rows = await tx.fetch("SELECT * FROM alert_events WHERE id = $1 FOR UPDATE", event_id)
+        return AlertView.model_validate(dict(rows[0])) if rows else None
+
+    @staticmethod
+    async def view(tx: Tx, event_id: EventId) -> AlertView | None:
+        rows = await tx.fetch("SELECT * FROM alert_events WHERE id = $1", event_id)
+        return AlertView.model_validate(dict(rows[0])) if rows else None
+
+    @staticmethod
+    async def inbox_source(tx: Tx, inbox_id: InboxId) -> Mapping[str, Any] | None:
+        """Where the event's message came from and its media handle: source, kind, media_ref, media_mime."""
+        rows = await tx.fetch("SELECT source, kind, media_ref, media_mime FROM inbox WHERE id = $1", inbox_id)
+        return dict(rows[0]) if rows else None
+
+    @staticmethod
+    async def due_attempts(tx: Tx, event_id: EventId) -> list[Mapping[str, Any]]:
+        """Attempts of the event that are still `due` at the transaction time, oldest first."""
+        rows = await tx.fetch(
+            "SELECT idem_key, stage, approver_id, due_at FROM alert_attempts"
+            " WHERE event_id = $1 AND status = 'due' AND due_at <= $2 ORDER BY due_at, id",
+            event_id,
+            tx.now,
+        )
+        return [dict(r) for r in rows]
+
+    @staticmethod
+    async def reached(tx: Tx, event_id: EventId, stage: str) -> set[ApproverId]:
+        """Approvers who already have a delivered attempt of this stage on this event."""
+        rows = await tx.fetch(
+            "SELECT DISTINCT approver_id FROM alert_attempts WHERE event_id = $1 AND stage = $2"
+            " AND status IN ('sent', 'delivered')",
+            event_id,
+            stage,
+        )
+        return {ApproverId(r["approver_id"]) for r in rows}
+
+    @staticmethod
+    async def attempt_status(tx: Tx, idem_key: str) -> str | None:
+        rows = await tx.fetch("SELECT status FROM alert_attempts WHERE idem_key = $1", idem_key)
+        return str(rows[0]["status"]) if rows else None
+
+    @staticmethod
+    async def recent_false_alarms(tx: Tx, approver: ApproverId, since: datetime) -> list[AlertView]:
+        """Events this approver acknowledged that were flagged a false alarm, started at or after `since`."""
+        rows = await tx.fetch(
+            "SELECT * FROM alert_events WHERE acked_by = $1 AND false_alarm AND t0 >= $2", approver, since
+        )
+        return [AlertView.model_validate(dict(r)) for r in rows]
+
+    @staticmethod
+    async def set_last_clip(tx: Tx, event_id: EventId, at: datetime) -> bool:
         tag = await tx.execute(
-            "INSERT INTO alert_attempts (household_id, event_id, stage, approver_id, channel, idem_key, due_at)"
-            " VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (household_id, idem_key) DO NOTHING",
+            "UPDATE alert_events SET last_elder_clip_at = $2 WHERE id = $1 AND state = 'open'", event_id, at
+        )
+        return affected(tag) == 1
+
+    @staticmethod
+    async def add_attempt(
+        tx: Tx,
+        event_id: EventId,
+        stage: str,
+        approver: ApproverId,
+        channel: str,
+        idem_key: str,
+        due_at: datetime,
+        *,
+        status: str = "due",
+    ) -> bool:
+        """One row per idempotency key: a repeat returns False. `status` is `due`, or `cancelled` for a slot that a
+        restart found long past (it is recorded so the plan does not offer it again, and is never sent)."""
+        tag = await tx.execute(
+            "INSERT INTO alert_attempts (household_id, event_id, stage, approver_id, channel, idem_key, due_at, status)"
+            " VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (household_id, idem_key) DO NOTHING",
             tx.household,
             event_id,
             stage,
@@ -62,6 +130,7 @@ class AlertRepo:
             channel,
             idem_key,
             due_at,
+            status,
         )
         return affected(tag) == 1
 
@@ -121,10 +190,19 @@ class AlertRepo:
         return affected(tag) == 1
 
     @staticmethod
-    async def false_alarm(tx: Tx, event_id: EventId) -> bool:
-        """A08: a flag on an acknowledged event; the state does not change."""
+    async def set_followup_due(tx: Tx, event_id: EventId, when: datetime | None) -> bool:
+        """The 15 minute follow-up of an acknowledged event: a later time to try again, or None once it is out."""
         tag = await tx.execute(
-            "UPDATE alert_events SET false_alarm = true WHERE id = $1 AND state = 'acknowledged'", event_id
+            "UPDATE alert_events SET followup_due_at = $2 WHERE id = $1 AND state = 'acknowledged'", event_id, when
+        )
+        return affected(tag) == 1
+
+    @staticmethod
+    async def false_alarm(tx: Tx, event_id: EventId) -> bool:
+        """A08: a flag on an acknowledged event; the state does not change. A second flag changes nothing (False)."""
+        tag = await tx.execute(
+            "UPDATE alert_events SET false_alarm = true WHERE id = $1 AND state = 'acknowledged' AND NOT false_alarm",
+            event_id,
         )
         return affected(tag) == 1
 

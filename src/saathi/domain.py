@@ -356,9 +356,27 @@ class SummarySlots(BaseModel):
 
 
 class AlertView(BaseModel):
-    """One alert event as the alert service reads it. The fields are set by WU-17."""
+    """One alert event as the alert service reads it (M14): the row of `alert_events`, ids and times only."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore", frozen=True)
+    id: EventId
+    household_id: HouseholdId
+    elder_id: ElderId
+    inbox_id: InboxId
+    kind: Literal["emergency", "scam", "unscanned"]
+    origin: str = ""
+    state: Literal["open", "acknowledged", "blocked"] = "open"
+    stage: Literal["a", "b", "c"] = "a"
+    rule_ids: tuple[str, ...] = ()
+    t0: datetime
+    next_due_at: datetime | None = None
+    acked_by: ApproverId | None = None
+    acked_at: datetime | None = None
+    false_alarm: bool = False
+    audio_ref: str | None = None
+    blocked_reason: str | None = None
+    followup_due_at: datetime | None = None
+    last_elder_clip_at: datetime | None = None
 
 
 # --------------------------------------------------------------------------- #

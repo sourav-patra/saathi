@@ -269,6 +269,8 @@ kind = "auto"
 command = ["uv", "run", "pytest", "tests/test_inbox_crash.py", "tests/test_lease.py", "tests/test_edge.py", "tests/test_channels_contract.py", "tests/test_whatsapp.py", "tests/test_elder_bot_authority.py", "-q"]
 receipt = "RECEIPT-v1"
 
+# Gate note (WU-17 ruling 3): RQ-95a is verified by the sign-off tests and `AlertService.signoff_check`, which checks one
+# household. The daily trigger that calls it for every household is pending (no scan function lists households yet).
 [[row]]
 id = "RQ-95a"
 phase = 0

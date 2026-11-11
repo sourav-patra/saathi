@@ -205,7 +205,7 @@ services:
     build: { context: .., dockerfile: infra/Dockerfile }
     restart: unless-stopped
     environment:
-      SAATHI_ENV: ${SAATHI_ENV:-prod}
+      SAATHI_ENV: prod  # pinned, no interpolation: the test fault hooks must never be armed from an .env file (R16-1)
       SAATHI_DB_URL_EDGE: postgresql://saathi_edge:${SAATHI_DB_PASSWORD_EDGE}@postgres:5432/saathi
       SAATHI_HEALTH_PATH: ${SAATHI_HEALTH_PATH:-/health}
       SAATHI_WA_APP_SECRET: ${SAATHI_WA_APP_SECRET:-}

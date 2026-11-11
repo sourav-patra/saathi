@@ -32,9 +32,7 @@ size = "6 scripts"
 split = "committed"
 gate = "all assertions pass; fails when the cadence constant changes"
 owner = "owner"
-runner = "pending"
-pending_until = "WU-17"
-reason = "the alert plan and counter it grades are built in WU-17; tests/test_alert_plan.py holds the six scripts"
+runner = "harness"
 phase = 0
 
 [[suite]]

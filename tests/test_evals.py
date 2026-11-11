@@ -114,9 +114,9 @@ def test_all_phase0_runs_and_unavailable_is_not_pass(monkeypatch: pytest.MonkeyP
     code = run.main(["--all"])
     out = capsys.readouterr().out
     assert code == 0
-    assert "radar: verified" in out and "redaction: verified" in out
+    assert "radar: verified" in out and "redaction: verified" in out and "false_alarm: verified" in out
     assert "radar_heldout: unavailable" in out
-    assert "summary: verified 2, invalid 0, unavailable 5" in out
+    assert "summary: verified 3, invalid 0, unavailable 4" in out
 
 
 def test_report_prints_k_n_bound() -> None:
@@ -508,6 +508,6 @@ def test_redaction_canaries_are_not_committed() -> None:
 
 
 def test_pending_suites_report_reason_not_pass() -> None:
-    for name in ("false_alarm", "trace_canary"):
+    for name in ("trace_canary",):
         res = run.run_row(_row(name), DATASETS)
         assert res.state == "unavailable" and res.reason

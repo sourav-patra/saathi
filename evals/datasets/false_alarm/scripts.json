@@ -1,0 +1,227 @@
+[
+ {
+  "approvers": [
+   "ap1",
+   "ap2"
+  ],
+  "budgets": [
+   2
+  ],
+  "events": [
+   {
+    "acked_by": "ap1",
+    "days_ago": 1,
+    "event_kind": "emergency",
+    "id": "e1",
+    "marked_at_s": 90
+   }
+  ],
+  "expect": {
+   "counts": {
+    "ap1": 0,
+    "ap2": 0
+   },
+   "review_after": {
+    "2": [
+     false
+    ]
+   }
+  },
+  "id": "fa-1-before-stage-b",
+  "kind": "counter",
+  "what": "a false alarm before t0 plus 2 min does not count"
+ },
+ {
+  "approvers": [
+   "ap1",
+   "ap2"
+  ],
+  "budgets": [
+   2
+  ],
+  "events": [
+   {
+    "acked_by": "ap1",
+    "days_ago": 1,
+    "event_kind": "emergency",
+    "id": "e1",
+    "marked_at_s": 130
+   }
+  ],
+  "expect": {
+   "counts": {
+    "ap1": 1,
+    "ap2": 0
+   },
+   "review_after": {
+    "2": [
+     false
+    ]
+   }
+  },
+  "id": "fa-2-after-stage-b",
+  "kind": "counter",
+  "what": "a false alarm after stage b started counts once, for that approver and no other"
+ },
+ {
+  "approvers": [
+   "ap1"
+  ],
+  "budgets": [
+   2,
+   3
+  ],
+  "events": [
+   {
+    "acked_by": "ap1",
+    "days_ago": 3,
+    "event_kind": "emergency",
+    "id": "e1",
+    "marked_at_s": 130
+   },
+   {
+    "acked_by": "ap1",
+    "days_ago": 2,
+    "event_kind": "emergency",
+    "id": "e2",
+    "marked_at_s": 130
+   },
+   {
+    "acked_by": "ap1",
+    "days_ago": 1,
+    "event_kind": "emergency",
+    "id": "e3",
+    "marked_at_s": 130
+   },
+   {
+    "acked_by": "ap1",
+    "days_ago": 0,
+    "event_kind": "emergency",
+    "id": "e4",
+    "marked_at_s": 130
+   }
+  ],
+  "expect": {
+   "counts": {
+    "ap1": 4
+   },
+   "review_after": {
+    "2": [
+     false,
+     false,
+     true,
+     false
+    ],
+    "3": [
+     false,
+     false,
+     false,
+     true
+    ]
+   }
+  },
+  "id": "fa-3-third-opens-review",
+  "kind": "counter",
+  "what": "the third counted event in 7 days opens one review with the default budget; with the budget set to 3 it opens on the fourth"
+ },
+ {
+  "approvers": [
+   "ap1"
+  ],
+  "budgets": [
+   2
+  ],
+  "events": [
+   {
+    "acked_by": "ap1",
+    "days_ago": 8,
+    "event_kind": "emergency",
+    "id": "e1",
+    "marked_at_s": 130
+   },
+   {
+    "acked_by": "ap1",
+    "days_ago": 2,
+    "event_kind": "emergency",
+    "id": "e2",
+    "marked_at_s": 130
+   },
+   {
+    "acked_by": "ap1",
+    "days_ago": 1,
+    "event_kind": "emergency",
+    "id": "e3",
+    "marked_at_s": 130
+   }
+  ],
+  "expect": {
+   "counts": {
+    "ap1": 2
+   },
+   "review_after": {
+    "2": [
+     false,
+     false,
+     false
+    ]
+   }
+  },
+  "id": "fa-4-older-than-7-days",
+  "kind": "counter",
+  "what": "an event older than 7 days drops out"
+ },
+ {
+  "approvers": [
+   "ap1",
+   "ap2"
+  ],
+  "at_s": 7200,
+  "expect": {
+   "calls": 4,
+   "offsets_s": [
+    240,
+    300,
+    420,
+    480
+   ]
+  },
+  "id": "fa-5-calls-per-event",
+  "kind": "calls",
+  "voice_calls_per_event": 4,
+  "what": "with voice_calls_per_event set to 4 the fifth call is not placed"
+ },
+ {
+  "approvers": [
+   "ap1"
+  ],
+  "at_s": 100000,
+  "expect": {
+   "offsets_s": [
+    0,
+    60,
+    120,
+    180,
+    240,
+    540,
+    840,
+    1140,
+    1440,
+    1740,
+    2040,
+    2340,
+    2640,
+    2940,
+    3240,
+    3540,
+    3840,
+    4140,
+    4440,
+    4740
+   ],
+   "sends": 20
+  },
+  "id": "fa-6-stage-a-cadence",
+  "kind": "cadence",
+  "what": "stage a sends fall at 0, 60, 120, 180, 240 s, then every 300 s, and stop at 20"
+ }
+]

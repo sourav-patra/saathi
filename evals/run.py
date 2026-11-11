@@ -16,6 +16,7 @@ from evals.dataset import DatasetEmpty, DatasetMissing, EvalError
 from evals.plan import ApprovalMissing, authorize, load_approvals, load_plan
 from evals.registry import REGISTRY_PATH, Row, check_registry, load_registry
 from evals.results import Results
+from evals.suites.false_alarm import FalseAlarmSuite
 from evals.suites.pending import PendingSuite
 from evals.suites.radar import RadarHeldoutSuite, RadarSuite
 from evals.suites.redaction import RedactionSuite
@@ -26,7 +27,7 @@ DATASETS = HERE / "datasets"
 
 
 def harness_suites() -> dict[str, object]:
-    return {s.name: s for s in (RadarSuite(), RadarHeldoutSuite(), RedactionSuite())}
+    return {s.name: s for s in (RadarSuite(), RadarHeldoutSuite(), RedactionSuite(), FalseAlarmSuite())}
 
 
 def current_phase(repo_root: Path = REPO_ROOT) -> int:

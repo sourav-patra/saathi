@@ -384,7 +384,7 @@ async def _send_effects(
                 reply,
                 voice=deps.voice,
                 language=ctx.cfg.reply_language,
-                idem=idem_key(ctx.inbox, "reply"),
+                idem=replies.reply_idem(ctx.inbox),
                 owner_alert=deps.owner_alert,
                 audit=deps.audit,
                 household=ctx.household,
