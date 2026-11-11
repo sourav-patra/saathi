@@ -15,8 +15,6 @@ Regenerate this file with `uv run python scripts/third_party_notices.py` from th
 
 | Package | Version | Licence | Note |
 |---|---|---|---|
-| /' "manifest-$NAME.txt"[0m | UNKNOWN | UNKNOWN |  |
-| /' "versions-$NAME.txt"[0m | UNKNOWN | UNKNOWN |  |
 | apt | 3.0.4 | GPL-2+ | owner-approved |
 | base-files | 13.8+deb13u7 | GPL-2+ | owner-approved |
 | base-passwd | 3.6.7 | GPL-2 | owner-approved |
@@ -108,8 +106,6 @@ Regenerate this file with `uv run python scripts/third_party_notices.py` from th
 
 | Package | Version | Licence | Note |
 |---|---|---|---|
-| /' "manifest-$NAME.txt"[0m | UNKNOWN | UNKNOWN |  |
-| /' "versions-$NAME.txt"[0m | UNKNOWN | UNKNOWN |  |
 | adduser | 3.152 | GPL-2+ | owner-approved |
 | apt | 3.0.4 | GPL-2+ | owner-approved |
 | base-files | 13.8+deb13u7 | GPL-2+ | owner-approved |
