@@ -12,6 +12,7 @@ from fakes import FakeClock
 from store_helpers import open_store
 from worker_helpers import NOW, Rig, add_inbox, provision
 
+from saathi.channels.telegram import TelegramCaregiverChannel
 from saathi.channels.telegram_elder import TelegramElderChannel
 from saathi.channels.whatsapp import WhatsAppElderChannel
 from saathi.channels.worker_main import build_elder_channel, build_owner_alert, build_worker
@@ -85,11 +86,12 @@ async def test_the_caregiver_stand_in_fails_loudly_and_sends_nothing():
 
 
 async def test_build_worker_composes_the_concrete_adapters(pg_db: PgDb, tmp_path: Path):
-    kek, token = tmp_path / "kek", tmp_path / "wa_access_token"
+    kek, token, bot = tmp_path / "kek", tmp_path / "wa_access_token", tmp_path / "tg_caregiver_token"
     kek.write_bytes(b"k" * 32)
     token.write_text("synthetic-token\n")
+    bot.write_text("123:synthetic-bot\n")
     s = settings(
-        kek_file=str(kek), wa_phone_number_id="1", wa_access_token_file=str(token),
+        kek_file=str(kek), wa_phone_number_id="1", wa_access_token_file=str(token), tg_caregiver_token_file=str(bot),
         db_url_core=pg_db.dsn("saathi_core"), media_dir=str(tmp_path / "media"),
         whispercpp_url="http://127.0.0.1:1", egress_url="http://egress:8081",
     )  # fmt: skip
@@ -98,7 +100,7 @@ async def test_build_worker_composes_the_concrete_adapters(pg_db: PgDb, tmp_path
         assert isinstance(deps.asr, LocalAsrClient) and isinstance(deps.codec, OpusCodec)
         assert deps.store.role is Role.CORE
         assert deps.elder.kind == "whatsapp" and isinstance(deps.elder._inner, WhatsAppElderChannel)  # type: ignore[attr-defined]
-        assert isinstance(deps.caregiver._inner, PendingCaregiverChannel)  # type: ignore[attr-defined]
+        assert isinstance(deps.caregiver._inner, TelegramCaregiverChannel)  # type: ignore[attr-defined]
         assert deps.elder._inner._client.base == "http://egress:8081/whatsapp/v23.0"  # type: ignore[attr-defined]
         assert "synthetic-token" not in repr(deps)
     finally:
@@ -112,6 +114,10 @@ async def test_build_worker_names_what_is_missing(tmp_path: Path):
     kek.write_bytes(b"k" * 32)
     with pytest.raises(ConfigError, match="elder channel"):  # a key but no channel: nothing is opened first
         await build_worker(settings(kek_file=str(kek), db_url_core="postgresql://x@localhost:1/none"))
+    with pytest.raises(ConfigError, match="caregiver bot token"):  # no stand-in any more: the bot is required
+        await build_worker(
+            settings(kek_file=str(kek), tg_elder_token="1:elder", db_url_core="postgresql://x@localhost:1/none")
+        )
 
 
 async def _seal_address(db: PgDb, ring: KeyRing, pub: bytes) -> None:

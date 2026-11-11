@@ -91,12 +91,37 @@ jobs:
       - run: uv sync --frozen
       - run: uv run python -m evals.run --all
 
-  # Report mode never fails the build; it becomes required at the Phase 0 exit (WU-23).
+  # PL-08, PL-15, PL-31. No names file exists in CI, so the private-name check reports unavailable; the step still
+  # scans keys, media and attribution. The second step checks the commits of this push or pull request only.
+  leak-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+      - run: uv python install 3.12
+      - run: uv sync --frozen
+      - run: uv run python scripts/leak_scan.py
+      - name: Commit-range scan (attribution, keys, media in the new commits)
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+            range="$HEAD_SHA"
+          else
+            range="$BASE..$HEAD_SHA"
+          fi
+          uv run python scripts/leak_scan.py --history --range "$range"
+
+  # Report mode never fails the build; gate.py writes the step summary itself. It becomes required at the Phase 0 exit.
   gate-report:
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
       - run: uv python install 3.12
       - run: uv sync --frozen
-      - run: uv run python scripts/gate.py --phase 0 --report | tee -a "$GITHUB_STEP_SUMMARY"
+      - run: uv run python scripts/gate.py --phase 0 --report

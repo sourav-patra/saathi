@@ -8,6 +8,7 @@ nowhere else (repos see only `Tx`).
 
 from __future__ import annotations
 
+import contextlib
 import json
 from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
@@ -100,6 +101,22 @@ class Store:
         if self._role not in SCAN_GRANTS:
             raise PermissionError(f"role {self._role.value} has no scan grants")
         return ScanFns(self._pool, self._role)
+
+    @asynccontextmanager
+    async def singleton(self, key: int) -> AsyncIterator[bool]:
+        """Hold the session advisory lock `key` on one pooled connection for the life of the block. Yields False
+        (and holds nothing) when another session already holds it, so a second process can refuse to start."""
+        try:
+            async with self._pool.acquire() as conn:
+                got = bool(await conn.fetchval("SELECT pg_try_advisory_lock($1)", key))
+                try:
+                    yield got
+                finally:
+                    if got:
+                        with contextlib.suppress(*CONN_ERRORS):
+                            await conn.execute("SELECT pg_advisory_unlock($1)", key)
+        except CONN_ERRORS as exc:
+            raise StoreUnavailable(type(exc).__name__) from exc
 
     async def close(self) -> None:
         await self._pool.close()

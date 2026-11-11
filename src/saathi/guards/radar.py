@@ -84,6 +84,14 @@ SCAM_ROMAN: tuple[str, ...] = (
     "paise receive", "scan karo", "qr scan", "request accept", "video call pe raho",
     "ed officer", "narcotics", "money laundering", "aadhaar misuse", "aadhaar band",
     "remote app", "will be disconnected",
+    # added in WU-26 (append only): the digital-arrest parcel story
+    "parcel mein drugs", "parcel me drugs", "parcel main drugs", "parcel mai drugs", "parcel mein drug",
+    "parcel me drug", "parcel in drugs", "drugs in your parcel", "drugs found in parcel", "parcel se drugs",
+    # added in the WU-26 fix pass (append only): the same story with other carriers and other drug words
+    "parcel contains drugs", "parcel contained drugs", "parcel has drugs", "courier mein drugs", "courier me drugs",
+    "courier contains drugs", "package mein drugs", "package me drugs", "package contains drugs",
+    "parcel mein ganja", "parcel me ganja", "parcel mein mdma", "parcel me mdma", "parcel mein charas",
+    "parcel mein nasha", "parcel mein narcotics", "illegal items in parcel", "parcel mein illegal",
 )
 SCAM_DEVANAGARI: tuple[str, ...] = (
     "ओटीपी", "केवाईसी", "खाता बंद", "अकाउंट बंद", "सिम बंद", "लॉटरी", "इनाम", "बिजली कट",
@@ -91,6 +99,10 @@ SCAM_DEVANAGARI: tuple[str, ...] = (
     "ओटीपी बताओ", "यूपीआई पिन",
     # added in the WU-09 fix pass (append only)
     "के वाई सी", "बैंक से कॉल", "बैंक से फोन", "पिन डालो", "सीबीआई", "पुलिस केस", "ओ टी पी",
+    # added in WU-26 (append only)
+    "पार्सल में ड्रग्स", "पार्सल मे ड्रग्स", "पार्सल में ड्रग",
+    # added in the WU-26 fix pass (append only)
+    "पार्सल में नशीले पदार्थ", "पार्सल में नशीला", "पार्सल में गांजा", "कूरियर में ड्रग्स", "पैकेज में ड्रग्स",
 )
 
 # A classifier call may not stall the alert path (M10: never wait for a model). The LLD sets no value.
@@ -142,6 +154,13 @@ _URGENCY_RE = _build_pattern(_URGENCY_ROMAN)
 
 
 _LINK_URGENCY = "link+urgency"
+# An OTP glued to its digits ("otp123", "123otp") slips past the word-bounded phrase match (added in WU-26).
+_OTP_GLUED = "otp+digits"
+_OTP_GLUED_RE = re.compile(r"(?<![a-z])otp_?\d{3,8}(?!\d)|(?<!\d)\d{3,8}_?otp(?![a-z])")
+# Added in the WU-26 fix pass: an OTP glued to a word before it ("myotp1234") or spelled with a zero ("0TP1234").
+# Four or more digits keep "hotpot123" (no digits after "otp") and short codes clean.
+_OTP_GLUED_WIDE = "otp+digits(wide)"
+_OTP_GLUED_WIDE_RE = re.compile(r"[o0]tp[\s_-]?\d{4,8}(?!\d)")
 
 
 def _ids(kind: str, terms: tuple[str, ...]) -> dict[str, str]:
@@ -155,6 +174,8 @@ RULE_IDS: dict[str, str] = {
     **_ids("SCR", SCAM_ROMAN),
     **_ids("SCD", SCAM_DEVANAGARI),
     _LINK_URGENCY: "RD-LNK-1",
+    _OTP_GLUED: "RD-OTP-1",
+    _OTP_GLUED_WIDE: "RD-OTP-2",
 }
 
 
@@ -183,6 +204,10 @@ def scan(text: str | None) -> RadarResult:
         for roman in romans:
             em |= {m.group(0) for m in _EMERGENCY_RE.finditer(roman)}
             sc |= {m.group(0) for m in _SCAM_RE.finditer(roman)}
+            if _OTP_GLUED_RE.search(roman):
+                sc.add(_OTP_GLUED)
+            if _OTP_GLUED_WIDE_RE.search(roman):
+                sc.add(_OTP_GLUED_WIDE)
         em |= _devanagari_hits(EMERGENCY_DEVANAGARI, dev)
         sc |= _devanagari_hits(SCAM_DEVANAGARI, dev)
 

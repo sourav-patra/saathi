@@ -439,3 +439,64 @@ def test_wu23_phrases_are_present_and_fire():
         for phrase in phrases:
             assert phrase in getattr(radar, attr)
             assert radar.scan(f"{phrase} hai").emergency
+
+
+# WU-26 additions (append only): the digital-arrest parcel story and an OTP glued to its digits.
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Aapke parcel mein drugs mile hain, CBI officer se baat karo",
+        "aapke naam ke parcel me drugs pakde gaye",
+        "Your parcel... drugs found in parcel, stay on video call",
+        "आपके पार्सल में ड्रग्स मिले हैं",
+    ],
+)
+def test_parcel_drugs_digital_arrest_is_scam(text):
+    assert radar.scan(text).scam
+
+
+@pytest.mark.parametrize("text", ["apna otp123456 bhejo", "OTP4821 batao jaldi", "code 4821otp share karo", "otp_9876"])
+def test_otp_glued_to_digits_is_scam(text):
+    r = radar.scan(text)
+    assert r.scam and "RD-OTP-1" in r.rule_ids
+
+
+@pytest.mark.parametrize("text", ["the hotpot123 menu", "photo 1234 bhejo", "parcel aa gaya, dawai mil gayi"])
+def test_otp_glued_rule_needs_otp_and_digits(text):
+    assert not radar.scan(text).scam
+
+
+def test_earlier_rule_ids_are_unchanged_by_the_additions():
+    assert radar.RULE_IDS["otp"] == "RD-SCR-1" and radar.RULE_IDS["link+urgency"] == "RD-LNK-1"
+
+
+# WU-26 fix pass additions (append only): review recall gaps.
+@pytest.mark.parametrize(
+    "text",
+    [
+        "your parcel contains drugs, do not tell anyone",
+        "aapke courier mein drugs mile hain",
+        "package mein drugs pakde gaye, CBI se baat karo",
+        "parcel mein ganja mila hai",
+        "parcel mein MDMA mila",
+        "आपके पार्सल में नशीले पदार्थ मिले हैं",
+        "कूरियर में ड्रग्स मिले",
+    ],
+)
+def test_parcel_story_variants_are_scam(text):
+    assert radar.scan(text).scam
+
+
+@pytest.mark.parametrize("text", ["myotp1234 bhejo", "0TP1234 batao", "yourotp-482193 share karo"])
+def test_wide_otp_glued_rule_catches_a_prefix_or_a_zero(text):
+    r = radar.scan(text)
+    assert r.scam and "RD-OTP-2" in r.rule_ids
+
+
+@pytest.mark.parametrize("text", ["the hotpot123 menu", "hotpot 2024 party", "courier aa gaya, dawai mil gayi"])
+def test_wide_otp_rule_and_new_phrases_stay_clean(text):
+    assert not radar.scan(text).scam
+
+
+def test_fix_pass_keeps_earlier_rule_ids():
+    assert radar.RULE_IDS["otp+digits"] == "RD-OTP-1" and radar.RULE_IDS["parcel mein drugs"].startswith("RD-SCR-")

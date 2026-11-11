@@ -543,8 +543,7 @@ async def serve(
 
 
 def run() -> None:  # pragma: no cover - entry point of `saathi-bot`
-    from saathi.config import ConfigError, get_settings
+    """`require_secrets` and the composition run in `worker_main.serve_bot` (imported here to avoid an import cycle)."""
+    from saathi.channels.worker_main import main_bot
 
-    logging.basicConfig(level=logging.INFO)
-    require_secrets(get_settings())
-    raise ConfigError("the caregiver bot composition (store, alerts, bot token) is wired with the compose service")
+    main_bot()

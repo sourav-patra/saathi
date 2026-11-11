@@ -33,15 +33,15 @@ The cap is a monthly figure from config and is passed in; nothing here holds a v
 from __future__ import annotations
 
 import logging
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import ROUND_CEILING, Decimal
-from typing import Literal, get_args
+from typing import Any, Literal, get_args
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from saathi.errors import BudgetExceeded
-from saathi.ids import HouseholdId, RunId
+from saathi.ids import ApproverId, HouseholdId, RunId, idem_key
 from saathi.ports import Tx
 from saathi.store import Store
 from saathi.store.repos._util import affected
@@ -78,6 +78,7 @@ class Reservation:
 
 
 AlertSink = Callable[[SpendAlert], Awaitable[None]]
+CapSink = Callable[[HouseholdId, str], Awaitable[None]]  # (household, month) when a reservation hits the cap
 
 
 def _zone(tz: str) -> ZoneInfo:
@@ -105,6 +106,7 @@ class PgLedger:
         household: HouseholdId,
         *,
         on_alert: AlertSink | None = None,
+        on_cap: CapSink | None = None,
         scope: Scope = "global",
         tz: str = DEFAULT_TZ,
     ) -> None:
@@ -114,11 +116,21 @@ class PgLedger:
         self._store = store
         self._household = household
         self._on_alert = on_alert
+        self._on_cap = on_cap
+        self._cap_month = ""
         self._scope: Scope = scope
         self._tz = tz
 
     async def reserve(self, run: RunId, tier: str, worst_case_inr: Decimal, cap: Decimal | None) -> int:
-        got = await self.reserve_checked(run, tier, worst_case_inr, cap)
+        try:
+            got = await self.reserve_checked(run, tier, worst_case_inr, cap)
+        except BudgetExceeded as exc:
+            if str(exc) == "paid cap reached" and self._on_cap is not None:
+                try:  # the caregiver summary at the cap (RQ-48); a failed notice never hides the refusal
+                    await self._on_cap(self._household, self._cap_month)
+                except Exception as sink_exc:  # noqa: BLE001
+                    log.warning("cap notice failed: %s", type(sink_exc).__name__)
+            raise
         if got.alert is not None and self._on_alert is not None:
             try:
                 await self._on_alert(got.alert)
@@ -141,6 +153,7 @@ class PgLedger:
             before = await self._total(tx, month)
             after = before + worst_case_inr
             if after > cap:
+                self._cap_month = month
                 raise BudgetExceeded("paid cap reached")
             rows = await tx.fetch(
                 "INSERT INTO llm_reservations (household_id, run_id, tier, reserved_inr, month)"
@@ -195,3 +208,53 @@ class PgLedger:
         else:
             rows = await tx.fetch(_TOTAL_SQL, self._household, month)
         return Decimal(rows[0]["total"])
+
+
+CAP_SUMMARY = (
+    "Saathi: the paid helper has reached this month's limit. Until next month the elder's requests come to you as"
+    " summaries only; the emergency and scam alerts are not affected."
+)
+
+
+class SpendNotices:
+    """The ledger's two notices (RQ-48): at 80% the owner hears a short code (`on_alert`); at the cap every approver of
+    the household gets one caregiver summary per month (`on_cap`). Both are best effort and hold no cap figure."""
+
+    def __init__(
+        self,
+        caregivers: Any,
+        approvers: Callable[[HouseholdId], Awaitable[Sequence[ApproverId]]],
+        owner_alert: Callable[[str], Awaitable[None]],
+    ) -> None:
+        self._caregivers = caregivers
+        self._approvers = approvers
+        self._owner_alert = owner_alert
+        self._told: set[tuple[str, str]] = set()
+
+    async def on_alert(self, alert: SpendAlert) -> None:
+        await self._owner_alert(f"spend_80pct_{alert.month}")
+
+    async def on_cap(self, household: HouseholdId, month: str) -> None:
+        if (str(household), month) in self._told:
+            return
+        failure: Exception | None = None
+        for approver in await self._approvers(household):
+            try:
+                await self._caregivers.send_text(approver, CAP_SUMMARY, key=idem_key("cap", household, month, approver))
+            except Exception as exc:  # noqa: BLE001  (one approver failing does not stop the others)
+                failure = failure or exc
+        await self._owner_alert(f"spend_cap_{month}")
+        if failure is not None:
+            raise failure
+        self._told.add((str(household), month))
+
+
+def store_approvers(store: Store) -> Callable[[HouseholdId], Awaitable[list[ApproverId]]]:
+    """The approvers of one household, primary first, read under that household's scope."""
+
+    async def approvers(household: HouseholdId) -> list[ApproverId]:
+        async with store.tx(household=household) as tx:
+            rows = await tx.fetch("SELECT id FROM approvers ORDER BY is_primary DESC, id")
+        return [ApproverId(r["id"]) for r in rows]
+
+    return approvers

@@ -276,7 +276,7 @@ def test_the_scripts_are_sealed_and_synthetic():
 
 
 # --- the radar phrase table is pinned (SPEC safety evidence section 3: fails if a keyword row changes) ---------------
-RADAR_TABLE_SHA256 = "e242661c62ecae3b578cebd7826904176a7c8bfed1580a71af71ddcce30c63ab"
+RADAR_TABLE_SHA256 = "2b72571fbffd4e05873f14f48d5a3e7a16eed699ab47513f918c140ca9aa5807"
 
 
 def _radar_table_hash() -> str:

@@ -3,8 +3,12 @@
 
 Scans the files git would commit (tracked plus untracked and not ignored; a plain walk outside a git work tree)
 for generic leaks: phone numbers, emails outside the owner noreply and reserved example domains, key and token
-patterns, private home paths, and media files. It always scans commit metadata (author and committer, messages with
-attribution through commit_msg_check). With --history it also scans every added line and added media path.
+patterns, private home paths, sandbox temp paths, and media files. RFC 2606 reserved names (.example, .test,
+.invalid, .localhost) pass as email domains and URL userinfo hosts unless an inner label is a public top-level
+name; URL userinfo that carries a password is always flagged (a `<placeholder>` or `${VAR}` is not a
+password). It always scans commit metadata (author and
+committer, messages with attribution through commit_msg_check). With --history it also scans every added line and
+added media path.
 
 The private-name denylist comes from --names-file or the SAATHI_NAMES_FILE variable: one term per line, `#`
 comments. The file lives under the git-ignored private/ folder; no real term belongs in the repository. A hit is
@@ -18,10 +22,12 @@ A finding is reported to the owner; it is never fixed by rewriting history.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 import re
 import subprocess
 import sys
+import tomllib
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -39,6 +45,15 @@ MAX_BYTES = 2_000_000
 
 EMAIL = re.compile(r"(?<![\w.+-])[\w.+-]+@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)")
 EMAIL_OK_DOMAINS = ("users.noreply.github.com", "example.com", "example.org", "example.net")
+# RFC 2606 reserved top-level names: an address or URL userinfo under them can reach no one.
+RESERVED_TLDS = ("example", "test", "invalid", "localhost")
+# A reserved name is allowed only when no inner label is a public top-level name: an address under `mail.com.test` still
+# spells a real address, so it is flagged.
+PUBLIC_TLDS = frozenset(
+    "com net org in co io gov edu mil int info biz me us uk de fr jp cn ru br au ca app dev ai xyz".split()
+)
+URL_PASSWORD = re.compile(r"(?i)\b[a-z][a-z0-9+.-]*://[^\s/@:]*:([^\s/@]+)@")  # URL userinfo with a password
+PASSWORD_PLACEHOLDER = re.compile(r"(?i)^(?:<[^>]*>|\$\{?[A-Za-z_][\w{}]*|\$\{\{.*|[\w-]*throwaway[\w-]*)$")
 PHONE = re.compile(
     r"(?<![\w.])(?:\+\d{1,3}[\s-]?\(?\d{2,5}\)?[\s-]?\d{3,5}[\s-]?\d{3,6}|(?:\+91[\s-]?|0)?[6-9]\d{4}[\s-]?\d{5})(?![\w])"
 )
@@ -58,6 +73,7 @@ KEYS: tuple[tuple[str, re.Pattern[str]], ...] = (
 )
 PLACEHOLDER = re.compile(r"(?i)(?:your|change|example|placeholder|dummy|fake|redacted|xxxx|\*{4}|<|\$\{?|test)")
 PRIVATE_PATH = re.compile(r"(?:/home/(?!user\b|runner\b)[a-z_][\w-]*/|/Users/[\w.-]+/|[A-Za-z]:\\Users\\[\w.-]+\\)")
+SANDBOX_PATH = re.compile("/tmp/" + r"claude-[\w.-]+")  # an agent sandbox temp path (split so this line is clean)
 
 
 @dataclass(frozen=True)
@@ -76,14 +92,24 @@ def load_names(path: Path) -> list[str]:
     return [s for raw in path.read_text(encoding="utf-8").splitlines() if (s := raw.strip()) and not s.startswith("#")]
 
 
+def _domain_ok(domain: str) -> bool:
+    """The owner noreply, the example domains, or an RFC 2606 reserved name with no public label inside it."""
+    if any(domain == ok or domain.endswith("." + ok) for ok in EMAIL_OK_DOMAINS):
+        return True
+    labels = domain.split(".")
+    if labels[-1] not in RESERVED_TLDS:
+        return False
+    return not any(label in PUBLIC_TLDS for label in labels[:-1])
+
+
 def scan_text(text: str, where: str, names: Sequence[str] | None, first_line: int = 1) -> list[Finding]:
     """Generic and denylist findings for one text; values are never copied into a message."""
     out: list[Finding] = []
     for n, line in enumerate(text.splitlines(), first_line):
         for m in EMAIL.finditer(line):
             domain = m.group(1).lower()
-            if any(domain == ok or domain.endswith("." + ok) for ok in EMAIL_OK_DOMAINS):
-                continue
+            if _domain_ok(domain):
+                continue  # the owner noreply, the example domains, or an RFC 2606 reserved name
             out.append(Finding("email", where, n, "an email address outside the configured domains"))
         for m in PHONE.finditer(line):
             digits = re.sub(r"\D", "", m.group(0))
@@ -104,8 +130,12 @@ def scan_text(text: str, where: str, names: Sequence[str] | None, first_line: in
             ):
                 continue  # a placeholder, or a value with no digit and letter mix (an identifier, not a key)
             out.append(Finding("key", where, n, f"a {label} pattern"))
+        if any(not PASSWORD_PLACEHOLDER.match(m.group(1)) for m in URL_PASSWORD.finditer(line)):
+            out.append(Finding("url_password", where, n, "a URL whose userinfo carries a password"))
         if PRIVATE_PATH.search(line):
             out.append(Finding("private_path", where, n, "a private home path"))
+        if SANDBOX_PATH.search(line):
+            out.append(Finding("sandbox_path", where, n, "a sandbox temp path"))
         for i, term in enumerate(names or (), 1):
             if re.search(r"(?<!\w)" + re.escape(term) + r"(?!\w)", line, re.I):
                 out.append(Finding("names", where, n, f"a term from the names file (entry {i})"))
@@ -184,10 +214,39 @@ def scan_metadata(
     return findings
 
 
+EXCEPTIONS_FILE = HERE / "leak_scan_exceptions.toml"
+
+
+def line_digest(line: str) -> str:
+    return hashlib.sha256(line.encode("utf-8")).hexdigest()
+
+
+def load_exceptions(path: Path | None = None) -> dict[tuple[str, str], set[str]]:
+    """Reviewed exceptions for immutable history: (full commit sha, sha256 of the added line) -> rule ids."""
+    path = path or EXCEPTIONS_FILE
+    if not path.is_file():
+        return {}
+    out: dict[tuple[str, str], set[str]] = {}
+    for e in tomllib.loads(path.read_text(encoding="utf-8")).get("exception", []):
+        sha, rule, digest, reason = e["commit"], e["rule"], e["line_sha256"], e.get("reason", "")
+        if not (re.fullmatch(r"[0-9a-f]{40}", sha) and re.fullmatch(r"[0-9a-f]{64}", digest) and rule and reason):
+            raise ValueError(f"malformed leak scan exception for commit {sha[:12]}")
+        out.setdefault((sha, digest), set()).add(rule)
+    return out
+
+
 def scan_history(
-    root: Path, names: Sequence[str] | None = None, rev_range: str = "--all", terms: Sequence[str] = ()
+    root: Path,
+    names: Sequence[str] | None = None,
+    rev_range: str = "--all",
+    terms: Sequence[str] = (),
+    exceptions: dict[tuple[str, str], set[str]] | None = None,
 ) -> list[Finding]:
-    """Commit metadata, added lines and added media paths across the history."""
+    """Commit metadata, added lines and added media paths across the history.
+
+    An exception waives one rule for one exact added line in one named commit; tree and other commits unaffected.
+    """
+    exceptions = load_exceptions() if exceptions is None else exceptions
     findings = scan_metadata(root, names, rev_range, terms)
     diff = _git(
         root,
@@ -207,10 +266,15 @@ def scan_history(
             continue
         sha, _, body = chunk.partition("\n")
         added: list[str] = []
+        where = f"commit {sha[:12]} diff"
         for line in body.splitlines():
             if line.startswith("+") and not line.startswith("+++"):
-                added.append(line[1:])
-        findings += scan_text("\n".join(added), f"commit {sha[:12]} diff", names, 0)
+                waived = exceptions.get((sha, line_digest(line[1:])))
+                if waived:
+                    findings += [f for f in scan_text(line[1:], where, names, 0) if f.rule not in waived]
+                else:
+                    added.append(line[1:])
+        findings += scan_text("\n".join(added), where, names, 0)
     names_added = _git(root, "log", rev_range, "--format=\x1e%H", "--name-only", "--diff-filter=AMR", "--no-renames")
     for chunk in names_added.split("\x1e"):
         sha, _, files = chunk.strip().partition("\n")

@@ -20,7 +20,7 @@ _spec.loader.exec_module(leak_scan)
 KEY = "AK" + "IA" + "ABCDEFGHIJKLMNOP"
 TOKEN = "gh" + "p_" + "a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8"
 PHONE = "+91 " + "98" + "7" + "01 23456"
-EMAIL = "someone" + "@" + "mail-host.test"
+EMAIL = "someone" + "@" + "mail-host" + ".io"
 TERM = "zorblax"  # a synthetic denylist term
 CO = "Co-" + "Authored-By: "
 
@@ -200,7 +200,8 @@ def test_history_scan_sees_a_key_added_in_a_merge(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    "address", ["noreply" + "@" + "vendor.test", "no-reply" + "@" + "tool-host.test", "git" + "@" + "host.test"]
+    "address",
+    ["noreply" + "@" + "vendor-host" + ".io", "no-reply" + "@" + "tool-host" + ".io", "git" + "@" + "code-hub" + ".io"],
 )
 def test_vendor_noreply_address_is_flagged(tmp_path: Path, address: str) -> None:
     write(tmp_path, "a.txt", f"contact {address}\n")
@@ -249,3 +250,94 @@ def test_plain_run_in_a_clean_repository_passes(tmp_path: Path, monkeypatch: pyt
     assert leak_scan.main([str(repo)]) == 0
     empty = _repo(tmp_path, "empty")
     assert leak_scan.main([str(empty)]) == 0  # no commits yet
+
+
+@pytest.mark.parametrize("tld", ["example", "test", "invalid", "localhost"])
+def test_rfc2606_reserved_names_pass_for_email_and_url_userinfo(tmp_path: Path, tld: str) -> None:
+    write(tmp_path, "a.txt", f"mail someone@host.{tld} or fetch https://user@evil.{tld}/x\n")
+    assert leak_scan.scan_tree(tmp_path) == []
+
+
+@pytest.mark.parametrize("tld", ["io", "in", "exampled", "testing"])
+def test_non_reserved_names_still_flagged(tmp_path: Path, tld: str) -> None:
+    write(tmp_path, "a.txt", "fetch https://user" + "@" + f"evil.{tld}/x\n")
+    assert rules(leak_scan.scan_tree(tmp_path)) == {"email"}
+
+
+def test_sandbox_temp_path_is_flagged(tmp_path: Path) -> None:
+    write(tmp_path, "a.txt", "see /tmp/" + "claude-0/scratch/out.log\n")
+    write(tmp_path, "b.txt", "a plain /tmp/build/out.log is fine\n")
+    assert [(f.where, f.rule) for f in leak_scan.scan_tree(tmp_path)] == [("a.txt", "sandbox_path")]
+
+
+@pytest.mark.parametrize(
+    "domain", ["mail-host.com.example", "corp.in.test", "zz-host.co.invalid", "bank.org.localhost"]
+)
+def test_reserved_name_with_a_public_inner_label_is_flagged(tmp_path: Path, domain: str) -> None:
+    write(tmp_path, "a.txt", "write to role" + "@" + domain + "\n")
+    assert rules(leak_scan.scan_tree(tmp_path)) == {"email"}
+
+
+@pytest.mark.parametrize("host", ["zz-host.invalid", "zz-host.example", "zz-host.io", "zz-host.com.test"])
+def test_url_userinfo_with_a_password_is_always_flagged(tmp_path: Path, host: str) -> None:
+    write(tmp_path, "a.txt", "fetch https://role" + ":" + "pw-synthetic" + "@" + host + "/x\n")
+    assert "url_password" in rules(leak_scan.scan_tree(tmp_path))
+
+
+def test_url_userinfo_without_a_password_on_a_reserved_name_passes(tmp_path: Path) -> None:
+    write(tmp_path, "a.txt", "fetch https://role" + "@" + "zz-host.invalid/x and a time 10:30 at noon\n")
+    assert leak_scan.scan_tree(tmp_path) == []
+
+
+def test_url_password_placeholders_pass(tmp_path: Path) -> None:
+    at = "@"
+    write(tmp_path, "a.txt", f"postgresql://role:<password>{at}db:5432/x\npostgresql://role:${{PW_VAR}}{at}db/x\n")
+    assert leak_scan.scan_tree(tmp_path) == []
+
+
+def _commit(repo: Path, name: str, body: str, msg: str) -> str:
+    write(repo, name, body)
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", msg)
+    return subprocess.run(["git", "-C", str(repo), "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+
+
+def test_url_password_placeholders_pass_in_history_diffs(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    at = "@"
+    body = f"  URL: postgresql://role:${{PW_VAR}}{at}db:5432/x\n  B: postgresql://role:<password>{at}db/x\n"
+    _commit(repo, "compose.yml", body, "placeholders")
+    assert "url_password" not in rules(leak_scan.scan_history(repo, exceptions={}))
+
+
+def test_history_exception_waives_only_the_named_commit_and_rule(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    line = 'url = "postgresql://role:' + "role" + "@" + 'db:5432/x"'
+    old = _commit(repo, "a.py", line + "\n", "old")
+    exc = {(old, leak_scan.line_digest(line)): {"url_password"}}
+    assert "url_password" not in rules(leak_scan.scan_history(repo, exceptions=exc))
+    _commit(repo, "b.py", line + "\n", "new")  # the same line in a new commit is still flagged
+    found = [f for f in leak_scan.scan_history(repo, exceptions=exc) if f.rule == "url_password"]
+    assert len(found) == 1 and old[:12] not in found[0].where
+    assert "url_password" in rules(leak_scan.scan_tree(repo))  # never applies to the tree
+    assert "url_password" in rules(leak_scan.scan_history(repo, rev_range="HEAD~1..HEAD", exceptions=exc))
+
+
+def test_history_exception_keeps_other_rules_on_the_line(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    line = "postgresql://role:" + "role" + "@" + f"db/x {KEY}"
+    old = _commit(repo, "a.py", line + "\n", "old")
+    exc = {(old, leak_scan.line_digest(line)): {"url_password"}}
+    assert rules(leak_scan.scan_history(repo, exceptions=exc)) == {"key"}
+
+
+def test_checked_in_exceptions_are_well_formed() -> None:
+    exc = leak_scan.load_exceptions()
+    assert exc and all(rules_ == {"url_password"} for rules_ in exc.values())
+
+
+def test_malformed_exception_is_rejected(tmp_path: Path) -> None:
+    body = '[[exception]]\ncommit = "abc"\nrule = "url_password"\nline_sha256 = "00"\nreason = "x"\n'
+    write(tmp_path, "e.toml", body)
+    with pytest.raises(ValueError):
+        leak_scan.load_exceptions(tmp_path / "e.toml")

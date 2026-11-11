@@ -323,18 +323,39 @@ async def test_contract_health(h: Harness) -> None:
         assert await h.channel.health() == state
 
 
-async def test_health_down_on_transport_error(h: Harness) -> None:
-    if h.kind == "fake":
-        pytest.skip("the fake has no transport")
+HARNESSES = {"whatsapp": WhatsAppHarness, "telegram_elder": TelegramHarness, "fake": FakeHarness}
+TRANSPORT_KINDS = ["whatsapp", "telegram_elder"]  # the fake has no transport, so it has no transport error
+# Each kind with each send method it offers: send_template only where the channel has templates (RQ-108). The cases
+# are generated, not skipped, so that a gate run sees no skip (RQ-100); test_send_cases_follow_the_capabilities keeps
+# the list honest.
+SEND_CASES = [
+    (k, m)
+    for k in KINDS
+    for m in SENDS
+    if m != "send_template" or ChannelCap.TEMPLATES in HARNESSES[k]().channel.capabilities
+]
+
+
+def test_send_cases_follow_the_capabilities() -> None:
+    for k in KINDS:
+        caps = HARNESSES[k]().channel.capabilities
+        assert ((k, "send_template") in SEND_CASES) == (ChannelCap.TEMPLATES in caps)
+        assert all((k, m) in SEND_CASES for m in SENDS if m != "send_template")
+    assert ("telegram_elder", "send_template") not in SEND_CASES and ("whatsapp", "send_template") in SEND_CASES
+    assert all(HARNESSES[k]().kind != "fake" for k in TRANSPORT_KINDS)
+
+
+@pytest.mark.parametrize("kind", TRANSPORT_KINDS)
+async def test_health_down_on_transport_error(kind: str) -> None:
+    h = HARNESSES[kind]()
     h.inject("down")
     assert await h.channel.health() == ChannelHealth.DOWN
 
 
 @pytest.mark.parametrize("outcome", ["down", "rate_limited", "rejected"])
-@pytest.mark.parametrize("method", SENDS)
-async def test_contract_each_error_on_send(h: Harness, method: str, outcome: str) -> None:
-    if method == "send_template" and ChannelCap.TEMPLATES not in h.channel.capabilities:
-        pytest.skip("no templates on this channel")
+@pytest.mark.parametrize(("kind", "method"), SEND_CASES)
+async def test_contract_each_error_on_send(kind: str, method: str, outcome: str) -> None:
+    h = HARNESSES[kind]()
     h.inject(outcome)
     with pytest.raises(ERROR_OUTCOMES[outcome]) as info:
         await send(h.channel, method, key(1))

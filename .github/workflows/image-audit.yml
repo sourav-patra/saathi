@@ -1,0 +1,48 @@
+name: image-audit
+# Builds the ASR and speech images, writes their package manifest and runs the licence audit on it (LLD build
+# section 2). It runs on changes under infra/ only. Every `uses:` is pinned to a 40 hex digest (scripts/ci_lint.py).
+on:
+  push:
+    branches: [main]
+    paths: ["infra/**"]
+  pull_request:
+    paths: ["infra/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  image-audit:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - { name: asr, context: infra/whisper, file: infra/whisper/Dockerfile }
+          - { name: speech, context: ., file: infra/Dockerfile.worker }
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+      - run: uv python install 3.12
+      - run: uv sync --frozen
+      - name: Build the image
+        env:
+          NAME: ${{ matrix.image.name }}
+          CONTEXT: ${{ matrix.image.context }}
+          FILE: ${{ matrix.image.file }}
+        run: docker build -t "saathi-audit-$NAME" -f "$FILE" "$CONTEXT"
+      - name: Write the package manifest (name | licence from the Debian copyright file)
+        env:
+          NAME: ${{ matrix.image.name }}
+        run: |
+          docker run --rm --entrypoint sh "saathi-audit-$NAME" -c '
+            for p in $(dpkg-query -W -f="\${binary:Package}\n"); do
+              f="/usr/share/doc/${p%%:*}/copyright"
+              lic=$(grep -m1 "^License:" "$f" 2>/dev/null | cut -d" " -f2-)
+              echo "$p | ${lic:-UNKNOWN}"
+            done' > "manifest-$NAME.txt"
+          wc -l "manifest-$NAME.txt"
+      - name: Licence audit of the image
+        env:
+          NAME: ${{ matrix.image.name }}
+        run: uv run python scripts/license_audit.py --dockerfiles --manifest "manifest-$NAME.txt"
