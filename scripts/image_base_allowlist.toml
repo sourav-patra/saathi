@@ -284,6 +284,7 @@ reason = "unmodified distribution base layer, not linked into or distributed as 
 [[package]]
 name = "ca-certificates"
 licence = "GPL-2+ (scripts); MPL-2.0 (certificate data)"
+reported = "GPL-2+"
 reason = "unmodified distribution package, not linked into Saathi code; owner-approved by name"
 
 [[package]]
