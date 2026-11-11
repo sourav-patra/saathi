@@ -180,6 +180,7 @@ BASE_REASONS = frozenset(
     {
         "unmodified distribution base layer, not linked into or distributed as part of Saathi code",
         "GCC runtime exception",
+        "unmodified distribution package, not linked into Saathi code; owner-approved by name",
     }
 )
 _BASE_FIELDS = {"name", "licence", "reason", "reported"}

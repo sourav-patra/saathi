@@ -2,10 +2,11 @@
 # never by --packages. A fixed, named, per-package list: the unmodified distribution base
 # layer and the C/C++ runtime (GCC runtime exception). No licence category is excepted:
 # a package not named here, or named with a licence other than the one the image reports,
-# still fails. Packages our Dockerfiles install on top of the base are never listed here.
+# still fails. A package our Dockerfiles install on top of the base, or one from an upstream image
+# layer, is listed only when the owner approves it by name (third reason below).
 #
 # Fields: name (Debian binary package, no :arch), licence (the true licence), reason (one of
-# the two fixed reasons), and `reported` only where the image's copyright file reports a
+# the fixed reasons in scripts/license_audit.py BASE_REASONS), and `reported` only where the image's copyright file reports a
 # different first License: line (missing, or the documentation licence).
 
 [[package]]
@@ -279,3 +280,34 @@ reason = "unmodified distribution base layer, not linked into or distributed as 
 name = "util-linux"
 licence = "GPL-2+"
 reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "ca-certificates"
+licence = "GPL-2+ (scripts); MPL-2.0 (certificate data)"
+reported = "GPL-2+"
+reason = "unmodified distribution package, not linked into Saathi code; owner-approved by name"
+
+[[package]]
+name = "libflac14"
+licence = "GPL-2+ or LGPL-2.1+"
+reason = "unmodified distribution package, not linked into Saathi code; owner-approved by name"
+
+[[package]]
+name = "libgdbm6t64"
+licence = "GPL-3+"
+reason = "unmodified distribution package, not linked into Saathi code; owner-approved by name"
+
+[[package]]
+name = "libreadline8t64"
+licence = "GPL-3+"
+reason = "unmodified distribution package, not linked into Saathi code; owner-approved by name"
+
+[[package]]
+name = "netbase"
+licence = "GPL-2"
+reason = "unmodified distribution package, not linked into Saathi code; owner-approved by name"
+
+[[package]]
+name = "readline-common"
+licence = "GPL-3+"
+reason = "unmodified distribution package, not linked into Saathi code; owner-approved by name"

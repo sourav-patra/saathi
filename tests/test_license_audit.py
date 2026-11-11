@@ -221,7 +221,7 @@ def test_dockerfile_similar_names_pass(tmp_path, line):
 def test_final_image_has_no_downloader():
     """F1: the final stage installs only opus-tools; no wget or curl (wget is GPL-3.0+)."""
     text = (ROOT / "infra" / "whisper" / "Dockerfile").read_text()
-    final = text.split("FROM debian:bookworm-slim", 3)[-1]
+    final = text.split("FROM debian:trixie-slim", 3)[-1]
     assert "wget" not in final and "curl" not in final
     assert "COPY --from=build" in final and "/models/" in final
 
@@ -297,7 +297,26 @@ def test_base_allowlist_does_not_apply_to_packages():
 def test_repo_base_allowlist_is_well_formed():
     entries, problems = la.load_base_allowlist()
     assert problems == [] and "libc6" in entries
-    assert not any("opus" in n or "flac" in n for n in entries)
+    assert not any("opus" in n for n in entries)
+    # libflac14 (opus-tools runtime) is listed only because the owner approved it by name.
+    assert entries["libflac14"]["reason"].endswith("owner-approved by name")
+
+
+OWNER_APPROVED = ("libflac14", "ca-certificates", "netbase", "libgdbm6t64", "libreadline8t64", "readline-common")
+
+
+def test_owner_approved_packages_listed_by_exact_name():
+    entries, _ = la.load_base_allowlist()
+    reason = "unmodified distribution package, not linked into Saathi code; owner-approved by name"
+    for name in OWNER_APPROVED:
+        assert entries[name]["reason"] == reason, name
+
+
+def test_owner_approved_package_with_other_licence_fails(tmp_path):
+    entries, _ = la.load_base_allowlist()
+    assert la.audit_manifest(manifest(tmp_path, "libflac14:amd64 | GPL-2+ or LGPL-2.1+"), entries) == []
+    assert la.audit_manifest(manifest(tmp_path, "libflac14:amd64 | AGPL-3+"), entries)
+    assert la.audit_manifest(manifest(tmp_path, "libflac12:amd64 | GPL-2+ or LGPL-2.1+"), entries)
 
 
 @pytest.mark.parametrize(

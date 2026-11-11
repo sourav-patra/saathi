@@ -213,6 +213,7 @@ services:
         WHISPER_CPP_REF: ${WHISPER_CPP_REF:-v1.7.6}
         WHISPER_MODEL: ${WHISPER_MODEL:?set in private .env}
         WHISPER_MODEL_URL: ${WHISPER_MODEL_URL:?set in private .env}
+        WHISPER_MODEL_SHA256: ${WHISPER_MODEL_SHA256:?set in private .env}
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/ > /dev/null || exit 1"]

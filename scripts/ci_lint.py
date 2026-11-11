@@ -6,7 +6,10 @@ PATH is a workflow file or a directory searched for *.yml and *.yaml. Fails (exi
 - a `uses:` value (block form or flow form such as `- {uses: x@v4}`) that does not end in a
   40 hex commit digest (`owner/repo[/path]@<40 hex>`); a local action (`./path`) is exempt, and a `docker://`
   reference must end in `@sha256:<64 hex>`;
-- an `image:` value with no `@sha256:<64 hex>` digest (service containers, TQ-61 b).
+- an `image:` value with no `@sha256:<64 hex>` digest (service containers, TQ-61 b);
+- any step that would publish an image: `docker push` (or `docker image push`, `buildx ... --push`),
+  `push: true` in a build action, or a registry login (`docker login`, a `*login-action` `uses:`).
+  The images are built for the owner's own server only and are never published (docs/SETUP.md).
 A trailing `# <tag>` comment on a `uses:` line is expected (build part section 2); a missing one is a warning.
 The scan is line based so that it needs no YAML library.
 """
@@ -22,6 +25,13 @@ USES = re.compile(r"\buses:\s*(?P<value>[^\s#,}]+)")
 IMAGE = re.compile(r"^\s*(?:-\s+)?image:\s*(?P<value>[^\s#]+)")
 ACTION_DIGEST = re.compile(r"^[\w.-]+/[\w.-]+(?:/[\w./-]+)?@[0-9a-f]{40}$")
 IMAGE_DIGEST = re.compile(r"@sha256:[0-9a-f]{64}$")
+PUBLISH = (
+    (re.compile(r"\b(?:docker|podman)\s+(?:image\s+)?push\b"), "docker push step"),
+    (re.compile(r"\bbuildx\b.*--push\b"), "buildx --push"),
+    (re.compile(r"\bpush:\s*['\"]?(?:true|\$\{\{)", re.I), "push: true in a build action"),
+    (re.compile(r"\b(?:docker|podman|helm|oras|crane)\s+(?:registry\s+)?login\b"), "registry login"),
+    (re.compile(r"\buses:\s*['\"]?[\w.-]+/[\w.-]*login[\w.-]*(?:@|/)", re.I), "registry login action"),
+)
 
 
 def code_part(line: str) -> str | None:
@@ -48,6 +58,18 @@ def check_actions_pinned(workflow: Path) -> list[str]:
             value = m.group("value").strip("'\"")
             if not IMAGE_DIGEST.search(value):
                 out.append(f"{workflow}:{n}: image {value} has no @sha256 digest")
+    return out
+
+
+def check_no_publish(workflow: Path) -> list[str]:
+    """Images are never published: no push step, no `push: true`, no registry login."""
+    out: list[str] = []
+    for n, line in enumerate(workflow.read_text(encoding="utf-8").splitlines(), 1):
+        code = code_part(line) or ""
+        for rx, what in PUBLISH:
+            if rx.search(code):
+                out.append(f"{workflow}:{n}: {what}: images are never published")
+                break
     return out
 
 
@@ -87,6 +109,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     findings: list[str] = []
     for f in files:
         findings += check_actions_pinned(f)
+        findings += check_no_publish(f)
         for w in tag_warnings(f):
             print(w)
     for msg in findings:
