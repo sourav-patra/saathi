@@ -1,0 +1,59 @@
+# Roster schema with synthetic values. The real file lives outside the repository (SAATHI_ROSTER_PATH).
+# Entries name a grade (G1 to G4, or F for the free tier). Model ids, endpoints and key variable names are private.
+# A receipt records the provider's terms; an entry with no receipt receives no personal data (RQ-50).
+# `wants` lists the media classes the entry is meant to take; the receipt must cover all of them.
+# Prices (USD per million tokens) are required on paid grades (G3, G4); without both the tier stays disabled.
+
+[[entry]]
+id = "example-local"
+grade = "G1"
+model = "example-grade-a"
+base_url = "http://localhost:0/v1"
+wants = ["text", "audio"]
+[entry.receipt]
+licence = "example-licence"
+training = "no training; runs on the server"
+retention = "none"
+classes = ["text", "audio"]
+read_on = 2000-01-01
+read_by = "owner"
+
+[[entry]]
+id = "example-hosted"
+grade = "G2"
+model = "example-grade-b"
+base_url = "https://example.invalid/v1"
+key_env = "EXAMPLE_KEY_B"
+wants = ["text", "image"]
+[entry.receipt]
+licence = "example-licence"
+training = "example: no training on API data"
+retention = "example: 30 days"
+classes = ["text", "image"]
+read_on = 2000-01-01
+read_by = "owner"
+
+[[entry]]
+id = "example-paid"
+grade = "G4"
+model = "example-grade-d"
+base_url = "https://example.invalid/v1"
+key_env = "EXAMPLE_KEY_D"
+usd_per_m_input = 1.0
+usd_per_m_output = 5.0
+wants = ["text"]
+[entry.receipt]
+licence = "example-licence"
+training = "example: no training on API data"
+retention = "example: 30 days"
+classes = ["text"]
+read_on = 2000-01-01
+read_by = "owner"
+
+[[entry]]
+id = "example-free"
+grade = "F"
+model = "example-free-model"
+base_url = "https://example.invalid/free/v1"
+key_env = "EXAMPLE_KEY_F"
+# no receipt and no wants: public payloads only

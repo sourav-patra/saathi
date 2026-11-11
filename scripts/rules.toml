@@ -1,0 +1,193 @@
+# Mirrors the rule table of SPEC evidence section 3 (RQ-63). phase = the phase of the implemented requirement in the PRD table.
+
+[[rule]]
+id = "PE-01"
+title = "payment is cash or wallet"
+implements = "safety RQ-25"
+phase = 1
+
+[[rule]]
+id = "PE-02"
+title = "pause denies"
+implements = "safety RQ-32"
+phase = 1
+
+[[rule]]
+id = "PE-03"
+title = "address allowlist"
+implements = "safety RQ-27"
+phase = 1
+
+[[rule]]
+id = "PE-04"
+title = "blocked categories"
+implements = "safety RQ-27"
+phase = 1
+
+[[rule]]
+id = "PE-05"
+title = "cart sanity"
+implements = "safety RQ-29"
+phase = 1
+
+[[rule]]
+id = "PE-06"
+title = "caps"
+implements = "safety RQ-26"
+phase = 1
+
+[[rule]]
+id = "PE-07"
+title = "electronics threshold"
+implements = "safety RQ-27"
+phase = 1
+
+[[rule]]
+id = "PE-08"
+title = "duplicates"
+implements = "safety RQ-28"
+phase = 1
+
+[[rule]]
+id = "PE-09"
+title = "ride fields"
+implements = "safety RQ-29"
+phase = 1
+
+[[rule]]
+id = "PE-10"
+title = "secret length"
+implements = "safety RQ-22"
+phase = 1
+
+[[rule]]
+id = "PE-11"
+title = "signature"
+implements = "safety RQ-22"
+phase = 1
+
+[[rule]]
+id = "PE-12"
+title = "hash binding"
+implements = "safety RQ-22"
+phase = 1
+
+[[rule]]
+id = "PE-13"
+title = "live re-read"
+implements = "safety RQ-80"
+phase = 1
+
+[[rule]]
+id = "PE-14"
+title = "cart quote expiry"
+implements = "safety RQ-29"
+phase = 1
+
+[[rule]]
+id = "PE-15"
+title = "second confirmation"
+implements = "safety RQ-26"
+phase = 1
+
+[[rule]]
+id = "PE-16"
+title = "ride tolerance"
+implements = "safety RQ-29"
+phase = 1
+
+[[rule]]
+id = "PE-17"
+title = "happy path"
+implements = "safety RQ-30"
+phase = 1
+
+[[rule]]
+id = "PE-18"
+title = "token single use"
+implements = "safety RQ-22"
+phase = 1
+
+[[rule]]
+id = "PE-19"
+title = "token expiry"
+implements = "safety RQ-22"
+phase = 1
+
+[[rule]]
+id = "PE-20"
+title = "approver is registered"
+implements = "safety RQ-23"
+phase = 1
+
+[[rule]]
+id = "PE-21"
+title = "pause persists"
+implements = "safety RQ-32"
+phase = 1
+
+[[rule]]
+id = "PE-22"
+title = "unset caps deny"
+implements = "safety RQ-26"
+phase = 1
+
+[[rule]]
+id = "PE-23"
+title = "cap on tolerance ceiling"
+implements = "safety RQ-26, RQ-29"
+phase = 1
+
+[[rule]]
+id = "PE-24"
+title = "single commit path"
+implements = "safety RQ-30"
+phase = 1
+
+[[rule]]
+id = "PE-25"
+title = "unknown category denied"
+implements = "safety RQ-27"
+phase = 1
+
+[[rule]]
+id = "PE-26"
+title = "crash-safe commit, aborted_no_call"
+implements = "safety RQ-80"
+phase = 1
+
+[[rule]]
+id = "PE-27"
+title = "household lock"
+implements = "safety RQ-83"
+phase = 1
+
+[[rule]]
+id = "PE-28"
+title = "token voided on supersede"
+implements = "requests RQ-39"
+phase = 1
+
+[[rule]]
+id = "PE-29"
+title = "second-confirmation code (wrong, expired, replayed)"
+implements = "safety RQ-26, POLICY PL-27"
+phase = 1
+
+[[rule]]
+id = "PE-30"
+title = "false-alarm counter and cadence"
+implements = "safety RQ-18"
+phase = 0
+
+[[rule]]
+id = "PE-31"
+title = "no money movement"
+implements = "POLICY PL-36"
+phase = 0
+
+[[rule]]
+id = "PE-32"
+title = "only every_order commits in v1; an unknown mode denies"
+implements = "product RQ-112"
+phase = 1

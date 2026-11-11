@@ -1,0 +1,332 @@
+# Saathi stack for a single always-on ARM64 (or x86_64) VPS.
+#
+#   caddy ─► edge (FastAPI: webhooks and health) ─► postgres ◄─ worker ─► egress ─► the platform and model hosts
+#   ollama (T1 models) · whisper (T1 ASR)
+#   profile "langfuse" (off by default, Phase 1, D-74): langfuse-web/worker ─► postgres · clickhouse · valkey · seaweedfs
+#
+# Licensing: every image here is MIT/Apache, or permissive for infrastructure
+# (PostgreSQL License, BSD-3). Deliberate swaps from Langfuse's reference
+# compose file:
+#   MinIO (AGPL) → SeaweedFS (Apache-2.0)
+#   Redis 7.4+ (RSAL/SSPL) → Valkey (BSD-3)
+#
+# Exposure: only Caddy (80/443) is public, and only for the webhook paths and the health route.
+# Langfuse's UI is bound to localhost; reach it over Tailscale or an SSH tunnel.
+#
+# Networks: `internal` has no route out. The worker is a model-driven process (RQ-102) and sits on `internal` alone;
+# its only exit is the `egress` proxy, which forwards the listed routes (infra/egress/Caddyfile) and nothing else.
+#
+# Secrets come from ../.env (copy .env.example). Never commit .env.
+
+name: saathi
+
+x-langfuse-env: &langfuse-env
+  NEXTAUTH_URL: ${LANGFUSE_NEXTAUTH_URL:-http://localhost:3000}
+  DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/langfuse
+  SALT: ${LANGFUSE_SALT:-}
+  ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-}
+  TELEMETRY_ENABLED: "false"
+  CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
+  CLICKHOUSE_URL: http://clickhouse:8123
+  CLICKHOUSE_USER: ${CLICKHOUSE_USER:-clickhouse}
+  CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
+  CLICKHOUSE_CLUSTER_ENABLED: "false"
+  LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+  LANGFUSE_S3_EVENT_UPLOAD_REGION: us-east-1
+  LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-}
+  LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-}
+  LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://seaweedfs:8333
+  LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+  LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+  LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+  LANGFUSE_S3_MEDIA_UPLOAD_REGION: us-east-1
+  LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-}
+  LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-}
+  LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://seaweedfs:8333
+  LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+  LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
+  REDIS_HOST: valkey
+  REDIS_PORT: "6379"
+  REDIS_AUTH: ${VALKEY_PASSWORD:-}
+
+x-langfuse-depends: &langfuse-depends
+  postgres: { condition: service_healthy }
+  clickhouse: { condition: service_healthy }
+  valkey: { condition: service_healthy }
+  seaweedfs-init: { condition: service_completed_successfully }
+
+services:
+  # ------------------------------------------------------------ data layer
+  postgres:
+    networks: [internal]                   # no route out and no published port: admin access is `docker compose exec postgres psql`
+    image: pgvector/pgvector:pg17          # PostgreSQL License + pgvector (PostgreSQL License)
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: postgres
+      SAATHI_DB_PASSWORD_MIGRATOR: ${SAATHI_DB_PASSWORD_MIGRATOR:?set SAATHI_DB_PASSWORD_MIGRATOR}
+      SAATHI_DB_PASSWORD_EDGE: ${SAATHI_DB_PASSWORD_EDGE:?set SAATHI_DB_PASSWORD_EDGE}
+      SAATHI_DB_PASSWORD_CORE: ${SAATHI_DB_PASSWORD_CORE:?set SAATHI_DB_PASSWORD_CORE}
+      SAATHI_DB_PASSWORD_MODEL: ${SAATHI_DB_PASSWORD_MODEL:?set SAATHI_DB_PASSWORD_MODEL}
+      SAATHI_DB_PASSWORD_OWNER: ${SAATHI_DB_PASSWORD_OWNER:?set SAATHI_DB_PASSWORD_OWNER}
+      SAATHI_DB_PASSWORD_READONLY: ${SAATHI_DB_PASSWORD_READONLY:?set SAATHI_DB_PASSWORD_READONLY}
+      TZ: UTC
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./sql:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  valkey:
+    profiles: ["langfuse"]
+    networks: [internal]
+    image: valkey/valkey:8-alpine          # BSD-3
+    restart: unless-stopped
+    command: ["valkey-server", "--requirepass", "${VALKEY_PASSWORD:-}", "--maxmemory-policy", "noeviction"]
+    volumes: [valkey_data:/data]
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli -a \"$${VALKEY_PASSWORD:-}\" ping | grep PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    environment:
+      VALKEY_PASSWORD: ${VALKEY_PASSWORD:-}
+
+  clickhouse:
+    profiles: ["langfuse"]
+    networks: [internal]
+    image: clickhouse/clickhouse-server:26.3.62.3   # Apache-2.0 (tag from Langfuse's reference compose)
+    restart: unless-stopped
+    user: "101:101"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-clickhouse}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
+    volumes:
+      - ch_data:/var/lib/clickhouse
+      - ch_logs:/var/log/clickhouse-server
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  seaweedfs:
+    profiles: ["langfuse"]
+    networks: [internal]
+    image: chrislusf/seaweedfs:latest      # Apache-2.0. Pin a digest once deployed.
+    restart: unless-stopped
+    environment:
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-}
+    # s3.json is generated from env at start, so no credentials live in the repo.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        printf '{"identities":[{"name":"langfuse","credentials":[{"accessKey":"%s","secretKey":"%s"}],"actions":["Admin","Read","Write","List","Tagging"]}]}'
+        "$$S3_ACCESS_KEY" "$$S3_SECRET_KEY" > /tmp/s3.json &&
+        exec weed server -dir=/data -ip.bind=0.0.0.0 -master.volumeSizeLimitMB=1024
+        -s3 -s3.port=8333 -s3.config=/tmp/s3.json
+    volumes:
+      - seaweed_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9333/cluster/status > /dev/null || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  seaweedfs-init:                          # creates the 'langfuse' bucket (idempotent)
+    profiles: ["langfuse"]
+    networks: [internal]
+    image: chrislusf/seaweedfs:latest
+    depends_on: { seaweedfs: { condition: service_healthy } }
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["echo 's3.bucket.create -name langfuse' | weed shell -master=seaweedfs:9333 || true"]
+    restart: "no"
+
+  # ------------------------------------------------------------ observability
+  langfuse-worker:
+    profiles: ["langfuse"]
+    networks: [internal]
+    image: docker.langfuse.com/langfuse/langfuse-worker:${LANGFUSE_IMAGE_TAG:-4}
+    restart: unless-stopped
+    depends_on: *langfuse-depends
+    environment: *langfuse-env
+
+  langfuse-web:
+    profiles: ["langfuse"]
+    networks: [internal, public]   # public only so that the localhost port can be published
+    image: docker.langfuse.com/langfuse/langfuse:${LANGFUSE_IMAGE_TAG:-4}
+    restart: unless-stopped
+    depends_on: *langfuse-depends
+    ports: ["127.0.0.1:3000:3000"]         # private: Tailscale / SSH tunnel only
+    environment:
+      <<: *langfuse-env
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-}
+      LANGFUSE_INIT_ORG_ID: saathi
+      LANGFUSE_INIT_ORG_NAME: Saathi
+      LANGFUSE_INIT_PROJECT_ID: saathi
+      LANGFUSE_INIT_PROJECT_NAME: saathi
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${SAATHI_LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${SAATHI_LANGFUSE_SECRET_KEY:-}
+      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_ADMIN_EMAIL:-}
+      LANGFUSE_INIT_USER_NAME: admin
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_ADMIN_PASSWORD:-}
+      AUTH_DISABLE_SIGNUP: "true"
+
+  # ------------------------------------------------------------ T1 models
+  ollama:
+    networks: [internal]                   # local only: nothing here can dial out, and the worker reaches it by name
+    image: ollama/ollama:latest            # MIT. Pin a version once deployed.
+    restart: unless-stopped
+    environment:
+      OLLAMA_NO_CLOUD: "1"                 # this instance is LOCAL ONLY (T1)
+      OLLAMA_KEEP_ALIVE: "30m"
+    volumes: [ollama_data:/root/.ollama]
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  # Run once by hand: `docker compose --profile pull run --rm ollama-pull`. It is the only service that reaches the model
+  # registry, it sits on `public` alone and shares no network with the worker, and it fills the volume the server reads.
+  ollama-pull:
+    profiles: ["pull"]
+    networks: [public]
+    image: ollama/ollama:latest
+    environment: { OLLAMA_NO_CLOUD: "1" }
+    volumes: [ollama_data:/root/.ollama]
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["ollama serve & sleep 3; ollama pull ${SAATHI_T1_MODEL:?set in private .env}"]
+    restart: "no"
+
+  whisper:
+    networks: [internal]
+    build:
+      context: ./whisper
+      args:
+        WHISPER_CPP_REF: ${WHISPER_CPP_REF:-v1.7.6}
+        WHISPER_MODEL: ${WHISPER_MODEL:?set in private .env}
+        WHISPER_MODEL_URL: ${WHISPER_MODEL_URL:?set in private .env}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/ > /dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+
+  # ------------------------------------------------------------ app
+  # The public edge: persists inbound messages, scans for keywords, answers the health route. It connects as the
+  # `saathi_edge` role, holds no key-encryption key, no caregiver token and no model key, and so has no env_file.
+  edge:
+    build: { context: .., dockerfile: infra/Dockerfile }
+    restart: unless-stopped
+    environment:
+      SAATHI_ENV: prod  # pinned, no interpolation: the test fault hooks must never be armed from an .env file (R16-1)
+      SAATHI_DB_URL_EDGE: postgresql://saathi_edge:${SAATHI_DB_PASSWORD_EDGE}@postgres:5432/saathi
+      SAATHI_HEALTH_PATH: ${SAATHI_HEALTH_PATH:-/health}
+      SAATHI_WA_APP_SECRET_FILE: /run/secrets/wa_app_secret
+      SAATHI_WA_VERIFY_TOKEN_FILE: /run/secrets/wa_verify_token
+      SAATHI_WA_WEBHOOK_PATH: ${SAATHI_WA_WEBHOOK_PATH:-}
+      SAATHI_TG_ELDER_SECRET_FILE: /run/secrets/tg_elder_secret
+      SAATHI_TG_ELDER_WEBHOOK_PATH: ${SAATHI_TG_ELDER_WEBHOOK_PATH:-}
+      SAATHI_SENDER_HMAC_KEY_FILE: /run/secrets/sender_hmac_key
+      SAATHI_EDGE_PORT: ${SAATHI_EDGE_PORT:-8000}
+    secrets: [sender_hmac_key, wa_app_secret, wa_verify_token, tg_elder_secret]
+    networks: [internal, public]
+    depends_on:
+      postgres: { condition: service_healthy }
+    ports: ["127.0.0.1:${SAATHI_EDGE_PORT:-8000}:${SAATHI_EDGE_PORT:-8000}"]
+
+  # The worker: leases inbox rows, runs the steps, sends the replies and the caregiver cards, and beats the core
+  # heartbeat. It connects as the `saathi_core` role and is the only service that lists the key-encryption key
+  # and the approval secret. Every token is a secret file, so no *_KEY, *_TOKEN, *_SECRET or *_PASSWORD variable is set
+  # (PL-13). Its only route out is the egress proxy.
+  worker:
+    build: { context: .., dockerfile: infra/Dockerfile.worker }
+    restart: unless-stopped
+    environment:
+      SAATHI_ENV: prod  # pinned, no interpolation: the test fault hooks must never be armed from an .env file (R16-1)
+      SAATHI_DB_URL_CORE: postgresql://saathi_core:${SAATHI_DB_PASSWORD_CORE:?set SAATHI_DB_PASSWORD_CORE}@postgres:5432/saathi
+      SAATHI_KEK_FILE: /run/secrets/kek
+      SAATHI_APPROVAL_SECRET_FILE: /run/secrets/approval_secret
+      SAATHI_WA_ACCESS_TOKEN_FILE: /run/secrets/wa_access_token
+      SAATHI_TG_CAREGIVER_TOKEN_FILE: /run/secrets/tg_caregiver_token
+      SAATHI_TG_ELDER_TOKEN_FILE: /run/secrets/tg_elder_token
+      SAATHI_WA_PHONE_NUMBER_ID: ${SAATHI_WA_PHONE_NUMBER_ID:-}
+      SAATHI_WA_GRAPH_VERSION: ${SAATHI_WA_GRAPH_VERSION:-v23.0}
+      SAATHI_TG_OPS_CHAT_ID: ${SAATHI_TG_OPS_CHAT_ID:-0}
+      SAATHI_EGRESS_URL: http://egress:${SAATHI_EGRESS_PORT:-8081}
+      SAATHI_WHISPERCPP_URL: ${SAATHI_WHISPERCPP_URL:-http://whisper:8080}
+      SAATHI_TTS_URL: ${SAATHI_TTS_URL:-}
+      SAATHI_T1_BASE_URL: ${SAATHI_T1_BASE_URL:-http://ollama:11434/v1}
+      SAATHI_MEDIA_DIR: /var/lib/saathi/media
+    secrets: [kek, approval_secret, wa_access_token, tg_caregiver_token, tg_elder_token]
+    volumes:
+      - saathi_data:/var/lib/saathi
+    networks: [internal]
+    depends_on:
+      postgres: { condition: service_healthy }
+      egress: { condition: service_started }
+
+  # The egress proxy (RQ-102, PL-04): no TLS interception, no certificate authority. One listener, one route per
+  # provider, and nothing else. The credential headers of the hosted model tiers come from a read-only environment
+  # file that only this service reads.
+  egress:
+    image: caddy:2-alpine                  # Apache-2.0
+    restart: unless-stopped
+    environment:
+      SAATHI_EGRESS_PORT: ${SAATHI_EGRESS_PORT:-8081}
+    env_file:
+      - path: ${SAATHI_EGRESS_ENV_FILE:-/etc/saathi/egress.env}
+        required: false
+    volumes:
+      - ./egress/Caddyfile:/etc/caddy/Caddyfile:ro
+    networks: [internal, public]
+
+  caddy:
+    networks: [public]
+    image: caddy:2-alpine                  # Apache-2.0; automatic HTTPS
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      SAATHI_DOMAIN: ${SAATHI_DOMAIN:?set SAATHI_DOMAIN (public DNS name pointing at this VPS)}
+      SAATHI_HEALTH_PATH: ${SAATHI_HEALTH_PATH:-/health}
+      SAATHI_EDGE_PORT: ${SAATHI_EDGE_PORT:-8000}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on: [edge]
+
+# Secret files live on the host in one directory (mode 600 each) and are mounted read-only at /run/secrets. Each service
+# lists only the files it needs. The key-encryption key and the approval secret go to the worker alone; the edge lists
+# the sender hash key and its own webhook secrets, nothing else.
+networks:
+  internal: { internal: true }
+  public: {}
+
+secrets:
+  wa_access_token: { file: "${SAATHI_SECRETS_DIR:-/etc/saathi/secrets}/wa_access_token" }
+  tg_caregiver_token: { file: "${SAATHI_SECRETS_DIR:-/etc/saathi/secrets}/tg_caregiver_token" }
+  tg_elder_token: { file: "${SAATHI_SECRETS_DIR:-/etc/saathi/secrets}/tg_elder_token" }
+  wa_app_secret: { file: "${SAATHI_SECRETS_DIR:-/etc/saathi/secrets}/wa_app_secret" }
+  wa_verify_token: { file: "${SAATHI_SECRETS_DIR:-/etc/saathi/secrets}/wa_verify_token" }
+  tg_elder_secret: { file: "${SAATHI_SECRETS_DIR:-/etc/saathi/secrets}/tg_elder_secret" }
+  sender_hmac_key: { file: "${SAATHI_SECRETS_DIR:-/etc/saathi/secrets}/sender_hmac_key" }
+  approval_secret: { file: "${SAATHI_SECRETS_DIR:-/etc/saathi/secrets}/approval_secret" }
+  kek: { file: "${SAATHI_SECRETS_DIR:-/etc/saathi/secrets}/kek" }
+
+volumes:
+  pg_data:
+  valkey_data:
+  ch_data:
+  ch_logs:
+  seaweed_data:
+  ollama_data:
+  caddy_data:
+  saathi_data:

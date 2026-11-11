@@ -1,0 +1,127 @@
+name: ci
+# Every `uses:` ends in a 40 hex commit digest with the tag as a comment (RQ-72a, build part section 2); scripts/ci_lint.py
+# re-checks that in the lint job. To refresh a pin: git ls-remote https://github.com/<owner>/<repo> refs/tags/<tag> 'refs/tags/<tag>^{}'
+# and use the dereferenced (^{}) commit when the tag is annotated.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+      - run: uv python install 3.12
+      - run: uv sync --frozen
+      - run: uv run ruff check src tests scripts evals
+      - run: uv run python scripts/ci_lint.py .github/workflows
+
+  test:
+    runs-on: ubuntu-latest
+    env:
+      CI: "true"
+      # Superuser DSN of the throwaway service container below; tests/conftest.py creates every role itself.
+      SAATHI_TEST_DSN: postgresql://postgres:ci-throwaway@localhost:5432/postgres
+    services:
+      postgres:
+        # postgres:16 index digest, resolved with `docker buildx imagetools inspect postgres:16` (RQ-72a).
+        image: postgres:16@sha256:f9a7b9ebf6f56201f949db745e47bc423c0f0f8294bafe991cc10bf74b029657
+        env:
+          POSTGRES_PASSWORD: ci-throwaway
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+      - run: uv python install 3.12
+      - run: uv sync --frozen
+      - run: sudo apt-get update -q && sudo apt-get install -y --no-install-recommends strace
+      - run: uv run pytest -q
+
+  license-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+      - run: uv python install 3.12
+      - run: uv sync --frozen --all-extras  # the optional pii extra too: its regex dependency is excepted by name
+      - name: License audit (MIT/Apache + permissive only)
+        run: uv run python scripts/license_audit.py --packages --dockerfiles --manifest tests/fixtures/image_manifest.txt
+
+  design-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: python3 scripts/design_check.py
+
+  doc-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+      - run: uv python install 3.12
+      - run: uv sync --frozen
+      - run: uv run python scripts/doc_lint.py 00-INDEX.md README.md docs
+
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Validate docker compose with placeholder env
+        run: |
+          sed -E 's/^([A-Z0-9_]+)=( *#.*)?$/\1=placeholder/' .env.example > .env
+          docker compose --env-file .env -f infra/docker-compose.yml config --quiet
+
+  evals:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+      - run: uv python install 3.12
+      - run: uv sync --frozen
+      - run: uv run python -m evals.run --all
+
+  # PL-08, PL-15, PL-31. No names file exists in CI, so the private-name check reports unavailable; the step still
+  # scans keys, media and attribution. The second step checks the commits of this push or pull request only.
+  leak-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+      - run: uv python install 3.12
+      - run: uv sync --frozen
+      - run: uv run python scripts/leak_scan.py
+      - name: Commit-range scan (attribution, keys, media in the new commits)
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+            range="$HEAD_SHA"
+          else
+            range="$BASE..$HEAD_SHA"
+          fi
+          uv run python scripts/leak_scan.py --history --range "$range"
+
+  # Report mode never fails the build; gate.py writes the step summary itself. It becomes required at the Phase 0 exit.
+  gate-report:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+      - run: uv python install 3.12
+      - run: uv sync --frozen
+      - run: uv run python scripts/gate.py --phase 0 --report

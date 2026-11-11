@@ -1,0 +1,137 @@
+{"id": "eme-001", "label": "emergency", "lang": "hi", "text": "मुझे सीने में बहुत दर्द हो रहा है"}
+{"id": "eme-002", "label": "emergency", "lang": "hi", "text": "बाथरूम में गिर गई हूँ उठा नहीं जा रहा"}
+{"id": "eme-003", "label": "emergency", "lang": "hi", "text": "दादी बेहोश हो गई हैं जल्दी आओ"}
+{"id": "eme-004", "label": "emergency", "lang": "hi", "text": "सांस लेने में तकलीफ हो रही है"}
+{"id": "eme-005", "label": "emergency", "lang": "hi", "text": "पापा को चक्कर आ रहे हैं और खून निकल रहा है"}
+{"id": "eme-006", "label": "emergency", "lang": "hi", "text": "एम्बुलेंस बुला दो"}
+{"id": "eme-007", "label": "emergency", "lang": "hi", "text": "मुझे बहुत घबराहट हो रही है"}
+{"id": "eme-008", "label": "emergency", "lang": "hi", "text": "हाथ पैर सुन्न हो गए हैं और बोलने में दिक्कत"}
+{"id": "eme-009", "label": "emergency", "lang": "hi", "text": "छाती में दर्द है दवा काम नहीं कर रही"}
+{"id": "eme-010", "label": "emergency", "lang": "hi", "text": "बचाओ कोई है"}
+{"id": "eme-011", "label": "emergency", "lang": "hinglish", "text": "seene mein dard ho raha hai"}
+{"id": "eme-012", "label": "emergency", "lang": "hinglish", "text": "main gir gaya hu bathroom mein"}
+{"id": "eme-013", "label": "emergency", "lang": "hinglish", "text": "saans nahi aa rahi ek dum"}
+{"id": "eme-014", "label": "emergency", "lang": "hinglish", "text": "mummy behosh ho gayi hain"}
+{"id": "eme-015", "label": "emergency", "lang": "hinglish", "text": "chakkar aa raha hai aur sab ghoom raha hai"}
+{"id": "eme-016", "label": "emergency", "lang": "hinglish", "text": "khoon nikal raha hai ruk nahi raha"}
+{"id": "eme-017", "label": "emergency", "lang": "hinglish", "text": "ambulance bulao jaldi"}
+{"id": "eme-018", "label": "emergency", "lang": "hinglish", "text": "dil mein dard hai bahut tez"}
+{"id": "eme-019", "label": "emergency", "lang": "hinglish", "text": "sugar low ho gaya hai kaampna ho raha hai"}
+{"id": "eme-020", "label": "emergency", "lang": "hinglish", "text": "chhati me dard hai kya karun"}
+{"id": "eme-021", "label": "emergency", "lang": "hinglish", "text": "bachao koi to aao"}
+{"id": "eme-022", "label": "emergency", "lang": "hinglish", "text": "bp bahut high lag raha hai sir bhaari hai"}
+{"id": "eme-023", "label": "emergency", "lang": "hinglish", "text": "gir gayi hu uth nahi pa rahi"}
+{"id": "eme-024", "label": "emergency", "lang": "hinglish", "text": "haath sunn ho gaya hai"}
+{"id": "eme-025", "label": "emergency", "lang": "en", "text": "I have chest pain and my left arm feels numb"}
+{"id": "eme-026", "label": "emergency", "lang": "en", "text": "I fell in the kitchen and cannot get up"}
+{"id": "eme-027", "label": "emergency", "lang": "en", "text": "He is unconscious please send someone"}
+{"id": "eme-028", "label": "emergency", "lang": "en", "text": "I cannot breathe properly"}
+{"id": "eme-029", "label": "emergency", "lang": "en", "text": "There is a lot of bleeding from the cut"}
+{"id": "eme-030", "label": "emergency", "lang": "en", "text": "I think it is a heart attack"}
+{"id": "eme-031", "label": "emergency", "lang": "en", "text": "Please call an ambulance"}
+{"id": "eme-032", "label": "emergency", "lang": "en", "text": "She collapsed in the garden"}
+{"id": "eme-033", "label": "emergency", "lang": "en", "text": "My face is drooping and I think it is a stroke"}
+{"id": "eme-034", "label": "emergency", "lang": "en", "text": "I feel dizzy and might faint"}
+{"id": "eme-035", "label": "emergency", "lang": "en", "text": "Help me I am stuck"}
+{"id": "eme-036", "label": "emergency", "lang": "en", "text": "not breathing properly since morning"}
+{"id": "sca-001", "label": "scam", "lang": "hi", "text": "आपका खाता बंद हो जाएगा अभी केवाईसी अपडेट करें"}
+{"id": "sca-002", "label": "scam", "lang": "hi", "text": "बैंक से कॉल आया था ओटीपी बताओ बोला"}
+{"id": "sca-003", "label": "scam", "lang": "hi", "text": "आपने लॉटरी जीती है इनाम पाने के लिए लिंक पर क्लिक करें"}
+{"id": "sca-004", "label": "scam", "lang": "hi", "text": "डिजिटल अरेस्ट हो गया है सीबीआई से फोन आया"}
+{"id": "sca-005", "label": "scam", "lang": "hi", "text": "बिजली कट जाएगी आज रात बिल भरो"}
+{"id": "sca-006", "label": "scam", "lang": "hi", "text": "यूपीआई पिन बताओ रिफंड मिलेगा"}
+{"id": "sca-007", "label": "scam", "lang": "hi", "text": "आपका सिम बंद हो जाएगा"}
+{"id": "sca-008", "label": "scam", "lang": "hi", "text": "पुलिस केस दर्ज होगा पैसे भेजो"}
+{"id": "sca-009", "label": "scam", "lang": "hi", "text": "कैशबैक के लिए पिन डालो"}
+{"id": "sca-010", "label": "scam", "lang": "hi", "text": "गिरफ्तार होने से बचना है तो पैसे दो"}
+{"id": "sca-011", "label": "scam", "lang": "hinglish", "text": "kisi ne OTP maanga bank se bol raha tha"}
+{"id": "sca-012", "label": "scam", "lang": "hinglish", "text": "aapka KYC expire ho gaya hai abhi update karo"}
+{"id": "sca-013", "label": "scam", "lang": "hinglish", "text": "lottery lagi hai 25 lakh ki"}
+{"id": "sca-014", "label": "scam", "lang": "hinglish", "text": "account band ho jayega pan link karo"}
+{"id": "sca-015", "label": "scam", "lang": "hinglish", "text": "UPI pin batao refund aayega"}
+{"id": "sca-016", "label": "scam", "lang": "hinglish", "text": "bijli kat jayegi aaj raat"}
+{"id": "sca-017", "label": "scam", "lang": "hinglish", "text": "digital arrest bol rahe hain video call pe raho"}
+{"id": "sca-018", "label": "scam", "lang": "hinglish", "text": "anydesk download karo main help karunga"}
+{"id": "sca-019", "label": "scam", "lang": "hinglish", "text": "QR scan karo paise milenge"}
+{"id": "sca-020", "label": "scam", "lang": "hinglish", "text": "customs mein parcel held hai fee bharo"}
+{"id": "sca-021", "label": "scam", "lang": "hinglish", "text": "paisa double karo investment mein"}
+{"id": "sca-022", "label": "scam", "lang": "hinglish", "text": "kbc se call aaya inaam jeeta hai"}
+{"id": "sca-023", "label": "scam", "lang": "hinglish", "text": "collect request accept karo"}
+{"id": "sca-024", "label": "scam", "lang": "hinglish", "text": "bank manager bol raha hun cvv batao"}
+{"id": "sca-025", "label": "scam", "lang": "en", "text": "Your account blocked, share your OTP to restore it"}
+{"id": "sca-026", "label": "scam", "lang": "en", "text": "You have won a prize, click this link to claim"}
+{"id": "sca-027", "label": "scam", "lang": "en", "text": "Update your KYC today or the account will be suspended"}
+{"id": "sca-028", "label": "scam", "lang": "en", "text": "Arrest warrant issued, contact the officer now"}
+{"id": "sca-029", "label": "scam", "lang": "en", "text": "Install a screen share app so we can fix your refund"}
+{"id": "sca-030", "label": "scam", "lang": "en", "text": "Your electricity will be disconnected tonight"}
+{"id": "sca-031", "label": "scam", "lang": "en", "text": "Verify your account with the verification code we sent"}
+{"id": "sca-032", "label": "scam", "lang": "en", "text": "Free recharge, click the link now"}
+{"id": "sca-033", "label": "scam", "lang": "en", "text": "Send your ATM PIN to claim cashback"}
+{"id": "sca-034", "label": "scam", "lang": "en", "text": "Lucky draw winner, reply with your card details"}
+{"id": "sca-035", "label": "scam", "lang": "en", "text": "Parcel held at customs, pay the fee"}
+{"id": "sca-036", "label": "scam", "lang": "en", "text": "Your Aadhaar link is pending, update at www.example.test urgent"}
+{"id": "nor-001", "label": "normal", "lang": "hi", "text": "आज मौसम बहुत अच्छा है"}
+{"id": "nor-002", "label": "normal", "lang": "hi", "text": "कल सुबह मंदिर जाना है"}
+{"id": "nor-003", "label": "normal", "lang": "hi", "text": "खाना खा लिया दाल चावल बनाए थे"}
+{"id": "nor-004", "label": "normal", "lang": "hi", "text": "नातिन का फोन आया था बहुत मज़ा आया"}
+{"id": "nor-005", "label": "normal", "lang": "hi", "text": "दवा समय पर ले ली"}
+{"id": "nor-006", "label": "normal", "lang": "hi", "text": "शाम को पार्क में टहलने गया था"}
+{"id": "nor-007", "label": "normal", "lang": "hi", "text": "चाय बन गई है आ जाओ"}
+{"id": "nor-008", "label": "normal", "lang": "hi", "text": "टीवी पर पुराना गाना आ रहा है"}
+{"id": "nor-009", "label": "normal", "lang": "hi", "text": "बाज़ार से सब्ज़ी ले आना"}
+{"id": "nor-010", "label": "normal", "lang": "hi", "text": "आज रविवार है छुट्टी है"}
+{"id": "nor-011", "label": "normal", "lang": "hi", "text": "पानी की बोतल भर दी है"}
+{"id": "nor-012", "label": "normal", "lang": "hi", "text": "रेडियो पर भजन सुन रहा हूँ"}
+{"id": "nor-013", "label": "normal", "lang": "hi", "text": "बिजली का बिल जमा हो चुका है"}
+{"id": "nor-014", "label": "normal", "lang": "hi", "text": "पड़ोसी के घर पूजा है"}
+{"id": "nor-015", "label": "normal", "lang": "hi", "text": "सब ठीक है चिंता मत करना"}
+{"id": "nor-016", "label": "normal", "lang": "hinglish", "text": "aaj subah sair par gaya tha"}
+{"id": "nor-017", "label": "normal", "lang": "hinglish", "text": "kal ka cricket match dekha kya"}
+{"id": "nor-018", "label": "normal", "lang": "hinglish", "text": "khana bahut tasty tha"}
+{"id": "nor-019", "label": "normal", "lang": "hinglish", "text": "dawai le li aur thoda aaram kiya"}
+{"id": "nor-020", "label": "normal", "lang": "hinglish", "text": "beta ka phone aaya tha sab theek hai"}
+{"id": "nor-021", "label": "normal", "lang": "hinglish", "text": "mandir jaana hai shaam ko"}
+{"id": "nor-022", "label": "normal", "lang": "hinglish", "text": "sabzi mandi se aloo lana"}
+{"id": "nor-023", "label": "normal", "lang": "hinglish", "text": "aaj raat kya banana hai"}
+{"id": "nor-024", "label": "normal", "lang": "hinglish", "text": "TV pe purana gaana chal raha hai"}
+{"id": "nor-025", "label": "normal", "lang": "hinglish", "text": "paudhon ko paani de diya"}
+{"id": "nor-026", "label": "normal", "lang": "hinglish", "text": "kal doctor ke paas appointment hai routine check"}
+{"id": "nor-027", "label": "normal", "lang": "hinglish", "text": "chashma mil gaya table par tha"}
+{"id": "nor-028", "label": "normal", "lang": "hinglish", "text": "dost ka message aaya tha chai pe bulaya hai"}
+{"id": "nor-029", "label": "normal", "lang": "hinglish", "text": "aaj bahut garmi hai pankha tez karo"}
+{"id": "nor-030", "label": "normal", "lang": "hinglish", "text": "naya kurta pasand aaya"}
+{"id": "nor-031", "label": "normal", "lang": "hinglish", "text": "pension ka message aaya hai bank app se"}
+{"id": "nor-032", "label": "normal", "lang": "hinglish", "text": "phone ki battery khatam ho rahi hai charger lagao"}
+{"id": "nor-033", "label": "normal", "lang": "hinglish", "text": "sham ko bhajan sunenge"}
+{"id": "nor-034", "label": "normal", "lang": "hinglish", "text": "grandson ne photo bheji badi pyari hai"}
+{"id": "nor-035", "label": "normal", "lang": "hinglish", "text": "kal pooja ka samaan lana hai"}
+{"id": "nor-036", "label": "normal", "lang": "en", "text": "The weather is lovely today"}
+{"id": "nor-037", "label": "normal", "lang": "en", "text": "I went for a walk in the park"}
+{"id": "nor-038", "label": "normal", "lang": "en", "text": "Lunch was dal and rice"}
+{"id": "nor-039", "label": "normal", "lang": "en", "text": "My granddaughter called, we talked for an hour"}
+{"id": "nor-040", "label": "normal", "lang": "en", "text": "I took my tablets on time"}
+{"id": "nor-041", "label": "normal", "lang": "en", "text": "Please buy some vegetables on your way back"}
+{"id": "nor-042", "label": "normal", "lang": "en", "text": "The cricket match starts at seven"}
+{"id": "nor-043", "label": "normal", "lang": "en", "text": "I am listening to old songs on the radio"}
+{"id": "nor-044", "label": "normal", "lang": "en", "text": "Tea is ready"}
+{"id": "nor-045", "label": "normal", "lang": "en", "text": "I will visit the temple tomorrow"}
+{"id": "nor-046", "label": "normal", "lang": "en", "text": "The newspaper has not come yet"}
+{"id": "nor-047", "label": "normal", "lang": "en", "text": "Remind me to water the plants"}
+{"id": "nor-048", "label": "normal", "lang": "en", "text": "Good morning, how did you sleep"}
+{"id": "nor-049", "label": "normal", "lang": "en", "text": "The plumber is coming at noon"}
+{"id": "nor-050", "label": "normal", "lang": "en", "text": "I found my glasses"}
+{"id": "nor-051", "label": "normal", "lang": "en", "text": "Can you read the message from the pharmacy about my regular medicine"}
+{"id": "nor-052", "label": "normal", "lang": "en", "text": "What is the time of the evening prayer"}
+{"id": "nor-053", "label": "normal", "lang": "en", "text": "I feel happy today"}
+{"id": "nor-054", "label": "normal", "lang": "en", "text": "The TV remote needs new batteries"}
+{"id": "nor-055", "label": "normal", "lang": "en", "text": "Send my love to everyone"}
+{"id": "nor-056", "label": "normal", "lang": "hi", "text": "आज पोते का जन्मदिन है केक मंगाना है"}
+{"id": "nor-057", "label": "normal", "lang": "hi", "text": "चश्मा कहाँ रख दिया पता नहीं"}
+{"id": "nor-058", "label": "normal", "lang": "hinglish", "text": "aaj ka paper padh liya sab theek hai"}
+{"id": "nor-059", "label": "normal", "lang": "hinglish", "text": "bhaiya ko bol do doodh de jayein"}
+{"id": "nor-060", "label": "normal", "lang": "en", "text": "We watched a film with a car accident scene last night"}
+{"id": "nor-061", "label": "normal", "lang": "hinglish", "text": "TV pe ambulance wali movie aa rahi hai"}
+{"id": "nor-062", "label": "normal", "lang": "en", "text": "The shop has a prize for the best rangoli"}
+{"id": "nor-063", "label": "normal", "lang": "hinglish", "text": "bank gaya tha passbook update karwayi"}
+{"id": "nor-064", "label": "normal", "lang": "en", "text": "He is dizzy from the merry go round at the fair"}
+{"id": "nor-065", "label": "normal", "lang": "hinglish", "text": "abhi chai peeni hai link wali kitab laayi kya"}

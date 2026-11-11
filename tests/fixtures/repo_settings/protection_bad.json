@@ -1,0 +1,25 @@
+{
+  "required_status_checks": {
+    "strict": false,
+    "contexts": [
+      "test",
+      "compose"
+    ],
+    "checks": []
+  },
+  "enforce_admins": {
+    "enabled": false
+  },
+  "required_pull_request_reviews": {
+    "required_approving_review_count": 1,
+    "require_last_push_approval": false,
+    "dismiss_stale_reviews": true
+  },
+  "restrictions": null,
+  "allow_force_pushes": {
+    "enabled": true
+  },
+  "allow_deletions": {
+    "enabled": false
+  }
+}

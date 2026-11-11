@@ -1,0 +1,14 @@
+# Reviewed leak scan exceptions for immutable history only (history scans; never the tree or other commits).
+# Each entry: full commit sha, rule id, reason, and sha256 of the exact added line (never the raw value).
+
+[[exception]]
+commit = "3d46456d39bb471cfecc8a77f76793fc802a6ce8"
+rule = "url_password"
+line_sha256 = "160a9e59b9becdec23ce55c3d233a2dea88e0e5beb39a9f198ed6ce3ba59792d"
+reason = "local dev database default in an old config.py; no real credential; already in main history"
+
+[[exception]]
+commit = "00e4fd1edf135945422382ee2d8fa0aa1ea7598a"
+rule = "url_password"
+line_sha256 = "160a9e59b9becdec23ce55c3d233a2dea88e0e5beb39a9f198ed6ce3ba59792d"
+reason = "merge that re-adds the same local dev default from 3d46456; already in main history"

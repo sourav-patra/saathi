@@ -1,0 +1,1070 @@
+# Phase gate registry (RQ-100). One row per id; an id with no receipt or a command whose program or file does not exist yet is reported unavailable.
+# Source: LLD tests part section 4. Rows for Phases 1 to 5 are manual rows (unavailable until an owner receipt exists); only rows at or below --phase N are run or printed.
+
+[[row]]
+id = "RQ-16"
+phase = 0
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-17"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_guards.py", "tests/test_replies.py", "tests/test_voice_store.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-116"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_guards.py", "tests/test_replies.py", "tests/test_voice_store.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-18"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_alert_plan.py", "tests/test_alerts.py", "tests/test_signoff.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-36"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_empty_run.py", "tests/test_states.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-40"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_gateway.py", "tests/test_ledger.py", "tests/test_roster.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-45"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_gateway.py", "tests/test_ledger.py", "tests/test_roster.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-46"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_gateway.py", "tests/test_ledger.py", "tests/test_roster.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-47"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_gateway.py", "tests/test_ledger.py", "tests/test_roster.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-48"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_gateway.py", "tests/test_ledger.py", "tests/test_roster.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-49"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_gateway.py", "tests/test_ledger.py", "tests/test_roster.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-50"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_gateway.py", "tests/test_ledger.py", "tests/test_roster.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-96"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_gateway.py", "tests/test_ledger.py", "tests/test_roster.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-02"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_gateway.py", "tests/test_ledger.py", "tests/test_roster.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-41"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_redaction.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-03"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_redaction.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-43"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_hosts.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-04"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_hosts.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-44"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_trace_canary.py", "tests/test_cards.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-57"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_trace_canary.py", "tests/test_cards.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-97"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_trace_canary.py", "tests/test_cards.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-07"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_trace_canary.py", "tests/test_cards.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-56a"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_audit.py", "tests/test_roles.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-58"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_evals.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-59"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_evals.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-60"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_evals.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-61"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_evals.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-99"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_evals.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-62"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_fault_receipts.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-63"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "python", "scripts/rule_index.py", "--phase", "0"]
+receipt = "RECEIPT-v1"
+
+# Fixture-only for the image half: tests/fixtures/image_manifest.txt is synthetic; image coverage is pending an owner decision (design-issue 3). Not verified on image grounds.
+[[row]]
+id = "RQ-71"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "python", "scripts/license_audit.py", "--packages", "--dockerfiles", "--manifest", "tests/fixtures/image_manifest.txt"]
+receipt = "RECEIPT-v1"
+
+# Fixture-only for the image half: tests/fixtures/image_manifest.txt is synthetic; image coverage is pending an owner decision (design-issue 3). Not verified on image grounds.
+[[row]]
+id = "PL-09"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "python", "scripts/license_audit.py", "--packages", "--dockerfiles", "--manifest", "tests/fixtures/image_manifest.txt"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-10"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "python", "scripts/license_audit.py", "--packages", "--dockerfiles", "--manifest", "tests/fixtures/image_manifest.txt"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-11"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "python", "scripts/license_audit.py", "--packages", "--dockerfiles", "--manifest", "tests/fixtures/image_manifest.txt"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-72a"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "python", "scripts/ci_lint.py", ".github/workflows"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-79"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_inbox_crash.py", "tests/test_lease.py", "tests/test_edge.py", "tests/test_channels_contract.py", "tests/test_whatsapp.py", "tests/test_elder_bot_authority.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-81"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_inbox_crash.py", "tests/test_lease.py", "tests/test_edge.py", "tests/test_channels_contract.py", "tests/test_whatsapp.py", "tests/test_elder_bot_authority.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-105"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_inbox_crash.py", "tests/test_lease.py", "tests/test_edge.py", "tests/test_channels_contract.py", "tests/test_whatsapp.py", "tests/test_elder_bot_authority.py", "-q"]
+receipt = "RECEIPT-v1"
+
+# Gate note (WU-17 ruling 3): RQ-95a is verified by the sign-off tests and `AlertService.signoff_check`, which checks one
+# household. The daily trigger that calls it for every household is pending (no scan function lists households yet).
+[[row]]
+id = "RQ-95a"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_signoff.py", "tests/test_admin.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-100"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_gate.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-101"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "python", "scripts/doc_lint.py", "00-INDEX.md", "README.md", "docs"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-19"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "python", "scripts/doc_lint.py", "00-INDEX.md", "README.md", "docs"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-103"
+phase = 0
+kind = "auto"
+command = ["python3", "scripts/design_check.py"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-24"
+phase = 0
+kind = "auto"
+command = ["python3", "scripts/design_check.py"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-104"
+phase = 0
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-109"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_schema.py", "tests/test_cross_tenant.py", "tests/test_keys.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-111a"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_schema.py", "tests/test_cross_tenant.py", "tests/test_keys.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-110"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_config.py", "tests/test_env_secrets.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-13"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_config.py", "tests/test_env_secrets.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-14"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_config.py", "tests/test_env_secrets.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-117"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_pilot_counts.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-118"
+phase = 0
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-119"
+phase = 0
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "PL-01"
+phase = 0
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "PL-05"
+phase = 0
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "PL-33"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_consent.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-34"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_consent.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-08"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "python", "scripts/leak_scan.py", "--history"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-12"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "python", "scripts/leak_scan.py", "--names-file", "$SAATHI_NAMES_FILE", "--require-names"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-15"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "python", "scripts/leak_scan.py", "--history"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-16"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "python", "scripts/repo_settings.py", "--check", "PL-16"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-17"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "python", "scripts/repo_settings.py", "--check", "PL-17"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-18"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "python", "scripts/repo_settings.py", "--check", "PL-18"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-21"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "python", "scripts/repo_settings.py", "--check", "PL-21"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-22"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "python", "scripts/repo_settings.py", "--check", "PL-22"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-31"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_commit_msg.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "PL-32"
+phase = 0
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "PL-36"
+phase = 0
+kind = "auto"
+command = ["uv", "run", "pytest", "tests/test_no_money.py", "-q"]
+receipt = "RECEIPT-v1"
+
+[[row]]
+id = "RQ-01"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-02"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-03"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-06"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-07"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-14"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-19"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-20"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-21"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-22"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-23"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-24"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-25"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-26"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-27"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-28"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-29"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-30"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-31"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-32"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-33"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-35"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-37"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-38"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-39"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-42"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-51"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-54"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-55"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-56b"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-64"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-65"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-66"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-68"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-70"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-72b"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-74"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-77"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-78"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-80"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-82"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-83"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-91"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-92"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-93"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-94"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-95b"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-98"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-102"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-106"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-107"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-108"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-111b"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-112"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-113"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-115"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "PL-06"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "PL-20"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "PL-23"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "PL-25"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "PL-26"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "PL-27"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "PL-28"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "PL-29"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "PL-30"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "PL-35"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "PL-37"
+phase = 1
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-04"
+phase = 2
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-05"
+phase = 2
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-34"
+phase = 2
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-53"
+phase = 2
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-87"
+phase = 2
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-88"
+phase = 2
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-89"
+phase = 2
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-90"
+phase = 2
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-09"
+phase = 3
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-10"
+phase = 3
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-11"
+phase = 3
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-12"
+phase = 3
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-15"
+phase = 3
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-08"
+phase = 4
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-13"
+phase = 4
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-73"
+phase = 5
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90
+
+[[row]]
+id = "RQ-114"
+phase = 5
+kind = "manual"
+receipt = "RECEIPT-v1"
+valid_days = 90

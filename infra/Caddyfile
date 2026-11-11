@@ -1,0 +1,23 @@
+# Public surface = the webhook paths and the health route. Everything else returns 404.
+{
+	servers {
+		timeouts {
+			read_header 5s
+			read_body 10s
+		}
+	}
+}
+
+{$SAATHI_DOMAIN} {
+	encode gzip
+	@public path /wa/* /tg/elder/* {$SAATHI_HEALTH_PATH:/health}
+	handle @public {
+		request_body {
+			max_size 1MB
+		}
+		reverse_proxy edge:{$SAATHI_EDGE_PORT:8000}
+	}
+	handle {
+		respond 404
+	}
+}
