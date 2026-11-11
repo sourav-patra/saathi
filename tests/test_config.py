@@ -112,8 +112,6 @@ def test_no_household_value_read_from_environment(monkeypatch: pytest.MonkeyPatc
     assert not any(hasattr(s, n) for n in HOUSEHOLD_VALUES)
     src = Path(__file__).resolve().parent.parent / "src" / "saathi"
     for p in src.rglob("*.py"):
-        if p.name == "legacy.py":  # the old message types, removed with the last unit that imports them
-            continue
         text = p.read_text()
         assert "settings.elder_phones" not in text and "get_settings().caps" not in text, p.name
 

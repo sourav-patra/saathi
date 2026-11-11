@@ -673,10 +673,8 @@ def test_errors_of_is_keyed_by_protocol_class() -> None:
     assert {e for group in ERRORS_OF.values() for e in group} <= listed
 
 
-# modules that import saathi.legacy today. The set may only shrink: see the removal plan in legacy.py.
-LEGACY_IMPORTERS = {
-    "src/saathi/channels/telegram.py",  # WU-18
-}
+# modules that import saathi.legacy: none since WU-18 deleted it; a new importer fails the test below.
+LEGACY_IMPORTERS: set[str] = set()
 
 
 LEGACY_IMPORT = re.compile(
@@ -696,9 +694,7 @@ def _legacy_importers() -> set[str]:
     return found
 
 
-def test_legacy_importers_only_shrink() -> None:
-    now = _legacy_importers()
-    assert now <= LEGACY_IMPORTERS, f"new importer of saathi.legacy: {sorted(now - LEGACY_IMPORTERS)}"
-    plan = (ROOT / "src/saathi/legacy.py").read_text()
-    for unit in ("WU-08", "WU-14", "WU-15", "WU-18", "WU-20"):
-        assert unit in plan, f"legacy.py removal plan lacks {unit}"
+def test_legacy_module_is_gone_and_nothing_imports_it() -> None:
+    """The last importer (the caregiver bot, WU-18) is rewritten, so the module is deleted and the pin is empty."""
+    assert not (ROOT / "src/saathi/legacy.py").exists()
+    assert _legacy_importers() == LEGACY_IMPORTERS == set()
