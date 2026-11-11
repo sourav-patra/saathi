@@ -1,0 +1,281 @@
+# Image base allowlist (owner decision, option (a), 2026-11-11). Used by --manifest only,
+# never by --packages. A fixed, named, per-package list: the unmodified distribution base
+# layer and the C/C++ runtime (GCC runtime exception). No licence category is excepted:
+# a package not named here, or named with a licence other than the one the image reports,
+# still fails. Packages our Dockerfiles install on top of the base are never listed here.
+#
+# Fields: name (Debian binary package, no :arch), licence (the true licence), reason (one of
+# the two fixed reasons), and `reported` only where the image's copyright file reports a
+# different first License: line (missing, or the documentation licence).
+
+[[package]]
+name = "adduser"
+licence = "GPL-2+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "apt"
+licence = "GPL-2+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "base-files"
+licence = "GPL-2+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "base-passwd"
+licence = "GPL-2"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "bash"
+licence = "GPL-3+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "bsdutils"
+licence = "GPL-2+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "coreutils"
+licence = "GPL-3+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "debian-archive-keyring"
+licence = "GPL-2+ (scripts); the OpenPGP keys themselves are not copyrightable"
+reported = "UNKNOWN"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "debianutils"
+licence = "GPL-2+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "diffutils"
+licence = "GPL-3+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "dpkg"
+licence = "GPL-2+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "findutils"
+licence = "GPL-3+ (programs) AND GFDL-NIV-1.3+ (documentation)"
+reported = "GFDL-NIV-1.3+ or GFDL-NIV-1.3+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "gcc-14-base"
+licence = "GPL-3+ WITH GCC-exception-3.1"
+reported = "UNKNOWN"
+reason = "GCC runtime exception"
+
+[[package]]
+name = "grep"
+licence = "GPL-3+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "gzip"
+licence = "GPL-3+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "hostname"
+licence = "GPL-2"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "libacl1"
+licence = "GPL-2+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "libapt-pkg7.0"
+licence = "GPL-2+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "libattr1"
+licence = "GPL-2+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "libaudit-common"
+licence = "GPL-2"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "libaudit1"
+licence = "GPL-2"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "libblkid1"
+licence = "GPL-2+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "libc-bin"
+licence = "LGPL-2.1+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "libc6"
+licence = "LGPL-2.1+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "libcap-ng0"
+licence = "LGPL-2.1+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "libcrypt1"
+licence = "LGPL-2.1+"
+reported = "UNKNOWN"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "libdb5.3t64"
+licence = "Sleepycat and BSD-3-clause"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "libgcc-s1"
+licence = "GPL-3+ WITH GCC-exception-3.1"
+reported = "UNKNOWN"
+reason = "GCC runtime exception"
+
+[[package]]
+name = "libgmp10"
+licence = "GPL-2+ or LGPL-3+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "libhogweed6t64"
+licence = "LGPL-3+ or GPL-2+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "liblastlog2-2"
+licence = "GPL-2+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "liblz4-1"
+licence = "GPL-2+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "liblzma5"
+licence = "0BSD"
+reported = "License:"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "libmount1"
+licence = "GPL-2+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "libnettle8t64"
+licence = "LGPL-3+ or GPL-2+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "libseccomp2"
+licence = "LGPL-2.1"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "libsemanage-common"
+licence = "LGPL-2.1+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "libsemanage2"
+licence = "LGPL-2.1+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "libsepol2"
+licence = "LGPL-2.1+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "libsmartcols1"
+licence = "GPL-2+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "libstdc++6"
+licence = "GPL-3+ WITH GCC-exception-3.1"
+reported = "UNKNOWN"
+reason = "GCC runtime exception"
+
+[[package]]
+name = "libsystemd0"
+licence = "LGPL-2.1+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "libudev1"
+licence = "LGPL-2.1+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "libuuid1"
+licence = "GPL-2+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "login"
+licence = "GPL-2+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "mawk"
+licence = "GPL-2.0-only"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "mount"
+licence = "GPL-2+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "perl-base"
+licence = "GPL-1+ or Artistic"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "sed"
+licence = "GPL-3+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "sqv"
+licence = "LGPL-2.0-or-later"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "sysvinit-utils"
+licence = "GPL-2.0+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "tar"
+licence = "GPL-3+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
+
+[[package]]
+name = "util-linux"
+licence = "GPL-2+"
+reason = "unmodified distribution base layer, not linked into or distributed as part of Saathi code"
