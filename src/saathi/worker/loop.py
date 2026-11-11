@@ -144,6 +144,10 @@ class Worker:
             log.warning("lease lost for %s; another worker owns the row now", lease.inbox_id)
         except Exception as exc:  # noqa: BLE001  (the lease runs out and the row is tried again)
             log.warning("step failed for %s: %s", lease.inbox_id, type(exc).__name__)
+            self._deps.trace.span(
+                "worker.process", inbox_id=lease.inbox_id, household_id=lease.household_id, ok=False,
+                reason=type(exc).__name__,
+            )  # fmt: skip
         return True
 
     async def _ack_loop(self) -> None:

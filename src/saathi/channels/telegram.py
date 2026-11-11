@@ -49,10 +49,11 @@ from saathi.domain import (
 from saathi.errors import ChannelDown, RateLimited, SaathiError, SendRejected
 from saathi.householdcfg import ConfigMissing
 from saathi.ids import ApproverId, EventId, HouseholdId, IdemKey, InboxId, RunId, derive_id, idem_key
-from saathi.ports import AuditSink, Clock, Opener, Store, Tx
+from saathi.ports import AuditSink, Clock, Opener, Store, TraceExporter, Tx
 from saathi.store.repos import ConfigRepo
 from saathi.store.repos._util import aad
 from saathi.store.repos.updates import UpdateRepo
+from saathi.trace import NullExporter
 from saathi.worker.summaries import render_card
 
 __all__ = [
@@ -401,6 +402,7 @@ class CallbackRouter:
         caregivers: _Sender,
         *,
         answer: Answer | None = None,
+        trace: TraceExporter | None = None,
     ) -> None:
         self._store = store
         self._alerts = alerts
@@ -408,6 +410,7 @@ class CallbackRouter:
         self._audit = audit
         self._caregivers = caregivers
         self._answer = answer
+        self._trace = trace or NullExporter()
         self._failures: dict[int, int] = {}
 
     async def _say(self, up: ApproverUpdate, text: str) -> None:
@@ -449,6 +452,7 @@ class CallbackRouter:
             return
         self._failures.pop(up.update_id, None)
         await self._record(up)
+        self._trace.span("bot.update", household_id=up.household_id, reason=up.kind, ok=True)
 
     async def _deny(self, up: RoutedUpdate, reason: str) -> None:
         await self._audit.append(

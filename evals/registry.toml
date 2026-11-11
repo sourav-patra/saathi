@@ -49,14 +49,12 @@ phase = 0
 [[suite]]
 name = "trace_canary"
 grader_order = "code"
-dataset = "pipeline run with personal canaries and a fake sink"
+dataset = "evals/datasets/trace_canary (seeded personal canaries through the real exporter into a file sink, generated at load)"
 size = "20"
 split = "committed"
 gate = "zero canaries outside raw_text"
 owner = "owner"
-runner = "pending"
-pending_until = "WU-19"
-reason = "the trace exporter it grades is built in WU-19; tests/test_trace_canary.py holds the run"
+runner = "harness"
 phase = 0
 
 [[suite]]

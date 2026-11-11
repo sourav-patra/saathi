@@ -103,6 +103,7 @@ class AlertRig:
     stage_c: FakeEscalator = field(default_factory=lambda: FakeEscalator("c"))
     owner_alerts: list[str] = field(default_factory=list)
     cfg: AlertConfig | None = None
+    trace: Any = None
 
     async def owner_alert(self, what: str) -> None:
         self.owner_alerts.append(what)
@@ -111,7 +112,7 @@ class AlertRig:
         return AlertService(
             store, self.caregiver, {Source.WHATSAPP: self.elder}, self.voice,
             {"a": TelegramStageA(self.caregiver), "b": self.stage_b, "c": self.stage_c},
-            audit or self.audit, SignoffRepo, self.clock, self.cfg, owner_alert=self.owner_alert,
+            audit or self.audit, SignoffRepo, self.clock, self.cfg, owner_alert=self.owner_alert, trace=self.trace,
         )  # fmt: skip
 
     async def seed(self, *, so1: bool = True) -> None:

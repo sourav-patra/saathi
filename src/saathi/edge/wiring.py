@@ -16,6 +16,7 @@ from saathi.errors import SaathiError
 from saathi.guards.radar import scan
 from saathi.store import Role, Store, create_pool
 from saathi.store.keys import KeyRing
+from saathi.trace import build_exporter
 
 
 class EdgeConfigError(SaathiError):
@@ -43,7 +44,8 @@ async def build_edge(s: Settings) -> tuple[FastAPI, Store]:
         raise EdgeConfigError("no inbound channel has a secret set")
     clock = SystemClock()
     store = Store(await create_pool(s.db_url_edge), Role.EDGE, clock)
-    app = create_edge_app(s, store, KeyRing(kek=None), adapters, scan, clock, sender_key=sender_key)
+    trace = build_exporter(s.trace_dir, clock)
+    app = create_edge_app(s, store, KeyRing(kek=None), adapters, scan, clock, sender_key=sender_key, trace=trace)
     return app, store
 
 

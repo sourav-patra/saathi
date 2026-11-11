@@ -13,9 +13,10 @@ from saathi.edge.adapters import InboundAdapter
 from saathi.edge.handler import MAX_BODY_BYTES, EdgeCounters, EdgeDeps, handle_inbound
 from saathi.edge.health import add_health_route
 from saathi.guards.radar import RadarResult
-from saathi.ports import Clock
+from saathi.ports import Clock, TraceExporter
 from saathi.store import Store
 from saathi.store.keys import KeyRing
+from saathi.trace import NullExporter
 
 
 async def _read_capped(request: Request, limit: int) -> bytes | None:
@@ -44,10 +45,11 @@ def create_edge_app(
     sender_key: bytes,
     counters: EdgeCounters | None = None,
     max_body: int = MAX_BODY_BYTES,
+    trace: TraceExporter | None = None,
 ) -> FastAPI:
     deps = EdgeDeps(
         store=store, keys=keys, adapters=adapters, radar=radar, clock=clock, sender_key=sender_key,
-        counters=counters or EdgeCounters(), max_body=max_body,
+        counters=counters or EdgeCounters(), max_body=max_body, trace=trace or NullExporter(),
     )  # fmt: skip
     app = FastAPI(title="saathi-edge", docs_url=None, redoc_url=None, openapi_url=None)
     app.state.edge = deps

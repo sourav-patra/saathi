@@ -116,7 +116,7 @@ def test_all_phase0_runs_and_unavailable_is_not_pass(monkeypatch: pytest.MonkeyP
     assert code == 0
     assert "radar: verified" in out and "redaction: verified" in out and "false_alarm: verified" in out
     assert "radar_heldout: unavailable" in out
-    assert "summary: verified 3, invalid 0, unavailable 4" in out
+    assert "summary: verified 4, invalid 0, unavailable 3" in out
 
 
 def test_report_prints_k_n_bound() -> None:
@@ -508,6 +508,8 @@ def test_redaction_canaries_are_not_committed() -> None:
 
 
 def test_pending_suites_report_reason_not_pass() -> None:
-    for name in ("trace_canary",):
-        res = run.run_row(_row(name), DATASETS)
+    pending = [r for r in load_registry() if r.runner == "pending"]
+    for row in pending:
+        res = run.run_row(row, DATASETS)
         assert res.state == "unavailable" and res.reason
+    assert _row("trace_canary").runner == "harness"  # WU-19: the trace canary grades the real exporter

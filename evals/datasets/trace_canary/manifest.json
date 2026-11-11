@@ -1,0 +1,9 @@
+{
+  "suite": "trace_canary",
+  "author": "seeded canary generator",
+  "author_role": "builder, synthetic",
+  "keyword_author": "trace allowlist author",
+  "sha256": "57be7e15f3c9bd9d851861f31cb98726d6e4401711fff846accf5a8a0e9babd4",
+  "n": 20,
+  "seed": 20261111
+}

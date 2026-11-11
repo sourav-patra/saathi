@@ -45,9 +45,10 @@ from saathi.errors import AuditUnavailable, CallbackRejected
 from saathi.faults import ALERT_BETWEEN_SEND_AND_MARK, fault
 from saathi.householdcfg import ConfigMissing
 from saathi.ids import ApproverId, EventId, HouseholdId, IdemKey, PersonRef, RunId, derive_id, idem_key
-from saathi.ports import AuditSink, CaregiverChannel, Clock, ElderChannel, Escalator, VoiceStore
+from saathi.ports import AuditSink, CaregiverChannel, Clock, ElderChannel, Escalator, TraceExporter, VoiceStore
 from saathi.store import Store
 from saathi.store.repos import AlertRepo, ConfigRepo, IdentityRepo, SignoffRepo
+from saathi.trace import NullExporter
 from saathi.voice.store import ReplyKey
 
 log = logging.getLogger(__name__)
@@ -103,6 +104,7 @@ class AlertService:
         cfg: AlertConfig | None = None,
         *,
         owner_alert: OwnerAlert,
+        trace: TraceExporter | None = None,
     ) -> None:
         self._store = store
         self._caregivers = DeliveredCaregiverChannel(caregivers)
@@ -114,6 +116,7 @@ class AlertService:
         self._clock = clock
         self._cfg = cfg  # None: each household's config row decides
         self._owner = owner_alert
+        self._trace = trace or NullExporter()
         self._noticed: set[tuple[str, int, str]] = set()
         self._no_config_told: set[str] = set()
 
@@ -189,9 +192,16 @@ class AlertService:
     async def step(self, household: HouseholdId, event: EventId) -> None:
         try:
             await self._step(household, event)
+            self._trace.span("alerts.step", event_id=event, household_id=household, ok=True)
         except ConfigMissing:  # nobody can be reached without the approvers; the owner hears once per process
             if str(household) not in self._no_config_told and await self._tell_owner("alert_no_config"):
                 self._no_config_told.add(str(household))
+            self._trace.span("alerts.step", event_id=event, household_id=household, ok=False, reason="no_config")
+            raise
+        except Exception as exc:
+            self._trace.span(
+                "alerts.step", event_id=event, household_id=household, ok=False, reason=type(exc).__name__
+            )
             raise
 
     async def _step(self, household: HouseholdId, event: EventId) -> None:

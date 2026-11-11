@@ -23,11 +23,12 @@ from saathi.edge.ratelimit import rate_state
 from saathi.faults import EDGE_AFTER_COMMIT, EDGE_BEFORE_COMMIT, fault
 from saathi.guards.radar import RadarResult
 from saathi.ids import new_id
-from saathi.ports import Clock
+from saathi.ports import Clock, TraceExporter
 from saathi.store import Store
 from saathi.store.keys import KeyRing, sender_hmac
 from saathi.store.repos import AlertRepo, InboxRepo
 from saathi.store.repos.inbox import DEFAULT_RAW_TTL_S
+from saathi.trace import NullExporter
 
 log = logging.getLogger(__name__)
 
@@ -63,6 +64,7 @@ class EdgeDeps:
     sender_key: bytes
     counters: EdgeCounters = field(default_factory=EdgeCounters)
     max_body: int = MAX_BODY_BYTES
+    trace: TraceExporter = field(default_factory=NullExporter)
 
 
 def _scan(deps: EdgeDeps, text: str | None) -> RadarResult:
@@ -107,6 +109,10 @@ async def _persist(deps: EdgeDeps, msg: InboundMessage, raw: bytes, household, e
             # Audio over the limit waits for the worker's transcript; until then it is unscanned and a human is told.
             alert = AlertOpen(kind="unscanned", origin="unscanned_edge")
             await AlertRepo.open(tx, new.id, elder, alert, now, None)
+        deps.trace.span(
+            "edge.persist", inbox_id=new.id, household_id=household, count=len(rule_ids), bytes=len(raw),
+            sha256=new.payload_sha256, flags=",".join(kinds), ok=True,
+        )  # fmt: skip
         fault(EDGE_BEFORE_COMMIT)  # test hook: inert unless the test switch is on
     fault(EDGE_AFTER_COMMIT)  # test hook: the commit is done, the 200 is not sent yet
 
@@ -144,8 +150,10 @@ async def handle_inbound(raw: bytes, headers: Mapping[str, str], source: Source,
                 deps.counters.inc("unknown_sender")
                 continue
             await _persist(deps, msg, raw, *who)
-    except Exception:  # noqa: BLE001 - nothing was acknowledged: the platform retries and the unique key dedupes
-        log.exception("edge insert failed")
+    except Exception as exc:  # noqa: BLE001 - nothing was acknowledged: the platform retries and the unique key dedupes
+        log.error("edge insert failed: %s", type(exc).__name__)  # the class only: a message may quote a value
         deps.counters.inc("insert_failed")
+        deps.trace.span("edge.inbound", count=len(messages), bytes=len(raw), ok=False, reason="insert_failed")
         return HTTPStatus.SERVICE_UNAVAILABLE
+    deps.trace.span("edge.inbound", count=len(messages), bytes=len(raw), ok=True)
     return HTTPStatus.OK

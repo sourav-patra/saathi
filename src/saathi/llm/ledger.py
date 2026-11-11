@@ -122,8 +122,8 @@ class PgLedger:
         if got.alert is not None and self._on_alert is not None:
             try:
                 await self._on_alert(got.alert)
-            except Exception:  # the reservation is stored; a failed notice must not strand it
-                log.exception("spend alert sink failed")
+            except Exception as exc:  # the reservation is stored; a failed notice must not strand it
+                log.warning("spend alert sink failed: %s", type(exc).__name__)  # the class only, never the text
         return got.id
 
     async def reserve_checked(self, run: RunId, tier: str, worst_case_inr: Decimal, cap: Decimal | None) -> Reservation:

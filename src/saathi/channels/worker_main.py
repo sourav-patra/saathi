@@ -27,6 +27,7 @@ from saathi.perception.asr import LocalAsrClient
 from saathi.ports import ElderChannel
 from saathi.store import Role, Store, create_pool
 from saathi.store.keys import KeyRing
+from saathi.trace import build_exporter
 from saathi.voice.codec import OpusCodec
 from saathi.voice.store import PgVoiceStore
 from saathi.worker.loop import serve
@@ -110,6 +111,7 @@ async def build_worker(s: Settings) -> WorkerDeps:
             clock=clock,
             owner_alert=build_owner_alert(s),
             cfg=WorkerConfig(),
+            trace=build_exporter(s.trace_dir, clock),
         )
     except BaseException:
         await store.close()

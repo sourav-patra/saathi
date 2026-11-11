@@ -20,6 +20,7 @@ from evals.suites.false_alarm import FalseAlarmSuite
 from evals.suites.pending import PendingSuite
 from evals.suites.radar import RadarHeldoutSuite, RadarSuite
 from evals.suites.redaction import RedactionSuite
+from evals.suites.trace_canary import TraceCanarySuite
 
 HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parent
@@ -27,7 +28,8 @@ DATASETS = HERE / "datasets"
 
 
 def harness_suites() -> dict[str, object]:
-    return {s.name: s for s in (RadarSuite(), RadarHeldoutSuite(), RedactionSuite(), FalseAlarmSuite())}
+    suites = (RadarSuite(), RadarHeldoutSuite(), RedactionSuite(), FalseAlarmSuite(), TraceCanarySuite())
+    return {s.name: s for s in suites}
 
 
 def current_phase(repo_root: Path = REPO_ROOT) -> int:

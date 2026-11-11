@@ -46,6 +46,7 @@ from saathi.ports import (
     ElderChannel,
     Gateway,
     MediaStore,
+    TraceExporter,
     Tx,
     VoiceStore,
 )
@@ -54,6 +55,7 @@ from saathi.store import Store
 from saathi.store.keys import KeyRing
 from saathi.store.repos import AlertRepo, ConfigRepo, IdentityRepo, InboxRepo, RequestRepo
 from saathi.store.repos._util import aad
+from saathi.trace import NullExporter
 from saathi.understand.router import understand
 from saathi.voice.store import ReplyKey
 from saathi.worker.effects import DeliveredCaregiverChannel, DeliveredElderChannel
@@ -95,6 +97,7 @@ class WorkerDeps:
     classifier: Classifier | None = None
     gateway: Gateway | None = None
     cfg: WorkerConfig = field(default_factory=WorkerConfig)
+    trace: TraceExporter = field(default_factory=NullExporter)
 
     def __post_init__(self) -> None:  # a repeated key is a delivered effect (WU-08 rulings)
         if not isinstance(self.elder, DeliveredElderChannel):
@@ -327,6 +330,10 @@ async def process(lease: Lease, deps: WorkerDeps) -> Outcome:
         log.warning("lease lost before settle for %s; the next worker repeats the sends with the same keys", ctx.inbox)
     # audio with no transcript, or a radar that crashed, was not scanned
     checks: dict[str, CheckState] = {"radar": check_state(bool(text) and radar_ok)}
+    deps.trace.span(
+        "worker.process", run_id=run, inbox_id=ctx.inbox, household_id=ctx.household, state=state,
+        intent=intent, rule_ids=hit.rule_ids, count=effects, ok=True,
+    )  # fmt: skip
     return Outcome(state, request_state, hit.emergency, hit.scam, effects, checks)
 
 
