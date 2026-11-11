@@ -40,7 +40,10 @@ every distribution package in each image, as the image-audit job reads it from t
 Regenerate this file with `uv run python scripts/third_party_notices.py` from the image-audit manifests.
 """
 
-FOOTER = "\nSkipped or not checked: the Python packages of the project itself (see `scripts/license_audit.py --packages`).\n"
+FOOTER = (
+    "\nSkipped or not checked: the Python packages of the project itself"
+    " (see `scripts/license_audit.py --packages`).\n"
+)
 
 
 def begin(image: str) -> str:
@@ -84,7 +87,8 @@ def section(image: str, licences: Mapping[str, str], versions: Mapping[str, str]
     ]
     for name in sorted(set(licences) | set(versions)):
         note = "owner-approved" if name in approved else ""
-        rows.append(f"| {name} | {_cell(versions.get(name, 'UNKNOWN'))} | {_cell(licences.get(name, 'UNKNOWN'))} | {note} |")
+        ver, lic = _cell(versions.get(name, "UNKNOWN")), _cell(licences.get(name, "UNKNOWN"))
+        rows.append(f"| {name} | {ver} | {lic} | {note} |")
     rows.append(end(image))
     return "\n".join(rows) + "\n"
 
