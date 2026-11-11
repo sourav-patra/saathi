@@ -18,8 +18,10 @@ jobs:
       fail-fast: false
       matrix:
         image:
-          - { name: asr, context: infra/whisper, file: infra/whisper/Dockerfile }
-          - { name: speech, context: ., file: infra/Dockerfile.worker }
+          # AUDIT_NO_MODEL=1 skips the model download in this audit build only (infra/whisper/Dockerfile);
+          # the production build in docker-compose fetches the model and verifies its sha256.
+          - { name: asr, context: infra/whisper, file: infra/whisper/Dockerfile, args: "--build-arg AUDIT_NO_MODEL=1" }
+          - { name: speech, context: ., file: infra/Dockerfile.worker, args: "" }
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
@@ -30,7 +32,9 @@ jobs:
           NAME: ${{ matrix.image.name }}
           CONTEXT: ${{ matrix.image.context }}
           FILE: ${{ matrix.image.file }}
-        run: docker build -t "saathi-audit-$NAME" -f "$FILE" "$CONTEXT"
+          ARGS: ${{ matrix.image.args }}
+        # The image stays local to this runner: it is never pushed (scripts/ci_lint.py).
+        run: docker build $ARGS -t "saathi-audit-$NAME" -f "$FILE" "$CONTEXT"
       - name: Write the package manifest (name | licence from the Debian copyright file)
         env:
           NAME: ${{ matrix.image.name }}
@@ -41,8 +45,17 @@ jobs:
               lic=$(grep -m1 "^License:" "$f" 2>/dev/null | cut -d" " -f2-)
               echo "$p | ${lic:-UNKNOWN}"
             done' > "manifest-$NAME.txt"
-          wc -l "manifest-$NAME.txt"
+          docker run --rm --entrypoint dpkg-query "saathi-audit-$NAME" \
+            -W -f='${binary:Package} | ${Version}\n' > "versions-$NAME.txt"
+          wc -l "manifest-$NAME.txt" "versions-$NAME.txt"
+          sed 's/^/manifest-line: /' "manifest-$NAME.txt"
+          sed 's/^/versions-line: /' "versions-$NAME.txt"
       - name: Licence audit of the image
         env:
           NAME: ${{ matrix.image.name }}
         run: uv run python scripts/license_audit.py --dockerfiles --manifest "manifest-$NAME.txt"
+      - name: Third-party notices are current for this image
+        if: always()
+        env:
+          NAME: ${{ matrix.image.name }}
+        run: uv run python scripts/third_party_notices.py --check "$NAME"

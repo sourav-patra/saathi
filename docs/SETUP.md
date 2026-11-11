@@ -101,6 +101,15 @@ Create the household, its elder, its approvers, the elder's channel identity and
 4. **Radar.** Send the text "seene mein dard" from the elder's number. Both approvers should get an alert that repeats until someone taps Acknowledge.
 5. **Traces.** Open Langfuse at `http://localhost:3000` (via an SSH tunnel or Tailscale).
 
+## Container images are never published
+
+The container images are built for the owner's own server only and are never published to any registry. Some
+packages in them carry GPL-family licences (listed by name in `scripts/image_base_allowlist.toml`). Publishing an
+image would make the owner a distributor of that GPL code. In that case the owner would need to ship the licence
+texts, a written offer of the matching source, and a third-party notices file. `scripts/ci_lint.py` fails on any
+workflow with a `docker push` step, `push: true` in a build action, or a registry login.
+`THIRD-PARTY-NOTICES.md` at the repository root lists the image packages for reference.
+
 ## Later phases
 
 - Phase 1: commerce MCP OAuth logins.

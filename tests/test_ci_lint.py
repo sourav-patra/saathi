@@ -60,3 +60,40 @@ def test_comment_lines_are_not_uses_lines(tmp_path: Path) -> None:
 
 def test_no_workflow_files_fails(tmp_path: Path) -> None:
     assert ci_lint.main([str(tmp_path)]) == 1
+
+
+# Images are never published: no push step, no `push: true`, no registry login.
+_PUBLISH_CASES = [
+    "      - run: docker push ghcr.io/x/y:1",
+    "      - run: docker image push x/y",
+    "      - run: docker buildx build --push -t x/y .",
+    "          push: true",
+    "          push: ${{ github.event_name == 'push' }}",
+    "      - run: echo \"$T\" | docker login ghcr.io -u x --password-stdin",
+    "      - uses: docker/login-action@" + "a" * 40 + " # v3",
+    "      - uses: aws-actions/amazon-ecr-login@" + "b" * 40 + " # v2",
+]
+
+
+def test_publish_steps_fail(tmp_path: Path) -> None:
+    for i, line in enumerate(_PUBLISH_CASES):
+        wf = tmp_path / f"p{i}.yml"
+        wf.write_text("on: [push]\njobs:\n  a:\n    steps:\n" + line + "\n")
+        assert ci_lint.check_no_publish(wf), line
+        assert ci_lint.main([str(wf)]) == 1, line
+
+
+def test_build_without_publish_passes(tmp_path: Path) -> None:
+    wf = tmp_path / "ok.yml"
+    wf.write_text(
+        "on:\n  push:\n    branches: [main]\njobs:\n  a:\n    steps:\n"
+        "      - run: docker build -t saathi-audit-asr .\n"
+        "          push: false\n"
+        "      # docker push is never used here\n"
+    )
+    assert ci_lint.check_no_publish(wf) == []
+
+
+def test_repo_workflows_never_publish() -> None:
+    for wf in ci_lint.collect([ROOT / ".github" / "workflows"]):
+        assert ci_lint.check_no_publish(wf) == [], wf

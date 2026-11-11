@@ -14,7 +14,19 @@ RUN cmake -B build -DCMAKE_BUILD_TYPE=Release -DWHISPER_BUILD_TESTS=OFF -DGGML_O
 
 ARG WHISPER_MODEL
 ARG WHISPER_MODEL_URL
-RUN mkdir -p /models && wget -q -O /models/model.bin "${WHISPER_MODEL_URL}"
+ARG WHISPER_MODEL_SHA256
+# AUDIT_NO_MODEL=1 is for the CI licence audit build only (image-audit.yml): it leaves an empty
+# placeholder so the package manifest can be written without the model. The production build
+# (docker-compose) never sets it, and then the URL and the sha256 are required and verified.
+ARG AUDIT_NO_MODEL=0
+RUN mkdir -p /models && if [ "${AUDIT_NO_MODEL}" = "1" ]; then \
+      : > /models/model.bin; \
+    else \
+      test -n "${WHISPER_MODEL_URL}" || { echo "WHISPER_MODEL_URL is not set" >&2; exit 1; }; \
+      test -n "${WHISPER_MODEL_SHA256}" || { echo "WHISPER_MODEL_SHA256 is not set" >&2; exit 1; }; \
+      wget -q -O /models/model.bin "${WHISPER_MODEL_URL}" \
+      && echo "${WHISPER_MODEL_SHA256}  /models/model.bin" | sha256sum -c -; \
+    fi
 
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
