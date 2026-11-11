@@ -31,11 +31,14 @@ openssl rand -hex 32
 
 ### Secret files
 
-Three secrets are files, not `.env` values. Keep them in one directory on the host (`SAATHI_SECRETS_DIR`, default `/etc/saathi/secrets`), mode 600, each its own random value:
+These secrets are files, not `.env` values. Keep them in one directory on the host (`SAATHI_SECRETS_DIR`, default `/etc/saathi/secrets`), mode 600, each its own random value:
 
 | File | Holds | Mounted into |
 |---|---|---|
 | `sender_hmac_key` | the key of the sender hash (the edge hashes every sender with it) | edge |
+| `wa_app_secret` | the WhatsApp app secret that signs webhook calls | edge |
+| `wa_verify_token` | the webhook verification token | edge |
+| `tg_elder_secret` | the secret of the elder bot's webhook | edge |
 | `approval_secret` | the approval signing secret, at least 32 bytes | worker and approval path, never the edge |
 | `kek` | the key-encryption key, exactly 32 bytes | worker only, never the edge |
 
@@ -46,11 +49,13 @@ openssl rand -hex 32 > /etc/saathi/secrets/approval_secret
 chmod 600 /etc/saathi/secrets/*
 ```
 
-A trailing newline is ignored. The `kek` file is created with the worker unit, which fixes its exact format (32 bytes); keep a copy offline, because without it the stored household keys cannot be opened.
+The three edge files hold the values the messaging platforms give you (the app secret, and a verify token you choose); write each with `printf %s` into its own file. A trailing newline is ignored. The `kek` file is created with the worker unit, which fixes its exact format (32 bytes); keep a copy offline, because without it the stored household keys cannot be opened.
 
 ### Database logins
 
 `SAATHI_DB_URL_EDGE`, `SAATHI_DB_URL_CORE`, `SAATHI_DB_URL_MODEL` and `SAATHI_DB_URL_OWNER` each log in as their own role. The passwords come from the `SAATHI_DB_PASSWORD_*` values, which the database container reads once when it first starts.
+
+The database has no published port and no route out; it sits on the internal network alone. For admin access, run psql inside the container: `docker compose exec postgres psql -U "$POSTGRES_USER" saathi`. To load the local models once, run `docker compose --profile pull run --rm ollama-pull`; that one-off service is the only one that reaches the model registry.
 
 ### Webhook paths
 

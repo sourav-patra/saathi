@@ -15,7 +15,7 @@
 		request_body {
 			max_size 1MB
 		}
-		reverse_proxy edge:8000
+		reverse_proxy edge:{$SAATHI_EDGE_PORT:8000}
 	}
 	handle {
 		respond 404

@@ -464,3 +464,18 @@ async def test_a_missing_alert_audio_consent_is_audited_for_an_audio_alert(pg_db
     denied = [e for e in rig.audit.events if e.event == "consent_denied"]
     assert [e.detail["use"] for e in denied] == ["alert_audio"]
     assert [m for m, *_ in rig.caregiver.sent] == ["send_card"]
+
+
+async def test_probe_alerts_fire_on_a_change_to_not_ok_and_on_recovery_only():
+    from saathi.health import ProbeResult, ProbeStatus
+    from saathi.worker.loop import _probe_alerts
+
+    sent: list[str] = []
+
+    async def alert(what: str) -> None:
+        sent.append(what)
+
+    on = _probe_alerts(alert)
+    for status in ("ok", "ok", "fail", "fail", "ok", "ok"):
+        await on(ProbeResult("disk", ProbeStatus(status)))
+    assert sent == ["probe_disk_fail", "probe_disk_ok"]  # the first ok is silent; a recovery is told once

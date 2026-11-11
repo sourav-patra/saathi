@@ -199,7 +199,7 @@ class Rig:
         self.procs: list[subprocess.Popen] = []
         self.ring = KeyRing(KEK)
 
-    def env(self, point: str | None) -> dict[str, str]:
+    def env(self, point: str | None, port: int | None = None) -> dict[str, str]:
         base = {k: v for k, v in os.environ.items() if not k.startswith("SAATHI_") and not k.startswith("CRASH_")}
         env = {
             **base,
@@ -211,7 +211,11 @@ class Rig:
             "CRASH_JOURNAL": str(self.journal),
             "CRASH_HOUSEHOLD": H,
             "CRASH_KEK_HEX": KEK.hex(),
+            "SAATHI_APPROVAL_SECRET": "synthetic-approval-secret-0123456789",  # the real worker entry requires one
+            "SAATHI_MEDIA_DIR": str(self.tmp / "media"),
         }
+        if port is not None:
+            env["SAATHI_EDGE_PORT"] = str(port)
         if point is not None:
             env["SAATHI_ENV"] = "test"
             env["SAATHI_FAULT_POINT"] = point
@@ -230,10 +234,10 @@ class Rig:
             await su.close()
         return wa_body(wa_msg(mid="wamid.crash1", text={"body": TEXT}))
 
-    def spawn(self, *args: str, point: str | None) -> subprocess.Popen:
+    def spawn(self, *args: str, point: str | None, port: int | None = None) -> subprocess.Popen:
         err = (self.tmp / f"proc{len(self.procs)}.err").open("w")
         proc = subprocess.Popen(
-            [sys.executable, str(PROC), *args], env=self.env(point), cwd=self.tmp, stdout=subprocess.DEVNULL,
+            [sys.executable, str(PROC), *args], env=self.env(point, port), cwd=self.tmp, stdout=subprocess.DEVNULL,
             stderr=err,
         )  # fmt: skip
         self.procs.append(proc)
@@ -242,7 +246,7 @@ class Rig:
     @contextmanager
     def edge(self, point: str | None = None) -> Iterator[tuple[subprocess.Popen, str]]:
         port = _free_port()
-        proc = self.spawn("edge", str(port), point=point)
+        proc = self.spawn("edge", point=point, port=port)
         deadline = time.monotonic() + WAIT_S
         while time.monotonic() < deadline:
             if proc.poll() is not None:

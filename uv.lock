@@ -2407,6 +2407,7 @@ pii = [
 dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
+    { name = "pyyaml" },
     { name = "ruff" },
 ]
 
@@ -2432,6 +2433,7 @@ provides-extras = ["pii"]
 dev = [
     { name = "pytest", specifier = ">=8" },
     { name = "pytest-asyncio", specifier = ">=0.24" },
+    { name = "pyyaml", specifier = ">=6" },
     { name = "ruff", specifier = ">=0.6" },
 ]
 

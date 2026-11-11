@@ -1,0 +1,56 @@
+# The egress proxy of the model-driven containers (POLICY RQ-102; data policy PL-04).
+#
+# One listener, one route per provider, no TLS interception and no certificate authority. The route set is the
+# allowlist: a path that matches no route gets 404, and nothing here forwards to a host that is not a row of the
+# outbound table (src/saathi/hosts.py, tests/test_hosts.py compares the two). The platform routes name their hosts.
+# The hosted model tiers are private config: each route takes its upstream and its credential header from the
+# read-only environment file of this service, and an unset upstream points at a name that never resolves.
+{
+	admin off
+	auto_https off
+}
+
+:{$SAATHI_EGRESS_PORT:8081} {
+	handle_path /whatsapp/* {
+		reverse_proxy https://graph.facebook.com {
+			header_up Host {upstream_hostport}
+		}
+	}
+	handle_path /whatsapp-media/* {
+		reverse_proxy https://lookaside.fbsbx.com {
+			header_up Host {upstream_hostport}
+		}
+	}
+	handle_path /telegram/* {
+		reverse_proxy https://api.telegram.org {
+			header_up Host {upstream_hostport}
+		}
+	}
+	handle_path /t2/* {
+		reverse_proxy {$SAATHI_EGRESS_T2_UPSTREAM:https://tier-unset.invalid} {
+			header_up Host {upstream_hostport}
+			header_up Authorization "Bearer {$SAATHI_EGRESS_T2_CREDENTIAL:}"
+		}
+	}
+	handle_path /t2free/* {
+		reverse_proxy {$SAATHI_EGRESS_T2FREE_UPSTREAM:https://tier-unset.invalid} {
+			header_up Host {upstream_hostport}
+			header_up Authorization "Bearer {$SAATHI_EGRESS_T2FREE_CREDENTIAL:}"
+		}
+	}
+	handle_path /t3/* {
+		reverse_proxy {$SAATHI_EGRESS_T3_UPSTREAM:https://tier-unset.invalid} {
+			header_up Host {upstream_hostport}
+			header_up Authorization "Bearer {$SAATHI_EGRESS_T3_CREDENTIAL:}"
+		}
+	}
+	handle_path /t4/* {
+		reverse_proxy {$SAATHI_EGRESS_T4_UPSTREAM:https://tier-unset.invalid} {
+			header_up Host {upstream_hostport}
+			header_up Authorization "Bearer {$SAATHI_EGRESS_T4_CREDENTIAL:}"
+		}
+	}
+	handle {
+		respond 404
+	}
+}

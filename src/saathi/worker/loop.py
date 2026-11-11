@@ -10,20 +10,27 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import inspect
 import logging
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
+from functools import partial
+from pathlib import Path
 
 from saathi import replies
 from saathi.audit.events import AuditName
-from saathi.config import Settings, require_secrets
+from saathi.config import ConfigError, Settings, require_secrets
 from saathi.domain import AlertOpen, AuditEvent
+from saathi.health import ProbeResult, ProbeStatus, beat_loop, disk_probe, skew_probe
+from saathi.hosts import require_listed_hosts
 from saathi.householdcfg import ConfigMissing
 from saathi.ids import ElderId, HouseholdId, InboxId, idem_key
 from saathi.ports import Clock, Store
 from saathi.store.repos import AlertRepo, ConfigRepo, IdentityRepo, InboxRepo
 from saathi.voice.store import ReplyKey
 from saathi.worker.lease import LeaseLost, LeaseRenewer, lease_next
+from saathi.worker.scope import acting_for
 from saathi.worker.steps import WorkerConfig, WorkerDeps, last_inbound_at, process, run_id
+from saathi.worker.wiring import PendingCaregiverChannel
 
 log = logging.getLogger(__name__)
 
@@ -54,18 +61,19 @@ async def _ack_one(store: Store, deps: WorkerDeps, household: HouseholdId, inbox
             language = replies.DEFAULT_LANGUAGE
         last = await last_inbound_at(tx, elder, source)
     deps.elder.note_inbound(person, last)  # type: ignore[attr-defined]
-    await replies.send_reply(
-        deps.elder,
-        person,
-        ReplyKey.ACK,
-        voice=deps.voice,
-        language=language,
-        idem=idem_key(inbox, "ack"),
-        owner_alert=deps.owner_alert,
-        audit=deps.audit,
-        household=household,
-        run=run_id(inbox),
-    )
+    with acting_for(household):
+        await replies.send_reply(
+            deps.elder,
+            person,
+            ReplyKey.ACK,
+            voice=deps.voice,
+            language=language,
+            idem=idem_key(inbox, "ack"),
+            owner_alert=deps.owner_alert,
+            audit=deps.audit,
+            household=household,
+            run=run_id(inbox),
+        )
     async with store.tx(household=household) as tx:
         await InboxRepo.mark_acked(tx, inbox, tx.now)
     return True
@@ -130,7 +138,8 @@ class Worker:
             return False
         try:
             async with LeaseRenewer(self._store, lease, self._clock, lease_s=self._cfg.lease_s):
-                await process(lease, self._deps)
+                with acting_for(HouseholdId(lease.household_id)):
+                    await process(lease, self._deps)
         except LeaseLost:
             log.warning("lease lost for %s; another worker owns the row now", lease.inbox_id)
         except Exception as exc:  # noqa: BLE001  (the lease runs out and the row is tried again)
@@ -163,16 +172,38 @@ class Worker:
                 await acker
 
 
-async def serve(s: Settings, build: Callable[[Settings], WorkerDeps]) -> None:
-    """Start-up: `require_secrets` first (the approval secret is the worker's, never the edge's), then compose, run."""
+def _probe_alerts(owner_alert: Callable[[str], Awaitable[None]]) -> Callable[[ProbeResult], Awaitable[None]]:
+    """Tell the owner when a probe changes to a state that is not ok, and once when it recovers; never for the first
+    ok and not at every beat."""
+    last: dict[str, ProbeStatus] = {}
+
+    async def on_result(result: ProbeResult) -> None:
+        prev = last.get(result.name)
+        last[result.name] = result.status
+        if prev is not result.status and (result.status is not ProbeStatus.OK or prev is not None):
+            await owner_alert(f"probe_{result.name}_{result.status.value}")
+
+    return on_result
+
+
+async def serve(s: Settings, build: Callable[[Settings], WorkerDeps | Awaitable[WorkerDeps]]) -> None:
+    """Start-up: `require_secrets` first (the approval secret is the worker's, never the edge's), the outbound host
+    table next, then compose and run. The core heartbeat beats beside the loop (RQ-104)."""
     require_secrets(s)
-    deps = build(s)
-    await Worker(deps.store, deps, deps.clock).run_forever()
-
-
-def main() -> None:  # pragma: no cover
-    from saathi.config import ConfigError, get_settings
-
-    logging.basicConfig(level=logging.INFO)
-    require_secrets(get_settings())
-    raise ConfigError("the worker composition (channels, voice runtime) is wired with the compose service")
+    require_listed_hosts(s)
+    built = build(s)
+    deps = await built if inspect.isawaitable(built) else built
+    if isinstance(deps.caregiver, PendingCaregiverChannel):
+        if s.env == "prod":
+            with contextlib.suppress(Exception):
+                await deps.store.close()
+            raise ConfigError("caregiver channel not wired (WU-18)")
+        await deps.owner_alert("caregiver_pending")
+    probes = [partial(disk_probe, Path(s.media_dir)), partial(skew_probe, deps.store, deps.clock)]
+    beat = asyncio.create_task(beat_loop(deps.store, deps.clock, probes, on_result=_probe_alerts(deps.owner_alert)))
+    try:
+        await Worker(deps.store, deps, deps.clock).run_forever()
+    finally:
+        beat.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await beat

@@ -8,7 +8,7 @@ import uvicorn
 from fastapi import FastAPI
 
 from saathi.clock import SystemClock
-from saathi.config import Settings, read_secret_file
+from saathi.config import Settings, read_secret_file, secret_text
 from saathi.domain import Source
 from saathi.edge.adapters import InboundAdapter, TelegramElderInbound, WhatsAppInbound
 from saathi.edge.app import create_edge_app
@@ -24,10 +24,12 @@ class EdgeConfigError(SaathiError):
 
 def build_adapters(s: Settings) -> dict[Source, InboundAdapter]:
     out: dict[Source, InboundAdapter] = {}
-    if s.wa_app_secret.get_secret_value():
-        out[Source.WHATSAPP] = WhatsAppInbound(s.wa_app_secret.get_secret_value())
-    if s.tg_elder_secret.get_secret_value():
-        out[Source.TELEGRAM_ELDER] = TelegramElderInbound(s.tg_elder_secret.get_secret_value())
+    wa_secret = secret_text(s.wa_app_secret, s.wa_app_secret_file)
+    if wa_secret:
+        out[Source.WHATSAPP] = WhatsAppInbound(wa_secret)
+    tg_secret = secret_text(s.tg_elder_secret, s.tg_elder_secret_file)
+    if tg_secret:
+        out[Source.TELEGRAM_ELDER] = TelegramElderInbound(tg_secret)
     return out
 
 
@@ -53,7 +55,8 @@ def uvicorn_config(app: FastAPI, *, host: str, port: int) -> uvicorn.Config:
     return uvicorn.Config(app, host=host, port=port, log_level="info", limit_concurrency=EDGE_LIMIT_CONCURRENCY)
 
 
-async def serve(s: Settings, *, host: str = "0.0.0.0", port: int = 8000) -> None:  # pragma: no cover
+async def serve(s: Settings, *, host: str = "0.0.0.0", port: int | None = None) -> None:  # pragma: no cover
+    port = s.edge_port if port is None else port
     app, store = await build_edge(s)
     try:
         await uvicorn.Server(uvicorn_config(app, host=host, port=port)).serve()

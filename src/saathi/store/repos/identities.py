@@ -30,6 +30,14 @@ class IdentityRepo:
         return (bytes(rows[0]["person_ref_enc"]), str(rows[0]["key_id"])) if rows else None
 
     @staticmethod
+    async def sealed_identity(tx: Tx, ref: PersonRef) -> tuple[str, bytes, str] | None:
+        """(identity id, sealed address, key id). The id is part of the box's AAD, so the core needs it to open."""
+        rows = await tx.fetch(
+            "SELECT id, person_ref_enc, key_id FROM elder_identities WHERE person_ref = $1 AND active", ref
+        )
+        return (str(rows[0]["id"]), bytes(rows[0]["person_ref_enc"]), str(rows[0]["key_id"])) if rows else None
+
+    @staticmethod
     async def register(
         tx: Tx,
         elder_id: ElderId,

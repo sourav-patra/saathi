@@ -8,20 +8,27 @@ a key press of 1 stops it (WU-17). The heartbeat flow belongs to WU-22. Syntheti
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
+from collections import namedtuple
 from datetime import timedelta
+from pathlib import Path
 
 import asyncpg
+import pytest
 from alert_helpers import B, P, make_rig
 from conftest import PgDb
 from edge_helpers import ELDER_NUMBER, SENDER_KEY, pg_edge, wa_body, wa_msg, wa_sign, wa_url
 from fakes import FakeClock, FakeEscalator
 from worker_helpers import NOW, Rig, Role, audio, open_store, provision, rows
 
+from saathi.config import Settings
 from saathi.ids import ApproverId, HouseholdId, idem_key
-from saathi.store.keys import sender_hmac
+from saathi.store.keys import KeyRing, sender_hmac
 from saathi.store.repos._util import aad
 from saathi.voice.store import ReplyKey
 from saathi.worker import Worker, WorkerConfig
+from saathi.worker.loop import serve
 
 H = "h1"
 HEARD = "meri dawai khatam ho gayi hai"  # what the fake speech to text returns; it must not reach the summary
@@ -180,3 +187,60 @@ async def test_emergency_to_stage_a_and_fake_b_c(pg_db: PgDb):
         follow = [(str(to), str(k)) for m, to, _p, k in rig.caregiver.sent if m == "send_text"]
         assert follow == [(P, f"alert:{event}:followup")]  # the one new message: the 15 minute follow-up
         assert [e.actor for e in rig.audit.events if e.event == "ack_voice"] == [f"approver:{ApproverId(P)}"]
+
+
+# --- flow 1.3: the heartbeat (RQ-104) ----------------------------------------------------------------------
+
+Disk = namedtuple("Disk", "total used free")
+
+
+async def _health_is(edge, code: int, *, within_s: float = 10.0):  # type: ignore[no-untyped-def]
+    """Ask the public route until it answers `code`: the worker beats on real tasks, the clock is moved by hand."""
+    deadline = asyncio.get_running_loop().time() + within_s
+    while True:
+        r = await edge.get("/health")
+        if r.status_code == code or asyncio.get_running_loop().time() > deadline:
+            return r
+        await asyncio.sleep(0.05)
+
+
+async def test_heartbeat_ok_then_503(pg_db: PgDb, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    free = {"pct": 90}  # free disk in percent, moved by the test
+    monkeypatch.setattr("saathi.health.shutil.disk_usage", lambda _p: Disk(100, 100 - free["pct"], free["pct"]))
+    clock = FakeClock(NOW)
+    rig = Rig()
+    cfg = Settings(_env_file=None, approval_secret="s" * 32, media_dir=str(tmp_path))  # type: ignore[arg-type]
+
+    async with open_store(pg_db, Role.CORE, clock=clock) as store, pg_edge(pg_db, clock=clock) as edge:
+        # 1. Nothing has beaten yet: the route answers 503 with no body.
+        r = await edge.get("/health")
+        assert (r.status_code, r.content) == (503, b"")
+
+        # 2. The worker starts through `serve` (secrets, host table, then the loop and the core beat): 200 `ok` only.
+        worker = asyncio.create_task(serve(cfg, lambda _s: rig.deps(store, KeyRing(kek=None), clock)))
+        try:
+            r = await _health_is(edge, 200)
+            assert (r.status_code, r.text) == (200, "ok")
+            assert set(r.headers) <= {"content-type", "content-length"}  # no name, count or version
+
+            # 3. A full disk turns the route to 503 at the next beat (10 s later), and it recovers when space returns.
+            free["pct"] = 5
+            await clock.advance(10)
+            r = await _health_is(edge, 503)
+            assert (r.status_code, r.content) == (503, b"")
+            free["pct"] = 90
+            await clock.advance(10)
+            assert (await _health_is(edge, 200)).text == "ok"
+        finally:  # 4. The core stops: the last beat goes stale and the route answers 503 within 30 s.
+            worker.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await worker
+        await clock.advance(20)
+        assert (await edge.get("/health")).status_code == 200  # a beat 20 s old is still fresh
+        await clock.advance(11)
+        r = await edge.get("/health")
+        assert (r.status_code, r.content) == (503, b"")
+
+    # The skew probe saw the test clock far from the database clock and told the owner once, not at every beat.
+    assert rig.owner_alerts.count("probe_skew_fail") == 1
+    assert [a for a in rig.owner_alerts if not a.startswith("probe_")] == []

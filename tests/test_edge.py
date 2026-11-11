@@ -468,3 +468,37 @@ def test_uvicorn_config_limits_concurrency():
 
     cfg = uvicorn_config(FastAPI(), host="127.0.0.1", port=8000)
     assert cfg.limit_concurrency == EDGE_LIMIT_CONCURRENCY > 0
+
+
+def test_edge_secrets_come_from_files(tmp_path):
+    from saathi.config import Settings
+    from saathi.domain import Source
+    from saathi.edge.wiring import build_adapters
+
+    files = {}
+    for name in ("app", "tg"):
+        f = tmp_path / name
+        f.write_text("synthetic-secret\n")
+        files[name] = str(f)
+    s = Settings(_env_file=None, wa_app_secret_file=files["app"], tg_elder_secret_file=files["tg"])  # type: ignore[call-arg]
+    assert set(build_adapters(s)) == {Source.WHATSAPP, Source.TELEGRAM_ELDER}
+    assert set(build_adapters(Settings(_env_file=None))) == set()  # type: ignore[call-arg]
+
+
+async def test_verification_token_comes_from_its_file(tmp_path):
+    from edge_helpers import adapters, settings
+
+    from saathi.edge import create_edge_app
+    from saathi.store.keys import KeyRing
+
+    tok = tmp_path / "verify"
+    tok.write_text("synthetic-file-verify\n")
+    base = settings()
+    s = base.model_copy(update={"wa_verify_token_file": str(tok), "wa_verify_token": type(base.wa_verify_token)("")})
+    store = EdgeFakeStore()
+    app = create_edge_app(s, store, KeyRing(kek=None), adapters(), scan, store.clock, sender_key=b"k" * 32)  # type: ignore[arg-type]
+    async with client(app) as c:
+        q = {"hub.mode": "subscribe", "hub.challenge": "5"}
+        ok = await c.get(wa_url(), params={**q, "hub.verify_token": "synthetic-file-verify"})
+        assert (ok.status_code, ok.text) == (200, "5")
+        assert (await c.get(wa_url(), params={**q, "hub.verify_token": "synthetic-verify"})).status_code == 403

@@ -7,7 +7,7 @@ from collections.abc import Callable, Mapping
 
 from fastapi import FastAPI, HTTPException, Query, Request, Response
 
-from saathi.config import Settings
+from saathi.config import Settings, secret_text
 from saathi.domain import Source
 from saathi.edge.adapters import InboundAdapter
 from saathi.edge.handler import MAX_BODY_BYTES, EdgeCounters, EdgeDeps, handle_inbound
@@ -61,7 +61,7 @@ def create_edge_app(
         return Response(status_code=status.value)
 
     if Source.WHATSAPP in adapters and settings.wa_webhook_path:
-        expected = settings.wa_verify_token.get_secret_value()
+        expected = secret_text(settings.wa_verify_token, settings.wa_verify_token_file)
 
         @app.get(f"/wa/{settings.wa_webhook_path}")
         async def wa_verify(

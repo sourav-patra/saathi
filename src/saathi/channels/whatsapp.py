@@ -188,8 +188,12 @@ class WhatsAppClient:
         graph_version: str = "v23.0",
         client: httpx.AsyncClient | None = None,
         media_hosts: frozenset[str] = MEDIA_HOSTS,
+        api_base: str = "",
+        media_base: str = "",
     ):
-        self.base = f"https://graph.facebook.com/{graph_version}"
+        # `api_base` and `media_base` name the egress proxy routes of a model-driven container (RQ-102); empty = direct.
+        self.base = f"{api_base.rstrip('/') or 'https://graph.facebook.com'}/{graph_version}"
+        self._media_base = media_base.rstrip("/")
         self.phone_number_id = phone_number_id
         self._headers = {"Authorization": f"Bearer {access_token}"}
         self._client = client or httpx.AsyncClient(timeout=60)
@@ -220,6 +224,9 @@ class WhatsAppClient:
         Raises `SendRejected` for a disallowed host or an oversize body."""
         if not self.media_url_allowed(url):
             raise SendRejected("bad_media_url")
+        if self._media_base:  # the checked URL is fetched through the proxy route, which names the same media host
+            parts = urlsplit(url)
+            url = f"{self._media_base}{parts.path}" + (f"?{parts.query}" if parts.query else "")
         async with self._client.stream("GET", url, headers=self._headers, follow_redirects=False) as resp:
             if not resp.is_success:
                 await resp.aread()

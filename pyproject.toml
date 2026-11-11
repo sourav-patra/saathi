@@ -30,12 +30,13 @@ dev = [
   "pytest>=8",               # MIT
   "pytest-asyncio>=0.24",    # Apache-2.0
   "ruff>=0.6",               # MIT
+  "pyyaml>=6",               # MIT (the compose tests read infra/docker-compose.yml)
 ]
 
 [project.scripts]
 saathi-api = "saathi.app:main_edge"
 saathi-bot = "saathi.channels.telegram:run"
-saathi-worker = "saathi.worker.loop:main"
+saathi-worker = "saathi.channels.worker_main:main"
 saathi-admin = "saathi.admin:main"
 
 [build-system]

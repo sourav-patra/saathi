@@ -1,8 +1,10 @@
 """Subprocess entry points for the crash tests (LT-08): the edge and the worker as separate processes.
 
-``python crash_proc.py edge <port>`` serves the real edge composition on 127.0.0.1.
-``python crash_proc.py worker`` runs the real worker with recording fakes for the platforms and models, until no inbox
-row of the household is waiting (exit 0) or the time is up (exit 3).
+``python crash_proc.py edge`` runs the real edge entry (`saathi.edge.wiring.serve`) on 127.0.0.1, on the port of the
+`SAATHI_EDGE_PORT` setting.
+``python crash_proc.py worker`` runs the real worker entry (`saathi.worker.loop.serve`: secrets, host table, core
+heartbeat, poll loop) with recording fakes for the platforms and models, until no inbox row of the household is
+waiting (exit 0) or the time is up (exit 3).
 ``python crash_proc.py alerts`` runs the real alert service for `CRASH_ALERT_SECONDS` seconds (exit 0).
 The fakes keep a journal of every effect in a file, so a restarted process sees the keys the killed one already sent
 and the channel refuses a second send with the same key. The journal records the refused sends too (R16-2), so a test
@@ -13,6 +15,7 @@ environment the test sets.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import os
 import sys
@@ -30,12 +33,13 @@ from fakes import (
 )
 
 from saathi.clock import SystemClock
-from saathi.config import get_settings
+from saathi.config import Settings, get_settings
 from saathi.errors import SendRejected
 from saathi.ids import HouseholdId
 from saathi.store import Role, Store, create_pool
 from saathi.store.keys import KeyRing
-from saathi.worker import Worker, WorkerConfig, WorkerDeps
+from saathi.worker import WorkerConfig, WorkerDeps
+from saathi.worker.loop import serve
 
 QUIET_TIMEOUT_S = 40.0
 LEASE_S = 2  # a killed worker's lease runs out quickly, so the restart does not wait a minute
@@ -106,33 +110,48 @@ async def _waiting(store: Store, household: str) -> int:
     return int(rows[0]["n"])
 
 
-async def run_worker() -> int:
+async def build_deps(settings: Settings) -> WorkerDeps:
+    """What `build_worker` makes from the settings, with fakes in place of the platforms and the speech runtimes. The
+    database login, the key ring and the loop are the real ones."""
     clock = SystemClock()
     journal = Journal(os.environ["CRASH_JOURNAL"])
-    household = os.environ["CRASH_HOUSEHOLD"]
-    store = Store(await create_pool(get_settings().db_url_core), Role.CORE, clock)
+    store = Store(await create_pool(settings.db_url_core), Role.CORE, clock)
 
     async def owner_alert(_what: str) -> None:
         return None
 
-    deps = WorkerDeps(
+    return WorkerDeps(
         store=store, keys=KeyRing(bytes.fromhex(os.environ["CRASH_KEK_HEX"])), elder=JournalElder(journal),
         caregiver=JournalCaregiver(journal), voice=FakeVoiceStore(), asr=FakeASR(), codec=FakeAudioCodec(),
         media=FakeMediaStore(), audit=FakeAudit(), clock=clock, owner_alert=owner_alert,
         cfg=WorkerConfig(lease_s=LEASE_S),
     )  # fmt: skip
-    worker = Worker(store, deps, clock)
+
+
+async def run_worker() -> int:
+    """`serve` runs until cancelled; this watches the queue and stops it when nothing is waiting."""
+    settings = get_settings()
+    household = os.environ["CRASH_HOUSEHOLD"]
+    served = asyncio.create_task(serve(settings, build_deps))
     deadline = time.monotonic() + QUIET_TIMEOUT_S
+    store: Store | None = None
     try:
         while time.monotonic() < deadline:
-            busy = await worker.run_once()
-            if not busy:
-                if await _waiting(store, household) == 0:
-                    return 0
-                await asyncio.sleep(0.3)
+            if served.done():
+                served.result()  # a start-up refusal or a crash surfaces here as a non-zero exit
+                return 4
+            if store is None:
+                store = Store(await create_pool(settings.db_url_core), Role.CORE, SystemClock())
+            if await _waiting(store, household) == 0 and await _worked(store, household):
+                return 0
+            await asyncio.sleep(0.3)
         return 3
     finally:
-        await store.close()
+        served.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await served
+        if store is not None:
+            await store.close()
 
 
 async def run_alerts() -> int:
@@ -170,24 +189,22 @@ async def run_alerts() -> int:
         await store.close()
 
 
-def run_edge(port: int) -> None:
-    import uvicorn
+async def _worked(store: Store, household: str) -> bool:
+    """True once the household has at least one inbox row and none is waiting, so an empty start is not 'done'."""
+    async with store.tx(household=HouseholdId(household)) as tx:
+        rows = await tx.fetch("SELECT count(*) AS n FROM inbox")
+    return int(rows[0]["n"]) > 0
 
-    from saathi.edge.wiring import build_edge, uvicorn_config
 
-    async def serve() -> None:
-        app, store = await build_edge(get_settings())
-        try:
-            await uvicorn.Server(uvicorn_config(app, host="127.0.0.1", port=port)).serve()
-        finally:
-            await store.close()
+def run_edge() -> None:
+    from saathi.edge.wiring import serve as serve_edge
 
-    asyncio.run(serve())
+    asyncio.run(serve_edge(get_settings(), host="127.0.0.1"))
 
 
 if __name__ == "__main__":
     if sys.argv[1] == "edge":
-        run_edge(int(sys.argv[2]))
+        run_edge()
     elif sys.argv[1] == "alerts":
         sys.exit(asyncio.run(run_alerts()))
     else:
