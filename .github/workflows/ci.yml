@@ -116,12 +116,34 @@ jobs:
           uv run python scripts/leak_scan.py --history --range "$range"
 
   # Report mode never fails the build; gate.py writes the step summary itself. It becomes required at the Phase 0 exit.
+  # The gate runs the same pytest files as the test job, so it gets the same environment: CI=true, the throwaway
+  # Postgres service with its DSN, and strace. Without them the database-backed rows skip or fail here while they
+  # pass in the test job.
   gate-report:
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      CI: "true"
+      SAATHI_TEST_DSN: postgresql://postgres:ci-throwaway@localhost:5432/postgres
+    services:
+      postgres:
+        # Same postgres:16 index digest as the test job (RQ-72a).
+        image: postgres:16@sha256:f9a7b9ebf6f56201f949db745e47bc423c0f0f8294bafe991cc10bf74b029657
+        env:
+          POSTGRES_PASSWORD: ci-throwaway
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0  # the PL-08 and PL-15 rows scan history
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
       - run: uv python install 3.12
       - run: uv sync --frozen
+      - run: sudo apt-get update -q && sudo apt-get install -y --no-install-recommends strace
       - run: uv run python scripts/gate.py --phase 0 --report
