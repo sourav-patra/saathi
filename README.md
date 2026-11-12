@@ -17,7 +17,9 @@ Many older people in India get stuck on everyday phone tasks: booking a ride, or
 
 Today Saathi takes the request in the elder's own words, in Hindi or everyday English, and passes it to the family with any danger flagged. From Phase 1 it is meant to do the work up to the final step, which a caregiver approves from Telegram.
 
-Evidence so far: the Phase 0 release checklist (a "gate" of 68 checks that the automated build, CI, runs on every change) has 55 checks passing and 0 failing. The other 13 wait on records only the owner can produce, such as the manual pilot and repository settings; one of these records is filed and waits for the next CI run ([gate script](scripts/gate.py), [records](docs/evidence/receipts)).
+Evidence so far: the Phase 0 release checklist (a "gate" of 68 checks that the automated build, CI, runs on every change) has 55 checks passing and 0 failing.
+
+The other 13 wait on records only the owner can produce, such as the manual pilot and repository settings. One of them is filed and waits for the next CI run ([gate script](scripts/gate.py), [records](docs/evidence/receipts)).
 
 ## Features
 
