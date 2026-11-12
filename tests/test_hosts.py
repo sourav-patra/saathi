@@ -376,7 +376,7 @@ def test_migrate_entry_point_refuses_a_missing_or_empty_schema_dir(tmp_path, mon
         target.mkdir()
     if make == "no_sql":
         (target / "README.txt").write_text("not a migration", encoding="utf-8")
-    monkeypatch.setenv("SAATHI_MIGRATE_DSN", "postgresql://saathi_migrator:x@127.0.0.1:1/none")
+    monkeypatch.setenv("SAATHI_MIGRATE_DSN", "postgresql://127.0.0.1:1/none")
     monkeypatch.setenv("SAATHI_SCHEMA_DIR", str(target))
     monkeypatch.setattr(mig.asyncpg, "connect", lambda *a, **k: pytest.fail("connected without migration files"))
     with pytest.raises(SystemExit) as exc:
