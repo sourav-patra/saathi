@@ -231,8 +231,10 @@ services:
     environment:
       SAATHI_MIGRATE_DSN: postgresql://saathi_migrator:${SAATHI_DB_PASSWORD_MIGRATOR:?set SAATHI_DB_PASSWORD_MIGRATOR}@postgres:5432/saathi
       SAATHI_SCHEMA_DIR: /app/schema
+    # Long form asks the engine not to create a missing source (Docker Desktop on Windows creates it anyway); the
+    # entry point refuses an empty or missing directory with exit 1, so edge and worker never start on no schema.
     volumes:
-      - ./sql/schema:/app/schema:ro
+      - { type: bind, source: ./sql/schema, target: /app/schema, read_only: true, bind: { create_host_path: false } }
     networks: [internal]
     depends_on:
       postgres: { condition: service_healthy }
