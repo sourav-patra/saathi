@@ -6,7 +6,8 @@ gate's own `evaluate`, and writes `RECEIPT-fault-<id>-<date>.md` with the fault 
 fault never touches the working tree: it runs on planted inputs in a temporary directory.
 
 Faults by check:
-- a pytest row: one test case is corrupted (scripts/fault_plugin.py fails the first case; `-x` stops the run);
+- radar/policy pytest rows: two independent source mutations, each in a fresh copy, with a clean control;
+- other pytest rows: one test case is corrupted (scripts/fault_plugin.py fails the first case; `-x` stops the run);
 - doc_lint: a planted document whose file name holds a space; design_check: a copy of the tree with one TQ row
   deleted; ci_lint: a planted workflow with an unpinned `uses:`; license_audit: a planted LGPL manifest line;
   rule_index: a planted phase 0 rule with no test; leak_scan: a planted key in a scratch repository (and a planted
@@ -20,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -32,6 +34,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import gate  # noqa: E402
+import mutation_faults  # noqa: E402
 
 ROOT = HERE.parent
 RECEIPTS = ROOT / "docs" / "evidence" / "receipts"
@@ -55,6 +58,7 @@ def record_fault(
     receipts: Path = RECEIPTS,
     today: date | None = None,
     revision: str | None = None,
+    details: Mapping[str, str] | None = None,
 ) -> Path:
     """Write RECEIPT-fault-<id>-<date>.md (first line a sentence, then `key: value` lines) and return its path."""
     today = today or date.today()
@@ -62,10 +66,12 @@ def record_fault(
     receipts.mkdir(parents=True, exist_ok=True)
     path = receipts / f"RECEIPT-fault-{gate_id.lower()}-{today.isoformat()}.md"
     outcome = "reported invalid" if result == "invalid" else f"reported {result}, which is a broken gate"
+    extra_fields = "".join(f"{key}: {value}\n" for key, value in (details or {}).items())
     path.write_text(
         f"A deliberate fault applied to gate row {gate_id} {outcome}; the clean row is run by scripts/gate.py.\n\n"
         f"kind: receipt\nid: {gate_id}\nrevision: {revision}\ndate: {today.isoformat()}\n"
         f"command: {' '.join(command)}\nfault: {fault}\nresult: {result}\n"
+        f"{extra_fields}"
         "restore: the fault ran on planted inputs in a scratch directory; the tree was not changed\n"
         "note: written by scripts/record_fault.py; no content\n",
         encoding="utf-8",
@@ -161,16 +167,71 @@ def make_fault(argv: Sequence[str], scratch: Path, root: Path = ROOT) -> Fault:
     raise ValueError(f"no deliberate fault is defined for: {' '.join(argv)}")
 
 
-def env_runner(extra: Mapping[str, str]) -> gate.Runner:
+def env_runner(extra: Mapping[str, str], cwd: Path = ROOT) -> gate.Runner:
     def run(argv: Sequence[str]) -> tuple[int, str]:
         env = {**os.environ, **extra}
-        done = subprocess.run(list(argv), cwd=ROOT, env=env, capture_output=True, text=True, timeout=1800, check=False)
+        done = subprocess.run(list(argv), cwd=cwd, env=env, capture_output=True, text=True, timeout=1800, check=False)
         return done.returncode, done.stdout
 
     return run
 
 
+def run_mutations(row: gate.Row, receipts: Path, today: date | None = None) -> gate.State:
+    """A clean control must pass before failures can provide mutation evidence."""
+    command = mutation_faults.affected_command(row.command or [])
+    safety_row = row.model_copy(update={"command": command})
+    details: dict[str, str] = {"mutation_command": " ".join(command)}
+    states: list[gate.State] = []
+    mutations = mutation_faults.mutations_for(row.command or [])
+    with tempfile.TemporaryDirectory(prefix="saathi-mutation-") as tmp:
+        scratch = Path(tmp)
+        for mutation in (None, *mutations):
+            name = mutation.id if mutation else "clean"
+            tree = mutation_faults.copy_tree(ROOT, scratch / name)
+            if mutation:
+                mutation.apply(tree)
+            extra = mutation_faults.mutation_env(tree)
+            result: dict[str, int | str] = {}
+            runner = env_runner(extra, tree)
+
+            def capture(argv: Sequence[str], run=runner, output=result) -> tuple[int, str]:
+                # The gate adds -rs, which replaces pytest's default failure summary; -rfs keeps the skip report
+                # and adds the FAILED lines that name the test that caught the mutation.
+                argv = ["-rfs" if arg == "-rs" else arg for arg in argv]
+                code, stdout = run(argv)
+                output.update(code=code, stdout=stdout)
+                return code, stdout
+
+            state = gate.evaluate(
+                safety_row, receipts, today or date.today(), capture, root=tree, env={**os.environ, **extra},
+            )
+            stdout = str(result.get("stdout", ""))
+            # An interpreter or test-collection error is not evidence that a test caught a defect.
+            if mutation and state == "invalid" and (
+                result.get("code") != 1 or not re.search(r"\b[1-9]\d* failed\b", stdout)
+            ):
+                state = "unavailable"
+            cases = re.findall(r"^FAILED (\S+)", stdout, re.M)
+            details[f"mutation_{name}" if mutation else "clean"] = (
+                f"{state}; exit {result.get('code', 'not run')}"
+                + (f"; tests: {', '.join(cases)}" if cases else "")
+            )
+            if mutation:
+                states.append(state)
+            elif state != "verified":
+                states.append("unavailable")
+                break
+    state = "verified" if "verified" in states else "unavailable" if "unavailable" in states else "invalid"
+    record_fault(
+        row.id, "; ".join(m.description for m in mutations), state,
+        command=row.command or [], receipts=receipts, today=today, details=details,
+    )
+    return state
+
+
 def run_fault(row: gate.Row, receipts: Path = RECEIPTS, today: date | None = None) -> gate.State:
+    if mutation_faults.mutations_for(row.command or []):
+        return run_mutations(row, receipts, today)
     with tempfile.TemporaryDirectory(prefix="saathi-fault-") as tmp:
         fault = make_fault(row.command or [], Path(tmp))
         faulted = row.model_copy(update={"command": fault.argv})
@@ -182,14 +243,22 @@ def run_fault(row: gate.Row, receipts: Path = RECEIPTS, today: date | None = Non
 
 def main(argv: Sequence[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--phase", type=int, default=0)
+    ap.add_argument("--phase", type=int, default=None, help="default: phase 0, or any phase for explicit --row")
     ap.add_argument("--row", action="append", default=[], help="only these row ids (repeatable)")
     ap.add_argument("--registry", type=Path, default=ROOT / "scripts" / "gate_registry.toml")
     ap.add_argument("--receipts", type=Path, default=RECEIPTS)
     args = ap.parse_args(argv)
-    rows = [r for r in gate.load_registry(args.registry) if r.kind == "auto" and r.phase <= args.phase]
+    registry = gate.load_registry(args.registry)
+    policy_rows = [gate.Row(**r) for r in mutation_faults.policy_rule_rows(ROOT)]
+    known = {r.id for r in registry}
+    rows = [r for r in [*registry, *(r for r in policy_rows if r.id not in known)] if r.kind == "auto"]
+    phase = args.phase if args.phase is not None else (None if args.row else 0)
+    rows = [r for r in rows if phase is None or r.phase <= phase]
     if args.row:
         rows = [r for r in rows if r.id in set(args.row)]
+        missing = set(args.row) - {r.id for r in rows}
+        if missing:
+            ap.error("unknown or filtered row id(s): " + ", ".join(sorted(missing)))
     broken = 0
     for r in rows:
         state = run_fault(r, args.receipts)

@@ -235,9 +235,11 @@ def test_commit_rejects_token_signed_with_other_secret():
 def test_commit_rejects_modified_approved_quote():
     q = cart()
     tok = _approve(q)
-    tampered = q.model_copy(update={"total": Decimal("900")})
+    # Stay below spending caps: only the token hash must reject this modification.
+    tampered = q.model_copy(update={"total": Decimal("320")})
     auth = engine().authorize_commit(approved_quote=tampered, live_quote=tampered, token=tok, ctx=CTX, now=NOW)
     assert not auth.allowed
+    assert auth.reasons == ["approved quote was modified after approval"], auth.reasons
 
 
 @rule("PE-13")
