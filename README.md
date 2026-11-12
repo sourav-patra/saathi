@@ -5,11 +5,11 @@ An open-source helper for older family members: they send a WhatsApp voice note,
 [![ci](https://github.com/sourav-patra/saathi/actions/workflows/ci.yml/badge.svg)](https://github.com/sourav-patra/saathi/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
-![Three columns: the elder sends a voice note on WhatsApp; the server saves it, acknowledges, transcribes and scans it; the caregiver gets a Telegram card and the elder hears "I have told your family"; an emergency adds a "call 112 or 108" reply](docs/figures/saathi-today.svg)
+![Three columns: the elder sends a voice note on WhatsApp; the server saves it, acknowledges, transcribes and scans it; the caregiver gets a Telegram card and the elder hears "I have told your family"; an emergency instead gives a "possible emergency" card and a "call 112 or 108" reply](docs/figures/saathi-today.svg)
 
 *What Phase 0 does today, shown with synthetic text. It listens, checks and tells the family. It orders nothing yet.*
 
-Saathi is a working codename; the public name comes later (D-90). Saathi is not an emergency service; it alerts your family. In an emergency, call 112, or 108 for an ambulance.
+Saathi is a working codename; the public name comes later. Saathi is not an emergency service; it alerts your family. In an emergency, call 112, or 108 for an ambulance.
 
 ## Why
 
@@ -17,12 +17,12 @@ Many older people in India get stuck on everyday phone tasks: booking a ride, or
 
 Today Saathi takes the request in the elder's own words, in Hindi or everyday English, and passes it to the family with any danger flagged. From Phase 1 it is meant to do the work up to the final step, which a caregiver approves from Telegram.
 
-Evidence so far: the Phase 0 release checklist (a "gate" of 68 checks that the automated build, CI, runs on every change) has 55 checks passing and 0 failing. The other 13 wait on records only the owner can produce, such as the manual pilot and repository settings ([gate script](scripts/gate.py), [records](docs/evidence/receipts)).
+Evidence so far: the Phase 0 release checklist (a "gate" of 68 checks that the automated build, CI, runs on every change) has 55 checks passing and 0 failing. The other 13 wait on records only the owner can produce, such as the manual pilot and repository settings; one of these records is filed and waits for the next CI run ([gate script](scripts/gate.py), [records](docs/evidence/receipts)).
 
 ## Features
 
 - Voice notes, photos and text on WhatsApp; caregiver cards on Telegram. Approval buttons come in Phase 1.
-- Emergency and scam radar: a keyword list is checked first, so a match alerts the family without waiting for a model.
+- Emergency and scam radar: a keyword list is checked first, so a match alerts the family without waiting for a classifier model.
 - Personal data leaves your server only by the routes [the data policy](docs/design/POLICY-saathi-data-2026-11-09.md) lists, after a recorded reason; free hosted model tiers never see it.
 - Every dependency is checked in CI against [the licence policy](scripts/license_exceptions.toml): MIT, Apache-2.0 or similar permissive licences, plus a short list of named, reasoned exceptions (for container base packages, [this list](scripts/image_base_allowlist.toml)).
 - For the planned order path, a policy engine is already built and tested as the only route to an order: it needs the caregiver's approval tied to the exact quote (items and price), cash on delivery or an allowed wallet, a spend cap and an address from the household's approved list.
@@ -41,7 +41,7 @@ To run Saathi on a server, follow [the setup guide](docs/SETUP.md).
 
 ![Sequence of eleven numbered messages between the caregiver on Telegram, the approval service, the database, the commit executor, the adapter and the commerce service, in three steps](docs/design/figures/commit-sequence.svg)
 
-*The approval and order sequence planned for Phase 1. The caregiver taps Approve on a card; code checks the approval against the quote before any order is placed. The codes (C12, X1 and so on) are component names from [the technical requirements](docs/design/TRD-saathi-2026-11-09.md).*
+*The approval and order sequence planned for Phase 1. The caregiver taps Approve on a card; code checks the approval against the quote before any order is placed. The codes (C12, X1 and so on) are component and zone names from [the technical requirements](docs/design/TRD-saathi-2026-11-09.md); compare-and-set means one approval can be used only once.*
 
 | Phase | Adds | State |
 |---|---|---|
