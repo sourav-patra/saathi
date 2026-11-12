@@ -335,3 +335,23 @@ def test_the_connect_check_notices_a_connection_outside_the_list(tmp_path: Path)
     finally:
         srv.shutdown()
         other.shutdown()
+
+
+def test_schema_is_migrated_before_edge_and_worker_start():
+    """DI-7: a one-shot `migrate` service applies infra/sql/schema as saathi_migrator; edge and worker wait for it."""
+    svcs = _compose_services()
+    mig = svcs["migrate"]
+    assert mig["command"] == ["saathi-migrate"]
+    assert mig["restart"] == "no"
+    assert mig["networks"] == ["internal"]
+    assert not mig.get("ports") and not mig.get("env_file") and not mig.get("secrets")
+    env = mig["environment"]
+    assert env["SAATHI_MIGRATE_DSN"].startswith("postgresql://saathi_migrator:")
+    assert env["SAATHI_SCHEMA_DIR"] == "/app/schema"
+    assert "./sql/schema:/app/schema:ro" in mig["volumes"]
+    assert mig["depends_on"]["postgres"] == {"condition": "service_healthy"}
+    for name in ("edge", "worker"):
+        assert svcs[name]["depends_on"]["migrate"] == {"condition": "service_completed_successfully"}, name
+    import tomllib
+    scripts = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["scripts"]
+    assert scripts["saathi-migrate"] == "saathi.store.migrate:main"

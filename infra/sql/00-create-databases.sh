@@ -1,7 +1,7 @@
 #!/bin/bash
 # Runs once on first Postgres start, as the superuser. Creates the Langfuse database, every Saathi role and the
 # Saathi database (LLD grants part, section 1). No migration creates a role: the migrator is not a superuser.
-# The schema is applied later by `saathi-migrate` as saathi_migrator (files 001 to 005 in ./schema).
+# The schema is applied later by `saathi-migrate` as saathi_migrator (every file in ./schema, by the compose `migrate` service before edge and worker start).
 # tests/conftest.py runs the block between the BEGIN and END markers below, with fixed test words for the secrets.
 set -euo pipefail
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<SQL

@@ -222,6 +222,21 @@ services:
       retries: 20
 
   # ------------------------------------------------------------ app
+  # One-shot schema migration (DI-7): applies infra/sql/schema as `saathi_migrator` under an advisory lock, then
+  # exits. Edge and worker start only after it completed successfully; a repeat start applies nothing new.
+  migrate:
+    build: { context: .., dockerfile: infra/Dockerfile }
+    restart: "no"
+    command: ["saathi-migrate"]
+    environment:
+      SAATHI_MIGRATE_DSN: postgresql://saathi_migrator:${SAATHI_DB_PASSWORD_MIGRATOR:?set SAATHI_DB_PASSWORD_MIGRATOR}@postgres:5432/saathi
+      SAATHI_SCHEMA_DIR: /app/schema
+    volumes:
+      - ./sql/schema:/app/schema:ro
+    networks: [internal]
+    depends_on:
+      postgres: { condition: service_healthy }
+
   # The public edge: persists inbound messages, scans for keywords, answers the health route. It connects as the
   # `saathi_edge` role, holds no key-encryption key, no caregiver token and no model key, and so has no env_file.
   edge:
@@ -242,6 +257,7 @@ services:
     networks: [internal, public]
     depends_on:
       postgres: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
     ports: ["127.0.0.1:${SAATHI_EDGE_PORT:-8000}:${SAATHI_EDGE_PORT:-8000}"]
 
   # The worker: leases inbox rows, runs the steps, sends the replies and the caregiver cards, and beats the core
@@ -273,6 +289,7 @@ services:
     networks: [internal]
     depends_on:
       postgres: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
       egress: { condition: service_started }
 
   # The egress proxy (RQ-102, PL-04): no TLS interception, no certificate authority. One listener, one route per
