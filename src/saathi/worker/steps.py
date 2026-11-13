@@ -18,10 +18,12 @@ from typing import Literal
 from saathi import replies
 from saathi.audit.events import AuditName
 from saathi.consents import gate
+from saathi.delivered import DUPLICATE
 from saathi.domain import (
     AlertOpen,
     AudioBlob,
     AuditEvent,
+    Card,
     Intent,
     Lease,
     MediaBlob,
@@ -50,6 +52,9 @@ from saathi.ports import (
     Tx,
     VoiceStore,
 )
+from saathi.rides.card import choice_card, known_card
+from saathi.rides.recognise import recognise
+from saathi.rides.repo import PlaceRepo
 from saathi.states import REQUEST, Machine
 from saathi.store import Store
 from saathi.store.keys import KeyRing
@@ -320,7 +325,8 @@ async def process(lease: Lease, deps: WorkerDeps) -> Outcome:
                 await RequestRepo.transition(tx, ctx.request, "received", "router_outcome_c", "handoff", "summary_only")
                 request_state = "handoff"
 
-    effects = await _send_effects(ctx, deps, run, hit, flag, intent, blob, transcript is not None)
+    ride = await _ride_step(ctx, deps, text, hit, radar_ok)
+    effects = await _send_effects(ctx, deps, run, hit, flag, intent, blob, transcript is not None, lease, ride)
 
     fault(WORKER_BEFORE_SETTLE)  # test hook: every effect is sent, the row is not settled yet
     state = {"unsupported": "unsupported", "media_lost": "media_lost"}.get(flag, "processed")
@@ -337,6 +343,37 @@ async def process(lease: Lease, deps: WorkerDeps) -> Outcome:
     return Outcome(state, request_state, hit.emergency, hit.scam, effects, checks)
 
 
+@dataclass(frozen=True)
+class _Ride:
+    """The extra caregiver card of the ride helper. `place_id` is the place to count; None for the choice card."""
+
+    card: Card
+    place_id: str | None
+
+
+async def _ride_step(ctx: _Ctx, deps: WorkerDeps, text: str, hit: RadarResult, radar_ok: bool) -> _Ride | None:
+    """The ride helper (a handoff only): with no emergency or scam, a household that has saved places and a ride word
+    in the words, a card for the caregiver. Any failure here is logged and gives None: the summary and the elder reply
+    never wait on it."""
+    if not (text and ctx.consent and radar_ok) or hit.emergency or hit.scam:
+        return None
+    try:
+        async with deps.store.tx(household=ctx.household) as tx:
+            places = await PlaceRepo.all(tx)
+        if not places:
+            return None
+        found = recognise(text, places)
+        if not found.ride_word:
+            return None
+        drop = next((p for p in places if p.id == found.place_id), None)
+        if drop is None:
+            return _Ride(choice_card(places), None)
+        return _Ride(known_card(drop, next((p for p in places if p.is_pickup), None)), drop.id)
+    except Exception as exc:  # noqa: BLE001  (a ride step that fails must not lose the summary)
+        log.warning("ride step failed for %s: %s", ctx.inbox, type(exc).__name__)
+        return None
+
+
 async def _send_effects(
     ctx: _Ctx,
     deps: WorkerDeps,
@@ -346,6 +383,8 @@ async def _send_effects(
     intent: str,
     blob: MediaBlob | None,
     transcribed: bool,
+    lease: Lease,
+    ride: _Ride | None = None,
 ) -> int:
     """The caregiver summary (and the audio when allowed), then the elder reply. The humans are told first, each send
     bounded by a timeout; an error or a cancel in their send does not stop the elder reply, and an error is raised
@@ -358,6 +397,7 @@ async def _send_effects(
     card = render_card(slots)
     sent = 0
     failure: Exception | None = None
+    fresh_ride = False  # a ride card went out that no earlier attempt had sent
     try:
         for approver in sorted(ctx.cfg.approvers, key=lambda a: a.role != "primary"):
             who = ApproverId(approver.approver_id)
@@ -372,8 +412,25 @@ async def _send_effects(
                             who, audio, AUDIO_CAPTION, key=idem_key(ctx.inbox, "audio", approver.approver_id)
                         )
                     sent += 1
+                if ride is not None:  # after the summary; its own key; its failure is only logged
+                    try:
+                        async with asyncio.timeout(CAREGIVER_SEND_TIMEOUT_S):
+                            ref = await deps.caregiver.send_card(
+                                who, ride.card, key=idem_key(ctx.inbox, "ride", approver.approver_id)
+                            )
+                        sent += 1
+                        fresh_ride = fresh_ride or ref.message_ref != DUPLICATE
+                    except Exception as exc:  # noqa: BLE001  (a timeout is one too)
+                        log.warning("ride card failed for %s: %s", ctx.inbox, type(exc).__name__)
             except Exception as exc:  # noqa: BLE001  (a timeout is one too)
                 failure = failure or exc
+        if ride is not None and ride.place_id is not None and fresh_ride:
+            try:  # counted once: a repeat of the row finds its keys already used and counts nothing
+                async with deps.store.tx(household=ctx.household) as tx:
+                    await holds(tx, lease)
+                    await PlaceRepo.count_ride(tx, ride.place_id)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("ride count failed for %s: %s", ctx.inbox, type(exc).__name__)
     finally:  # also on a cancel: the elder reply is never skipped because a caregiver send was in flight
         if hit.emergency:
             reply = ReplyKey.EMERGENCY

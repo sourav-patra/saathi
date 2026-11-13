@@ -566,7 +566,7 @@ def test_data_classes_pl01() -> None:
 def test_m15_m17_m19_value_types_have_the_lld_fields() -> None:
     """Field names exactly as the LLD safety part gives them (M15 line 46, M17 line 76, M19 lines 105-111)."""
     assert list(Card.model_fields) == ["title", "lines", "buttons"]
-    assert list(Button.model_fields) == ["text", "data"]
+    assert list(Button.model_fields) == ["text", "data", "url"]
     assert list(AuditEvent.model_fields) == [
         "household", "run_id", "actor", "event", "subject", "detail", "sensitive",
     ]  # fmt: skip

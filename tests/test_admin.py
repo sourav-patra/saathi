@@ -142,6 +142,10 @@ def test_parser_covers_every_command():
         ["consent", "record", "h1", "--file", "f"],
         ["config", "set", "h1", "--file", "f"],
         ["clips", "review", "ack", "1", "--receipt", "r", "--household", "h1"],
+        "place add --household h1 --label L --address A --lat 0.1 --lng 0.2 --alias a1 --alias a2 --pickup".split(),
+        ["place", "list", "--household", "h1"],
+        ["place", "alias-add", "--household", "h1", "--place", "L", "--alias", "x"],
+        ["place", "remove", "--household", "h1", "--place", "L"],
     ):
         assert isinstance(p.parse_args(argv), argparse.Namespace)
     with pytest.raises(SystemExit):
@@ -606,3 +610,83 @@ async def test_f5_elder_add_refuses_an_unknown_language(pg_db: PgDb, tmp_path: P
         with pytest.raises(AdminError, match="language"):
             await a.elder_add(H, "e1", name="n", lang="xx-evil")
     assert await su_fetch(pg_db, "SELECT 1 FROM elders") == []
+
+
+# --- ride places (008) ----------------------------------------------------------------------------------------
+
+
+async def test_place_add_list_alias_and_remove(pg_db: PgDb, tmp_path: Path):
+    p = build_parser()
+    async with admin_for(pg_db, tmp_path) as a:
+        await onboard(a)
+        out = await dispatch(
+            p.parse_args(
+                ["place", "add", "--household", H, "--label", "Clinic A", "--address", "2 Test Road, Sample Town",
+                 "--lat", "0.1", "--lng", "0.2", "--alias", "doctor", "--alias", "dr"]
+            ),
+            a,
+        )  # fmt: skip
+        clinic = out.removeprefix("place added: ")
+        home = await a.place_add(H, label="Home P", address="1 Pickup Lane, Sample Town", pickup=True)
+        listing = await dispatch(p.parse_args(["place", "list", "--household", H]), a)
+        assert listing.splitlines() == [
+            f"{clinic}  Clinic A  pickup=no  coordinates=yes  rides=0  aliases=doctor, dr",
+            f"{home}  Home P  pickup=yes  coordinates=no  rides=0  aliases=-",
+        ]
+        assert "Test Road" not in listing  # the address itself is not printed
+        by_label = p.parse_args(["place", "alias-add", "--household", H, "--place", "clinic a", "--alias", "Doctor"])
+        by_id = p.parse_args(["place", "alias-add", "--household", H, "--place", home, "--alias", "ghar"])
+        assert await dispatch(by_label, a) == "alias added"  # a label matches in any case
+        assert await dispatch(by_id, a) == "alias added"
+        with pytest.raises(AdminError, match="already has this alias"):
+            await a.place_alias_add(H, clinic, "doctor")
+        with pytest.raises(AdminError, match="no such place"):
+            await a.place_alias_add(H, "nowhere", "x")
+        with pytest.raises(AdminError, match="letter or digit"):
+            await a.place_alias_add(H, clinic, "?!")
+        removal = p.parse_args(["place", "remove", "--household", H, "--place", "Clinic A"])
+        assert await dispatch(removal, a) == "place removed"
+        with pytest.raises(AdminError, match="no such place"):
+            await a.place_remove(H, clinic)
+    rows_ = await su_fetch(pg_db, "SELECT id, aliases FROM addresses")
+    assert [(r["id"], r["aliases"]) for r in rows_] == [(home, ["ghar"])]
+
+
+async def test_place_rules(pg_db: PgDb, tmp_path: Path):
+    async with admin_for(pg_db, tmp_path) as a:
+        await onboard(a)
+        await onboard(a, "h2")
+        await a.place_add(H, label="Home P", address="x", pickup=True)
+        with pytest.raises(AdminError, match="already has a pickup"):
+            await a.place_add(H, label="Home Q", address="y", pickup=True)
+        await a.place_add("h2", label="Home P", address="x", pickup=True)  # another household has its own
+        with pytest.raises(AdminError, match="both"):
+            await a.place_add(H, label="Clinic A", address="y", lat=0.1)
+        with pytest.raises(AdminError, match="out of range"):
+            await a.place_add(H, label="Clinic A", address="y", lat=91.0, lng=0.0)
+        with pytest.raises(AdminError, match="label and an address"):
+            await a.place_add(H, label=" ", address="y")
+        with pytest.raises(AdminError, match="letter or digit"):
+            await a.place_add(H, label="Clinic A", address="y", aliases=["..."])
+        with pytest.raises(AdminError, match="no such household"):
+            await a.place_add("nope", label="Clinic A", address="y")
+        await a.place_add(H, label="Twin", address="y")
+        await a.place_add(H, label="twin", address="z")
+        with pytest.raises(AdminError, match="use the id"):
+            await a.place_remove(H, "TWIN")  # two places share the label: the id is needed
+    assert len(await su_fetch(pg_db, "SELECT 1 FROM addresses WHERE household_id = 'h1'")) == 3
+
+
+async def test_place_commands_audit_codes_only(pg_db: PgDb, tmp_path: Path):
+    async with admin_for(pg_db, tmp_path) as a:
+        await onboard(a)
+        await a.keys_init(H)
+        place = await a.place_add(H, label="Clinic A", address="2 Test Road, Sample Town", aliases=["doctor"])
+        await a.place_alias_add(H, place, "dr")
+        await a.place_remove(H, place)
+    rows_ = await su_fetch(pg_db, "SELECT event, actor, subject, detail FROM audit_log WHERE event LIKE 'admin_place%'")
+    assert [r["event"] for r in rows_] == ["admin_place_added", "admin_place_alias_added", "admin_place_removed"]
+    assert {r["actor"] for r in rows_} == {OWNER_ACTOR}
+    flat = json.dumps([dict(r) for r in rows_], default=str)
+    for private in ("Clinic A", "Test Road", "doctor"):
+        assert private not in flat  # no label, address or alias in an audit row
