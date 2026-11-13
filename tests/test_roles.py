@@ -523,6 +523,7 @@ EXPECTED: dict[str, dict[str, dict[str, set[str]]]] = {
             **{f"alert_attempts.{c}": {"UPDATE"} for c in ("status", "sent_at", "provider_ref_hmac")},
             **{f"requests.{c}": {"UPDATE"} for c in _REQUEST_COLS},
             **{f"runtime_flags.{c}": {"UPDATE"} for c in ("paused", "paused_by", "reason", "updated_at")},
+            **{f"addresses.{c}": {"UPDATE"} for c in ("ride_count", "last_ride_at")},  # 008: the ride counters only
         },
         "seq": {s: {"USAGE"} for s in
                 ("alert_attempts_id_seq", "approvals_id_seq", "commits_id_seq", "profile_facts_id_seq")},
@@ -540,8 +541,13 @@ EXPECTED: dict[str, dict[str, dict[str, set[str]]]] = {
         "fn": {"control.ledger_month_total(text)": {"EXECUTE"}},
     },
     "saathi_owner": {
-        "table": {**{t: {"SELECT", "INSERT"} for t in _HOUSEHOLD_ADMIN}, "voice_clips": {"SELECT", "INSERT"}},
+        "table": {
+            **{t: {"SELECT", "INSERT"} for t in _HOUSEHOLD_ADMIN},
+            "voice_clips": {"SELECT", "INSERT"},
+            "addresses": {"SELECT", "INSERT", "DELETE"},  # 008: the admin place commands
+        },
         "column": {
+            "addresses.aliases": {"UPDATE"}, "addresses.is_pickup": {"UPDATE"},
             "elder_identities.active": {"UPDATE"},
             "control.household_keys.retired_at": {"UPDATE"}, "control.household_keys.wrapped_key": {"UPDATE"},
             "control.signoffs.revoked_at": {"UPDATE"},

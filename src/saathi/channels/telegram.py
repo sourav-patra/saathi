@@ -81,7 +81,7 @@ TEXT_LIMIT = 4096
 CALLBACK_DATA_LIMIT = 64  # bytes, a Bot API limit
 POLL_TIMEOUT_S = 25
 RETRY_BACKOFF_S = 5.0
-_CALLBACK = re.compile(r"^(ack|fa|raw):([\w:.-]{1,48})$")
+_CALLBACK = re.compile(r"^(ack|fa|raw|ride):([\w:.-]{1,48})$")
 
 # Fixed words for the caregiver. No transcript, name or number appears in any of them.
 SAY_ACK = "Acknowledged."
@@ -92,6 +92,8 @@ SAY_NOT_ALLOWED = "This chat is not allowed to do that."
 SAY_NO_CONSENT = "Showing the message is not allowed by the consent on record."
 SAY_NO_TEXT = "No message text is kept for this item."
 SAY_UNKNOWN = "That button is not recognised."
+SAY_RIDE_SET = "Ride card updated."
+SAY_RIDE_GONE = "That place is no longer saved."
 SAY_RETRY = "That did not work. Please try again."
 SAY_WELCOME = "Saathi caregiver bot. You will get a card for each message and for each alert."
 
@@ -117,9 +119,13 @@ def _markup(card: Card) -> InlineKeyboardMarkup | None:
         return None
     rows = []
     for b in card.buttons:
-        if len(b.data.encode()) > CALLBACK_DATA_LIMIT:
+        if b.url is not None:
+            rows.append([InlineKeyboardButton(text=b.text, url=b.url)])
+            continue
+        data = b.data or ""
+        if len(data.encode()) > CALLBACK_DATA_LIMIT:
             raise SendRejected("callback_too_long")
-        rows.append([InlineKeyboardButton(text=b.text, callback_data=b.data)])
+        rows.append([InlineKeyboardButton(text=b.text, callback_data=data)])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -130,6 +136,7 @@ class RoutedUpdate(ApproverUpdate):
     """An `ApproverUpdate` that also names the household it was resolved in (the approver is registered there)."""
 
     household_id: HouseholdId
+    message_ref: str | None = None  # the card a tap came from, as `chat:message`; None for a text
 
 
 class ApproverDirectory(Protocol):
@@ -290,17 +297,21 @@ class TelegramCaregiverChannel:
             return None
         household, approver = found
         kind: Literal["callback", "text"]
+        message_ref: str | None = None
         if cb is not None:
             if not cb.data:
                 self.dropped += 1
                 return None
             self._callbacks[raw.update_id] = cb.id
             kind, data = "callback", cb.data
+            if cb.message is not None:
+                message_ref = f"{cb.message.chat.id}:{cb.message.message_id}"
         else:
             kind, data = "text", (msg.text or "") if msg is not None else ""
         return RoutedUpdate(
-            update_id=raw.update_id, approver_id=approver, kind=kind, data=data, household_id=household
-        )
+            update_id=raw.update_id, approver_id=approver, kind=kind, data=data, household_id=household,
+            message_ref=message_ref,
+        )  # fmt: skip
 
     async def health(self) -> ChannelHealth:
         try:
@@ -385,7 +396,15 @@ class _Sender(Protocol):
     async def send_text(self, to: ApproverId, text: str, *, key: IdemKey) -> SendReceipt: ...
 
 
+class RideTaps(Protocol):
+    """What the router needs of the ride helper: count the ride and give the card to show, or None when the place is
+    gone."""
+
+    async def tap(self, household: HouseholdId, place_id: str) -> Card | None: ...
+
+
 Answer = Callable[[ApproverUpdate, str], Awaitable[None]]
+Edit = Callable[[CardRef, Card], Awaitable[None]]
 
 
 class CallbackRouter:
@@ -403,6 +422,8 @@ class CallbackRouter:
         *,
         answer: Answer | None = None,
         trace: TraceExporter | None = None,
+        rides: RideTaps | None = None,
+        edit: Edit | None = None,
     ) -> None:
         self._store = store
         self._alerts = alerts
@@ -410,6 +431,8 @@ class CallbackRouter:
         self._audit = audit
         self._caregivers = caregivers
         self._answer = answer
+        self._rides = rides
+        self._edit = edit
         self._trace = trace or NullExporter()
         self._failures: dict[int, int] = {}
 
@@ -485,10 +508,25 @@ class CallbackRouter:
         elif verb == "fa":
             done = await self._alerts.false_alarm(up.household_id, EventId(ident), up.approver_id)
             await self._say(up, SAY_FALSE_ALARM if done else SAY_FALSE_ALARM_NONE)
+        elif verb == "ride":
+            await self._ride(up, ident)
         else:
             text = await show_raw(self._store, self._keys, self._audit, up, InboxId(ident))
             await self._caregivers.send_text(up.approver_id, text, key=idem_key("raw", str(up.update_id)))
             await self._say(up, "Sent.")
+
+    async def _ride(self, up: RoutedUpdate, place_id: str) -> None:
+        """A place chosen on the "place not recognised" card: the card becomes the known-place card and the ride is
+        counted. No booking happens here: the card only links to the apps."""
+        if self._rides is None or self._edit is None or up.message_ref is None:
+            await self._say(up, SAY_UNKNOWN)
+            return
+        card = await self._rides.tap(up.household_id, place_id)
+        if card is None:
+            await self._say(up, SAY_RIDE_GONE)
+            return
+        await self._edit(CardRef(approver_id=up.approver_id, message_ref=up.message_ref), card)
+        await self._say(up, SAY_RIDE_SET)
 
     async def _command(self, up: RoutedUpdate) -> None:
         words = up.data.split(maxsplit=1)

@@ -33,6 +33,7 @@ from saathi.errors import KeyMissing, ReceiptMissing, SaathiError
 from saathi.householdcfg import HouseholdConfig
 from saathi.ids import ElderId, HouseholdId, PersonRef, RunId, new_id, normalize_e164
 from saathi.ports import Clock, Tx
+from saathi.rides.recognise import normalise
 from saathi.store.db import Role, Store, create_pool
 from saathi.store.keys import KEY_LEN, KeyRing, generate_content_pair, generate_secret, sender_hmac
 from saathi.store.repos import ConfigRepo, ConsentEvent, ConsentRepo, IdentityRepo, SignoffRepo, VoiceRepo
@@ -74,6 +75,9 @@ EV_SIGNOFF_REVOKE = "admin_signoff_revoked"
 EV_CONSENT = "admin_consent_recorded"
 EV_CONFIG = "admin_config_set"
 EV_CLIP_REVIEW = "admin_clip_reviewed"
+EV_PLACE_ADDED = "admin_place_added"
+EV_PLACE_ALIAS = "admin_place_alias_added"
+EV_PLACE_REMOVED = "admin_place_removed"
 
 
 @dataclass(frozen=True)
@@ -509,6 +513,94 @@ class Admin:
                 tx, EV_CLIP_REVIEW, detail={"reply_key": reply_key, "version": version, "language": language}
             )
 
+    # -- ride places: the saved places the ride helper matches (rows of `addresses`) ----------------------------
+
+    @staticmethod
+    async def _find_place(tx: Tx, ref: str) -> str:
+        """The id of the place named by an id or a label (case folded). `AdminError` when none or several match."""
+        rows = await tx.fetch("SELECT id FROM addresses WHERE id = $1 OR lower(label) = lower($1)", ref)
+        ids = sorted({str(r["id"]) for r in rows})
+        if not ids:
+            raise AdminError("no such place")
+        if len(ids) > 1:
+            raise AdminError("more than one place has that label; use the id")
+        return ids[0]
+
+    async def place_add(
+        self,
+        household: str,
+        *,
+        label: str,
+        address: str,
+        lat: float | None = None,
+        lng: float | None = None,
+        aliases: Sequence[str] = (),
+        pickup: bool = False,
+    ) -> str:
+        """Save a place. Returns its id. At most one place of a household is the pickup."""
+        label, address = label.strip(), address.strip()
+        if not label or not address:
+            raise AdminError("a place needs a label and an address")
+        if (lat is None) != (lng is None):
+            raise AdminError("give both --lat and --lng, or neither")
+        if lat is not None and lng is not None and not (-90 <= lat <= 90 and -180 <= lng <= 180):
+            raise AdminError("the coordinates are out of range")
+        names = [a.strip() for a in aliases]
+        if not normalise(label) or not all(normalise(a) for a in names):
+            raise AdminError("a label and an alias need at least one letter or digit")
+        place = new_id()
+        try:
+            async with self._store.tx(household=HouseholdId(household)) as tx:
+                await self._need_household(tx)
+                if pickup and await tx.fetch("SELECT 1 FROM addresses WHERE is_pickup"):
+                    raise AdminError("this household already has a pickup place")
+                await tx.execute(
+                    "INSERT INTO addresses (id, household_id, label, formatted, lat, lng, aliases, is_pickup)"
+                    " VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+                    place, household, label, address, lat, lng, names, pickup,
+                )  # fmt: skip
+                await self._audit(tx, EV_PLACE_ADDED, subject=place, detail={"place": place, "pickup": pickup})
+        except asyncpg.UniqueViolationError:
+            raise AdminError("this household already has a pickup place") from None
+        return place
+
+    async def place_list(self, household: str) -> list[str]:
+        """One line per place: id, label, pickup, coordinates, rides, aliases. The address itself is not printed."""
+        async with self._store.tx(household=HouseholdId(household)) as tx:
+            await self._need_household(tx)
+            rows = await tx.fetch(
+                "SELECT id, label, lat, lng, aliases, is_pickup, ride_count FROM addresses ORDER BY label, id"
+            )
+        return [
+            f"{r['id']}  {r['label']}  pickup={'yes' if r['is_pickup'] else 'no'}"
+            f"  coordinates={'yes' if r['lat'] is not None and r['lng'] is not None else 'no'}"
+            f"  rides={r['ride_count']}  aliases={', '.join(r['aliases']) or '-'}"
+            for r in rows
+        ]
+
+    async def place_alias_add(self, household: str, place: str, alias: str) -> None:
+        alias = alias.strip()
+        if not normalise(alias):
+            raise AdminError("an alias needs at least one letter or digit")
+        async with self._store.tx(household=HouseholdId(household)) as tx:
+            await self._need_household(tx)
+            place_id = await self._find_place(tx, place)
+            tag = await tx.execute(
+                "UPDATE addresses SET aliases = array_append(aliases, $2) WHERE id = $1 AND NOT ($2 = ANY(aliases))",
+                place_id,
+                alias,
+            )
+            if not tag.endswith(" 1"):
+                raise AdminError("that place already has this alias")
+            await self._audit(tx, EV_PLACE_ALIAS, subject=place_id, detail={"place": place_id})
+
+    async def place_remove(self, household: str, place: str) -> None:
+        async with self._store.tx(household=HouseholdId(household)) as tx:
+            await self._need_household(tx)
+            place_id = await self._find_place(tx, place)
+            await tx.execute("DELETE FROM addresses WHERE id = $1", place_id)
+            await self._audit(tx, EV_PLACE_REMOVED, subject=place_id, detail={"place": place_id})
+
 
 def _fields(exc: ValidationError) -> str:
     """Field names only: a validation message can echo a value."""
@@ -596,6 +688,25 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--receipt", type=Path, required=True)
     c.add_argument("--household", required=True, help="household named on the audit row")
     c.add_argument("--language", default="hi")
+
+    pl = top.add_parser("place").add_subparsers(dest="cmd", required=True)
+    c = pl.add_parser("add")
+    c.add_argument("--household", required=True)
+    c.add_argument("--label", required=True)
+    c.add_argument("--address", required=True)
+    c.add_argument("--lat", type=float)
+    c.add_argument("--lng", type=float)
+    c.add_argument("--alias", action="append", default=[], help="another name for the place; repeat for several")
+    c.add_argument("--pickup", action="store_true", help="rides start here (one per household)")
+    c = pl.add_parser("list")
+    c.add_argument("--household", required=True)
+    c = pl.add_parser("alias-add")
+    c.add_argument("--household", required=True)
+    c.add_argument("--place", required=True, help="the place id, or its label")
+    c.add_argument("--alias", required=True)
+    c = pl.add_parser("remove")
+    c.add_argument("--household", required=True)
+    c.add_argument("--place", required=True, help="the place id, or its label")
     return p
 
 
@@ -644,6 +755,20 @@ async def dispatch(args: argparse.Namespace, admin: Admin) -> str:
                 args.household, args.reply_key, args.version, receipt=args.receipt, language=args.language
             )
             return f"clip reviewed: {args.reply_key} v{args.version}"
+        case ("place", "add"):
+            place = await admin.place_add(
+                args.household, label=args.label, address=args.address, lat=args.lat, lng=args.lng,
+                aliases=args.alias, pickup=args.pickup,
+            )  # fmt: skip
+            return f"place added: {place}"
+        case ("place", "list"):
+            return "\n".join(await admin.place_list(args.household)) or "no places"
+        case ("place", "alias-add"):
+            await admin.place_alias_add(args.household, args.place, args.alias)
+            return "alias added"
+        case ("place", "remove"):
+            await admin.place_remove(args.household, args.place)
+            return "place removed"
     raise AdminError("unknown command")  # pragma: no cover
 
 
