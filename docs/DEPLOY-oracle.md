@@ -83,7 +83,9 @@ Oracle may reclaim an Always Free instance that stays idle for 7 days. Idle mean
 1. Upgrade the account to Pay As You Go. Oracle states it does not charge for Always Free resources after the upgrade and charges only for use above the limits.
 2. Keep real load on the server: daily household use, plus the uptime monitor in [SETUP.md](SETUP.md).
 
-Check: the instance's metrics in the console show which of the three figures stays above 20% (not measured for this stack).
+Saathi's services are light, so the second way alone is unlikely to work. On a 12 GB test machine on 2026-11-13 the services in this runbook used about 0.6 GB at rest and 1.2 GB at peak while transcribing a voice note (speech service 0.98 GB, worker 0.11 GB, the rest under 0.05 GB each), which is under 20% of memory. Upgrade to Pay As You Go (the first way) before the first week ends.
+
+Check: the instance's metrics in the console after a week of use.
 
 ## 8. Back up the database
 
