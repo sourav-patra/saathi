@@ -38,6 +38,7 @@ saathi-api = "saathi.app:main_edge"
 saathi-bot = "saathi.channels.telegram:run"
 saathi-worker = "saathi.channels.worker_main:main"
 saathi-admin = "saathi.admin:main"
+saathi-migrate = "saathi.store.migrate:main"
 
 [build-system]
 requires = ["hatchling"]

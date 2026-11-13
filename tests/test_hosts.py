@@ -335,3 +335,50 @@ def test_the_connect_check_notices_a_connection_outside_the_list(tmp_path: Path)
     finally:
         srv.shutdown()
         other.shutdown()
+
+
+def test_schema_is_migrated_before_edge_and_worker_start():
+    """DI-7: a one-shot `migrate` service applies infra/sql/schema as saathi_migrator; edge and worker wait for it."""
+    svcs = _compose_services()
+    mig = svcs["migrate"]
+    assert mig["command"] == ["saathi-migrate"]
+    assert mig["restart"] == "no"
+    assert mig["networks"] == ["internal"]
+    assert not mig.get("ports") and not mig.get("env_file") and not mig.get("secrets")
+    env = mig["environment"]
+    assert env["SAATHI_MIGRATE_DSN"].startswith("postgresql://saathi_migrator:")
+    assert env["SAATHI_SCHEMA_DIR"] == "/app/schema"
+    assert mig["volumes"] == [
+        {
+            "type": "bind",
+            "source": "./sql/schema",
+            "target": "/app/schema",
+            "read_only": True,
+            "bind": {"create_host_path": False},
+        }
+    ]
+    assert mig["depends_on"]["postgres"] == {"condition": "service_healthy"}
+    for name in ("edge", "worker"):
+        assert svcs[name]["depends_on"]["migrate"] == {"condition": "service_completed_successfully"}, name
+    import tomllib
+
+    scripts = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["scripts"]
+    assert scripts["saathi-migrate"] == "saathi.store.migrate:main"
+
+
+@pytest.mark.parametrize("make", ["missing", "empty", "no_sql"])
+def test_migrate_entry_point_refuses_a_missing_or_empty_schema_dir(tmp_path, monkeypatch, make):
+    """Review U8 F1: without migration files the entry point exits nonzero before it connects."""
+    from saathi.store import migrate as mig
+
+    target = tmp_path / "schema"
+    if make != "missing":
+        target.mkdir()
+    if make == "no_sql":
+        (target / "README.txt").write_text("not a migration", encoding="utf-8")
+    monkeypatch.setenv("SAATHI_MIGRATE_DSN", "postgresql://127.0.0.1:1/none")
+    monkeypatch.setenv("SAATHI_SCHEMA_DIR", str(target))
+    monkeypatch.setattr(mig.asyncpg, "connect", lambda *a, **k: pytest.fail("connected without migration files"))
+    with pytest.raises(SystemExit) as exc:
+        mig.main()
+    assert exc.value.code not in (0, None)

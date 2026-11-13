@@ -101,6 +101,9 @@ def main() -> None:
     if not dsn:
         sys.exit("SAATHI_MIGRATE_DSN is not set (a saathi_migrator DSN)")
     directory = Path(os.environ.get("SAATHI_SCHEMA_DIR", "infra/sql/schema"))
+    # A missing or empty directory would "succeed" on an empty schema and release edge and worker (review U8 F1).
+    if not directory.is_dir() or not any(directory.glob("*.sql")):
+        sys.exit(f"{directory}: no migration files (is the schema directory mounted?)")
     for version in asyncio.run(migrate(dsn, directory)):
         print(f"applied {version}")
 
