@@ -93,7 +93,7 @@ The dump includes the database roles. Run it from the repository folder; `mktemp
 (set -o pipefail; f=$(mktemp ~/saathi-$(date +%F)-XXXXXX.sql.gz) || exit 1
 docker compose --env-file .env -f infra/docker-compose.yml exec -T postgres \
   sh -c 'pg_dumpall -U "$POSTGRES_USER"' | gzip > "$f" &&
- [ "$(zcat "$f" | awk NF | tail -n 2 | tr '\n' '|')" = "-- PostgreSQL database cluster dump complete|--|" ] &&
+ gzip -t "$f" && [ "$(zcat "$f" | awk NF | tail -n 2 | tr '\n' '|')" = "-- PostgreSQL database cluster dump complete|--|" ] &&
  sha256sum "$f" || { rm -f "$f"; false; })
 ```
 
