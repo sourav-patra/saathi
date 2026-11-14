@@ -19,16 +19,16 @@ REVOKE INSERT ON addresses FROM saathi_core;
 GRANT SELECT, INSERT, DELETE ON addresses TO saathi_owner;
 GRANT UPDATE (aliases, is_pickup) ON addresses TO saathi_owner;
 
--- Immutable claims: a callback keeps its card for edit retries; an inbox counts once across caregiver deliveries.
--- No address foreign key: removing a saved place must not discard an already-counted callback's retry card.
+-- Immutable claims store ids only. Callback edit retries rebuild from live addresses; removed places stay gone.
+-- No address foreign key: removing a place must not allow its callback or inbox claim to count again.
 CREATE TABLE ride_counts (
   household_id text NOT NULL REFERENCES households(id),
   source text NOT NULL CHECK (source IN ('callback', 'inbox')),
   source_id text NOT NULL,
   place_id text NOT NULL,
-  card jsonb,
+  pickup_id text,
   PRIMARY KEY (household_id, source, source_id),
-  CHECK ((source = 'callback' AND card IS NOT NULL) OR (source = 'inbox' AND card IS NULL))
+  CHECK (source = 'callback' OR pickup_id IS NULL)
 );
 SELECT control.apply_tenant_rls('ride_counts'::regclass, true);
 GRANT SELECT, INSERT ON ride_counts TO saathi_core;

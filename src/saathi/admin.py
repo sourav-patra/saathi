@@ -547,7 +547,10 @@ class Admin:
             raise AdminError("the coordinates are out of range")
         names = [a.strip() for a in aliases]
         if not usable_name(label) or not all(usable_name(a) for a in names):
-            raise AdminError("labels and aliases need at least 3 characters and must not be common words")
+            raise AdminError(
+                "labels and aliases need at least 3 characters (Latin letters) or 2 Devanagari letters"
+                " and must not be common words"
+            )
         place = new_id()
         try:
             async with self._store.tx(household=HouseholdId(household)) as tx:
@@ -581,7 +584,10 @@ class Admin:
     async def place_alias_add(self, household: str, place: str, alias: str) -> None:
         alias = alias.strip()
         if not usable_name(alias):
-            raise AdminError("an alias needs at least 3 characters and must not be a common word")
+            raise AdminError(
+                "an alias needs at least 3 characters (Latin letters) or 2 Devanagari letters"
+                " and must not be a common word"
+            )
         async with self._store.tx(household=HouseholdId(household)) as tx:
             await self._need_household(tx)
             place_id = await self._find_place(tx, place)

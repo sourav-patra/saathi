@@ -8,6 +8,7 @@ same longest phrase names no place, so the caregiver chooses. An explicitly name
 
 from __future__ import annotations
 
+import re
 import unicodedata
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -48,8 +49,25 @@ def _padded(text: str) -> str:
 
 _RIDE_PHRASES = tuple(_padded(w) for w in RIDE_WORDS)
 _NEGATIONS = tuple(
-    _padded(w) for w in ("no", "not", "never", "dont", "don't", "mat", "nahi", "nahin", "nhi", "नहीं", "नही", "मत")
+    _padded(f"{negation} {verb}")
+    for negation, verbs in (
+        ("do not", ("book", "call", "need", "want")),
+        ("don't", ("book", "call", "need", "want")),
+        ("dont", ("book", "call", "need", "want")),
+        ("never", ("book", "call")),
+        ("mat", ("bulao", "bulana", "mangao", "book karo")),
+        ("nahi", ("chahiye", "bulao", "bulana", "jaana hai", "jana hai")),
+        ("nahin", ("chahiye", "bulao", "bulana", "jaana hai", "jana hai")),
+        ("nhi", ("chahiye", "bulao", "bulana", "jaana hai", "jana hai")),
+        ("नहीं", ("चाहिए", "चाहिये", "बुलाओ", "जाना है")),
+        ("नही", ("चाहिए", "चाहिये", "बुलाओ", "जाना है")),
+        ("मत", ("बुलाओ", "बुलाना", "मंगाओ", "बुक करो")),
+    )
+    for verb in verbs
 )
+_RIDE_NOUNS = "|".join(re.escape(normalise(w)) for w in RIDE_WORDS if " " not in normalise(w))
+_NO_RIDE = re.compile(rf" (?:no (?:{_RIDE_NOUNS})|(?:{_RIDE_NOUNS}) (?:nahi|nahin|nhi|नहीं|नही)) $")
+_NO_RIDE_PREFIX = re.compile(rf" (?:no|नहीं|नही) (?:{_RIDE_NOUNS}) ")
 _COMMON_NAMES = frozenset(
     {"the", "and", "for", "get", "book", "cab", "taxi", "auto", "ride", "hai", "chahiye", "और", "है"}
 )
@@ -58,7 +76,14 @@ _COMMON_NAMES = frozenset(
 def usable_name(name: str) -> bool:
     """Reject short or common-word place names both at entry and when reading older saved aliases."""
     phrase = normalise(name)
-    return len(phrase) >= 3 and phrase not in _COMMON_NAMES
+    letters: dict[str, int] = {}
+    for ch in phrase:
+        if unicodedata.category(ch).startswith("L"):
+            script = unicodedata.name(ch, "").split(" ")[0]
+            letters[script] = letters.get(script, 0) + 1
+    return phrase not in _COMMON_NAMES and any(
+        count >= (2 if script == "DEVANAGARI" else 3) for script, count in letters.items()
+    )
 
 
 def _has_ride_word(padded: str) -> bool:
@@ -68,7 +93,12 @@ def _has_ride_word(padded: str) -> bool:
 def recognise(text: str, places: Sequence[Place]) -> RideResult:
     """`RideResult(ride_word, place_id)`. No ride word: `RideResult(False)`, whatever the places."""
     padded = _padded(text)
-    if not _has_ride_word(padded) or any(negation in padded for negation in _NEGATIONS):
+    if (
+        not _has_ride_word(padded)
+        or any(negation in padded for negation in _NEGATIONS)
+        or _NO_RIDE.search(padded)
+        or _NO_RIDE_PREFIX.search(padded)
+    ):
         return RideResult(False)
     candidates: list[tuple[int, str, str]] = []  # (length, phrase, place id)
     for place in places:

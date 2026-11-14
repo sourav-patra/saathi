@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Coroutine, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal
@@ -75,6 +75,26 @@ _PHASE_1 = Machine(REQUEST, phase=1)  # R02 is a phase 1 row; the worker takes i
 AUDIO_CAPTION = "Voice note from the elder"
 CAREGIVER_SEND_TIMEOUT_S = 10.0  # one caregiver send never holds the elder reply longer than this
 RIDE_DB_TIMEOUT_S = 3.0  # bounds each optional ride transaction, including pool acquisition and commit
+_RIDE_TASKS: set[asyncio.Task] = set()  # keep cancelled transactions alive until their cleanup finishes
+
+
+async def _ride_db[T](work: Coroutine[object, object, T]) -> T:
+    """Bound the caller's wait, even when cancellation stalls in rollback or connection reset."""
+    task = asyncio.create_task(work)
+    _RIDE_TASKS.add(task)
+
+    def finished(done: asyncio.Task) -> None:
+        _RIDE_TASKS.discard(done)
+        if not done.cancelled():
+            done.exception()  # retrieve a late failure without logging database or place text
+
+    task.add_done_callback(finished)
+    try:
+        async with asyncio.timeout(RIDE_DB_TIMEOUT_S):
+            return await asyncio.shield(task)
+    finally:
+        if not task.done():
+            task.cancel()  # cleanup continues independently; never await it on the elder reply path
 
 
 @dataclass(frozen=True)
@@ -357,10 +377,13 @@ async def _ride_step(ctx: _Ctx, deps: WorkerDeps, text: str, hit: RadarResult, r
     never wait on it."""
     if not (text and ctx.consent and radar_ok) or hit.emergency or hit.scam:
         return None
+
+    async def fetch_places():
+        async with deps.store.tx(household=ctx.household) as tx:
+            return await PlaceRepo.all(tx)
+
     try:
-        async with asyncio.timeout(RIDE_DB_TIMEOUT_S):
-            async with deps.store.tx(household=ctx.household) as tx:
-                places = await PlaceRepo.all(tx)
+        places = await _ride_db(fetch_places())
         if not places:
             return None
         found = recognise(text, places)
@@ -426,14 +449,16 @@ async def _send_effects(
             except Exception as exc:  # noqa: BLE001  (a timeout is one too)
                 failure = failure or exc
         if ride is not None and ride.place_id is not None and delivered_ride:
+
+            async def count_ride():
+                async with deps.store.tx(household=ctx.household) as tx:
+                    await holds(tx, lease)
+                    await PlaceRepo.count_once(tx, ride.place_id, source="inbox", source_id=str(ctx.inbox))
+
             try:
-                async with asyncio.timeout(RIDE_DB_TIMEOUT_S):
-                    async with deps.store.tx(household=ctx.household) as tx:
-                        await holds(tx, lease)
-                        await PlaceRepo.count_once(tx, ride.place_id, source="inbox", source_id=str(ctx.inbox))
+                await _ride_db(count_ride())
             except Exception as exc:  # noqa: BLE001
                 log.warning("ride count failed for %s: %s", ctx.inbox, type(exc).__name__)
-                failure = failure or exc  # retry accounting with the row, after the elder reply
     finally:  # also on a cancel: the elder reply is never skipped because a caregiver send was in flight
         if hit.emergency:
             reply = ReplyKey.EMERGENCY

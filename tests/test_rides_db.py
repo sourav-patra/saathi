@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 from contextlib import asynccontextmanager
+from time import monotonic
 from typing import Any
 
 import asyncpg
@@ -18,7 +19,7 @@ from conftest import PgDb
 from fakes import FakeAudit, FakeCaregiverChannel, FakeClock
 from worker_helpers import NOW, Rig, Role, add_inbox, open_store, provision, rows
 
-from saathi.channels.telegram import CallbackRouter, RoutedUpdate
+from saathi.channels.telegram import SAY_RIDE_GONE, CallbackRouter, RoutedUpdate
 from saathi.errors import ChannelDown
 from saathi.ids import ApproverId, HouseholdId, IdemKey
 from saathi.rides.repo import PlaceRepo
@@ -310,33 +311,29 @@ async def test_partial_delivery_retry_counts_once_per_inbox(pg_db: PgDb):
     assert len(await rows(pg_db, "SELECT 1 FROM ride_counts WHERE source = 'inbox'")) == 1
 
 
-async def test_failed_counter_transaction_rolls_back_and_retries(pg_db: PgDb, monkeypatch):
+async def test_failed_counter_rolls_back_but_inbox_completes(pg_db: PgDb, monkeypatch, caplog):
     ring, pub = await provision(pg_db)
     await seed_places(pg_db)
     await add_inbox(pg_db, ring, pub, H, "m1", text="cab to Clinic A")
     rig = Rig()
     real = PlaceRepo.count_ride
-    failed = False
 
     async def flaky(tx, place_id):
-        nonlocal failed
-        result = await real(tx, place_id)
-        if not failed:
-            failed = True
-            raise RuntimeError("synthetic counter failure")
-        return result
+        await real(tx, place_id)
+        raise RuntimeError("synthetic counter failure")
 
     monkeypatch.setattr(PlaceRepo, "count_ride", flaky)
     async with harness(pg_db, rig, ring) as (store, deps, clock):
         lease = await store.scan.lease_next(clock.now(), 60)
         assert lease is not None
-        with pytest.raises(RuntimeError, match="synthetic counter failure"):
-            await process(lease, deps)
+        assert (await process(lease, deps)).inbox_state == "processed"
         assert await ride_count(pg_db, "pl_clinic") == 0
         assert await rows(pg_db, "SELECT 1 FROM ride_counts") == []
         assert [m for m, *_rest in rig.elder.sent] == ["send_text"]
-        assert (await process(lease, deps)).inbox_state == "processed"
-    assert await ride_count(pg_db, "pl_clinic") == 1
+    assert "ride count failed for m1: RuntimeError" in caplog.text
+    assert "synthetic counter failure" not in caplog.text
+    assert await ride_count(pg_db, "pl_clinic") == 0
+    assert (await rows(pg_db, "SELECT state FROM inbox WHERE id = 'm1'"))[0]["state"] == "processed"
     assert len([k for *_rest, k in rig.caregiver.sent if ":ride:" in k]) == 1
 
 
@@ -347,6 +344,19 @@ async def test_stalled_ride_database_work_still_sends_summary_and_reply(pg_db: P
     await add_inbox(pg_db, ring, pub, H, "m1", text="cab to Clinic A")
     rig = Rig()
     entered = asyncio.Event()
+    events = []
+    send_card, send_text = rig.caregiver.send_card, rig.elder.send_text
+
+    async def card(*args, **kwargs):
+        events.append("summary" if ":summary:" in kwargs["key"] else "ride")
+        return await send_card(*args, **kwargs)
+
+    async def reply(*args, **kwargs):
+        events.append("reply")
+        return await send_text(*args, **kwargs)
+
+    rig.caregiver.send_card = card
+    rig.elder.send_text = reply
 
     async def stalled(*_args, **_kwargs):
         entered.set()
@@ -357,16 +367,16 @@ async def test_stalled_ride_database_work_still_sends_summary_and_reply(pg_db: P
     async with harness(pg_db, rig, ring) as (store, deps, clock):
         lease = await store.scan.lease_next(clock.now(), 60)
         assert lease is not None
-        if operation == "count_once":
-            with pytest.raises(TimeoutError):
-                await asyncio.wait_for(process(lease, deps), 2.0)
-        else:
-            assert (await asyncio.wait_for(process(lease, deps), 2.0)).inbox_state == "processed"
+        started = monotonic()
+        assert (await asyncio.wait_for(process(lease, deps), 2.0)).inbox_state == "processed"
+        assert monotonic() - started < 1.0
     assert entered.is_set()
     assert rig.caregiver.sent[0][2].title == "New message from the elder"
     assert [m for m, *_rest in rig.elder.sent] == ["send_text"]
     assert await ride_count(pg_db, "pl_clinic") == 0
-    assert "TimeoutError" in caplog.text
+    stage = "count" if operation == "count_once" else "step"
+    assert f"ride {stage} failed for m1: TimeoutError" in caplog.text
+    assert events[0] == "summary" and events[-1] == "reply"
     assert all(private not in caplog.text for private in ("Clinic A", "Test Road", "Pickup Lane"))
 
 
@@ -457,7 +467,7 @@ async def test_a_tap_from_a_chat_that_is_not_an_approver_is_refused(pg_db: PgDb)
     assert await ride_count(pg_db, "pl_clinic") == 0 and out.cards == {}
 
 
-async def test_failed_edit_replay_uses_saved_card_and_counts_once(pg_db: PgDb):
+async def test_failed_edit_replay_rebuilds_card_and_counts_once(pg_db: PgDb):
     rig = await make_rig(pg_db)
     await seed_places(pg_db)
     out = FakeCaregiverChannel()
@@ -477,13 +487,65 @@ async def test_failed_edit_replay_uses_saved_card_and_counts_once(pg_db: PgDb):
             await router().handle(update)
         assert await ride_count(pg_db, "pl_clinic") == 1
         assert await rows(pg_db, "SELECT 1 FROM tg_updates WHERE update_id = 9") == []
-        saved = await rows(pg_db, "SELECT card FROM ride_counts WHERE source = 'callback' AND source_id = '9'")
-        await rig.sql("DELETE FROM addresses WHERE id = 'pl_clinic'")
-        await router().handle(update)  # a new router, and even a removed place, retain the original card
+        saved = await rows(pg_db, "SELECT * FROM ride_counts WHERE source = 'callback' AND source_id = '9'")
+        assert set(saved[0].keys()) == {"household_id", "source", "source_id", "place_id", "pickup_id"}
+        assert (saved[0]["place_id"], saved[0]["pickup_id"]) == ("pl_clinic", "pl_home")
+        await router().handle(update)
         edited = next(iter(out.cards.values()))
-        assert edited.model_dump(mode="json") == json.loads(saved[0]["card"])
         assert edited.lines == ["To: Clinic A", "Pickup: 1 Pickup Lane, Sample Town", "Drop: 2 Test Road, Sample Town"]
         assert len(await rows(pg_db, "SELECT 1 FROM ride_counts")) == 1
+        assert await ride_count(pg_db, "pl_clinic") == 1
+
+
+async def test_place_remove_erases_text_and_replayed_tap_counts_nothing(pg_db: PgDb, tmp_path):
+    from test_admin import admin_for
+
+    rig = await make_rig(pg_db)
+    await seed_places(pg_db)
+    out = FakeCaregiverChannel()
+    out.fail("edit_card", ChannelDown)
+    answers = []
+
+    async def answer(_update, text):
+        answers.append(text)
+
+    update = RoutedUpdate(
+        update_id=12, approver_id=ApproverId(P), kind="callback", data="ride:pl_clinic",
+        household_id=HouseholdId(H), message_ref="card-1",
+    )  # fmt: skip
+    async with open_store(pg_db, Role.CORE, clock=rig.clock) as store:
+        taps = PgRideTaps(store)
+        router = CallbackRouter(
+            store, rig.service(store), rig.ring, FakeAudit(), out, rides=taps, edit=out.edit_card, answer=answer
+        )
+        with pytest.raises(ChannelDown):
+            await router.handle(update)
+        assert await taps.tap(HouseholdId(H), "pl_home", update_id=13) is not None
+        async with store.tx(household=HouseholdId(H)) as tx:
+            assert await PlaceRepo.count_once(tx, "pl_clinic", source="inbox", source_id="m1")
+        async with admin_for(pg_db, tmp_path) as admin:
+            await admin.place_remove(H, "pl_clinic")
+            await admin.place_remove(H, "pl_home")
+        claims = await rows(pg_db, "SELECT * FROM ride_counts ORDER BY source, source_id")
+        counts = await rows(pg_db, "SELECT id, ride_count FROM addresses ORDER BY id")
+        await router.handle(update)
+        assert out.cards == {}
+        assert answers[-1] == SAY_RIDE_GONE
+        assert await taps.tap(HouseholdId(H), "pl_home", update_id=13) is None
+        # A replay with a different payload cannot replace the original claim or count another place.
+        assert await taps.tap(HouseholdId(H), "pl_temple", update_id=12) is None
+    assert await rows(pg_db, "SELECT * FROM ride_counts ORDER BY source, source_id") == claims
+    assert await rows(pg_db, "SELECT id, ride_count FROM addresses ORDER BY id") == counts
+    su = await asyncpg.connect(pg_db.dsn())
+    try:
+        tables = await su.fetch("SELECT schemaname, tablename FROM pg_tables WHERE schemaname IN ('public', 'control')")
+        for schema, table in tables:
+            quoted = '"' + schema.replace('"', '""') + '"."' + table.replace('"', '""') + '"'
+            content = json.dumps([dict(r) for r in await su.fetch(f"SELECT * FROM {quoted}")], default=str)
+            for private in ("Clinic A", "2 Test Road, Sample Town", "Home P", "1 Pickup Lane, Sample Town"):
+                assert private not in content, (schema, table)
+    finally:
+        await su.close()
 
 
 async def test_concurrent_callback_claims_count_once(pg_db: PgDb):

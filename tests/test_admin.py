@@ -708,3 +708,20 @@ async def test_place_commands_refuse_short_or_common_names(pg_db: PgDb, tmp_path
                 )  # fmt: skip
     assert len(await su_fetch(pg_db, "SELECT 1 FROM addresses")) == 1
     assert (await su_fetch(pg_db, "SELECT aliases FROM addresses"))[0]["aliases"] == []
+
+
+@pytest.mark.parametrize("field", ["label", "alias", "alias-add"])
+async def test_place_commands_allow_two_devanagari_letters(pg_db: PgDb, tmp_path: Path, field):
+    async with admin_for(pg_db, tmp_path) as admin:
+        await onboard(admin)
+        place = await admin.place_add(
+            H, label="घर" if field == "label" else "Home P", address="1 Pickup Lane, Sample Town",
+            aliases=["घर"] if field == "alias" else [], pickup=True,
+        )  # fmt: skip
+        if field == "alias-add":
+            await admin.place_alias_add(H, place, "घर")
+    saved = (await su_fetch(pg_db, "SELECT label, aliases FROM addresses"))[0]
+    if field == "label":
+        assert saved["label"] == "घर"
+    else:
+        assert saved["aliases"] == ["घर"]

@@ -5,6 +5,8 @@ Synthetic places only ("Clinic A", "Temple B", "Relative C"); coordinates are sm
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
@@ -12,7 +14,7 @@ from saathi.channels.telegram import _markup
 from saathi.domain import Button, Card
 from saathi.rides import card as rc
 from saathi.rides.place import Place
-from saathi.rides.recognise import RIDE_WORDS, RideResult, normalise, recognise
+from saathi.rides.recognise import RIDE_WORDS, RideResult, normalise, recognise, usable_name
 
 HOME = Place("pl_home", "Home P", "1 Pickup Lane, Sample Town", 0.0, 0.0, ("ghar",), is_pickup=True)
 CLINIC = Place("pl_clinic", "Clinic A", "2 Test Road, Sample Town", 0.1, 0.2, ("doctor",))
@@ -74,10 +76,49 @@ def test_the_pickup_place_can_be_an_explicit_destination(text):
 
 @pytest.mark.parametrize(
     "text",
-    ["do not book a cab to Clinic A", "Clinic A ke liye cab mat bulao", "Clinic A जाने के लिए कैब नहीं चाहिए"],
+    [
+        "do not book a cab to Clinic A",
+        "Clinic A ke liye cab mat bulao",
+        "Clinic A जाने के लिए कैब नहीं चाहिए",
+        "don't need a cab",
+        "dont book a cab",
+        "no cab",
+        "cab nahi chahiye",
+        "cab nhi chahiye",
+        "कैब मत बुलाओ",
+        "cab nahin bulao",
+        "never book a cab",
+        "cab नहीं",
+        "नहीं कैब",
+    ],
 )
 def test_negated_requests_are_not_rides(text):
     assert recognise(text, PLACES) == RideResult(False)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "cab nahi mil rahi, bulao",
+        "koi auto nahi mila, cab bulao doctor ke liye",
+        "der mat karo, cab bulao",
+        "No one is home, please book a cab to Clinic A",
+        "not feeling well, cab to Clinic A",
+        "कैब नहीं मिल रही ... जाना है",
+    ],
+)
+def test_unrelated_negation_does_not_suppress_a_ride(text):
+    assert recognise(text, PLACES).ride_word
+
+
+def test_two_devanagari_letters_allow_a_home_alias():
+    home = Place("pl_home", "Home P", "x", aliases=("घर",), is_pickup=True)
+    assert recognise("घर जाना है", [home]) == RideResult(True, home.id)
+
+
+@pytest.mark.parametrize("name", ["PG", "ma", "a 1", "a b", "aह", "क्", "12"])
+def test_name_minimum_counts_letters_within_a_script(name):
+    assert not usable_name(name)
 
 
 @pytest.mark.parametrize("name", ["a", "me", "the", "get", "cab"])
@@ -89,6 +130,14 @@ def test_old_ambiguous_place_names_do_not_match(name):
 def test_normalise_keeps_devanagari_and_latin_and_drops_the_rest():
     assert normalise("  Clinic-A,  मंदिर।  ") == "clinic a मंदिर"
     assert all(normalise(w) for w in RIDE_WORDS)
+
+
+def test_ride_note_states_omitted_pickup_is_unverified():
+    note = (Path(__file__).resolve().parents[1] / "docs/NOTE-ride-helper-2026-11-13.md").read_text(encoding="utf-8")
+    assert "omitted pickup on `m.uber.com/looking` is not documented and not verified on a device" in note
+    assert "https://developers.google.com/maps/documentation/urls/get-started#directions-action" in note
+    assert "Maps defaults to device location if available" in note
+    assert "button/android" not in note
 
 
 # --- the Button type --------------------------------------------------------------------------------------------
