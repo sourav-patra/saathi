@@ -83,24 +83,25 @@ Oracle may reclaim an Always Free instance idle for 7 days: the 95th percentile 
 1. Upgrade the account to Pay As You Go. Oracle's [FAQ](https://www.oracle.com/cloud/free/faq/) says Always Free resources stay free after it. Neither page says an upgrade exempts the instance from reclaim; users report it, Oracle does not state it. Check: the console's billing page shows the account type as Pay As You Go.
 2. Keep real load on the server: daily household use, plus the uptime monitor in [SETUP.md](SETUP.md). Check: in the instance's metrics, CPU, network or memory sits above 20% for most of each day.
 
-Saathi is light, so the second way alone may not pass. On one local run (2026-11-13), `docker stats` showed these services at about 0.6 GB at rest and 1.2 GB peak while transcribing a voice note: container figures on another machine, not Oracle's host metric. Measure yours with `docker stats --no-stream` and the console metrics.
+Saathi is light, so the second way alone may not pass. Read the instance's metrics in the console after the first days of use; `docker stats --no-stream` shows each service.
 
 ## 8. Back up the database
 
-The dump includes the database roles. Run it from the repository folder; it writes a new file each time and fails if the dump fails or ends early:
+The dump includes the database roles. Run it from the repository folder; `mktemp` creates a new private file each run, and the command fails if the dump fails or ends early:
 
 ```bash
-(set -o pipefail; umask 077; f=~/saathi-$(date +%F-%H%M%S).sql.gz
+(set -o pipefail; f=$(mktemp ~/saathi-$(date +%F)-XXXXXX.sql.gz) || exit 1
 docker compose --env-file .env -f infra/docker-compose.yml exec -T postgres \
   sh -c 'pg_dumpall -U "$POSTGRES_USER"' | gzip > "$f" &&
- zcat "$f" | tail -n 10 | grep -q 'cluster dump complete' && sha256sum "$f")
+ [ "$(zcat "$f" | awk NF | tail -n 2 | tr '\n' '|')" = "-- PostgreSQL database cluster dump complete|--|" ] &&
+ sha256sum "$f" || { rm -f "$f"; false; })
 ```
 
-`-T` turns off the terminal so the output can be piped ([compose exec](https://docs.docker.com/reference/cli/docker/compose/exec/)). Copy the file to your own computer with `scp -i <private-key-file> ubuntu@<public-ip>:<file> <local-folder>`. Delete the server copy only after `sha256sum` on your computer prints the same hash.
+`-T` turns off the terminal so the output can be piped ([compose exec](https://docs.docker.com/reference/cli/docker/compose/exec/)). Copy the file to your own computer with `scp -i <private-key-file> ubuntu@<public-ip>:<file> <local-folder>`. Keep the server copy until a restore from your copy has been tested.
 
 Encrypted rows need `/etc/saathi/secrets/kek`; keep the secret files in a password manager, not beside the dump.
 
-Check: the command exits 0 and prints a hash; the copy on your computer has the same hash.
+Check: the command exits 0 and prints a hash; `sha256sum` on your computer prints the same hash for the copy.
 
 [free]: https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm
 
