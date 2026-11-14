@@ -69,7 +69,28 @@ _RIDE_NOUNS = "|".join(re.escape(normalise(w)) for w in RIDE_WORDS if " " not in
 _NO_RIDE = re.compile(rf" (?:no (?:{_RIDE_NOUNS})|(?:{_RIDE_NOUNS}) (?:nahi|nahin|nhi|नहीं|नही)) $")
 _NO_RIDE_PREFIX = re.compile(rf" (?:no|नहीं|नही) (?:{_RIDE_NOUNS}) ")
 _COMMON_NAMES = frozenset(
-    {"the", "and", "for", "get", "book", "cab", "taxi", "auto", "ride", "hai", "chahiye", "और", "है"}
+    {
+        "the",
+        "and",
+        "for",
+        "get",
+        "book",
+        "cab",
+        "taxi",
+        "auto",
+        "ride",
+        "hai",
+        "chahiye",
+        "और",
+        "है",
+        "पर",
+        "कब",
+        "सब",
+        "अब",
+        "तक",
+        "जब",
+        "हम",
+    }
 )
 
 

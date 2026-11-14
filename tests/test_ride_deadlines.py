@@ -88,3 +88,20 @@ async def test_stalled_cleanup_does_not_delay_reply(monkeypatch, caplog, operati
     finally:
         release.set()
         await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), 0.5)
+
+
+async def test_ride_work_is_skipped_while_an_earlier_cleanup_is_pending(monkeypatch):
+    """A stuck cleanup holds one pooled connection; new ride work must not strand more of them."""
+    blocker = asyncio.create_task(asyncio.Event().wait())
+    monkeypatch.setattr(steps, "_RIDE_TASKS", {blocker})
+    ran = []
+
+    async def work():
+        ran.append(1)
+
+    try:
+        with pytest.raises(steps.RideBusy):
+            await steps._ride_db(work())
+        assert ran == []
+    finally:
+        blocker.cancel()

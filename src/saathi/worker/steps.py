@@ -78,8 +78,15 @@ RIDE_DB_TIMEOUT_S = 3.0  # bounds each optional ride transaction, including pool
 _RIDE_TASKS: set[asyncio.Task] = set()  # keep cancelled transactions alive until their cleanup finishes
 
 
+class RideBusy(RuntimeError):
+    """An earlier ride transaction is still cleaning up; skip ride work so it cannot drain the shared pool."""
+
+
 async def _ride_db[T](work: Coroutine[object, object, T]) -> T:
     """Bound the caller's wait, even when cancellation stalls in rollback or connection reset."""
+    if _RIDE_TASKS:
+        work.close()
+        raise RideBusy
     task = asyncio.create_task(work)
     _RIDE_TASKS.add(task)
 

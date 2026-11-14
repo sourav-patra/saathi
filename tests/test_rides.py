@@ -258,3 +258,8 @@ async def test_a_routed_tap_carries_the_card_it_came_from():
     channel = TelegramCaregiverChannel(object(), Directory(), FakeClock())  # type: ignore[arg-type]
     routed = await channel._route(raw)
     assert routed is not None and (routed.data, routed.message_ref) == ("ride:pl_clinic", "3001:7")
+
+
+@pytest.mark.parametrize("word", ["पर", "कब", "सब", "अब", "तक", "जब", "हम"])
+def test_common_two_letter_devanagari_words_are_not_place_names(word):
+    assert not usable_name(word)
