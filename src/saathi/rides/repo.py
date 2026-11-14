@@ -29,6 +29,10 @@ async def optional[T](tx: Tx, work: Callable[[], Awaitable[T]], *, inbox: InboxI
         await tx.execute("SELECT set_config('lock_timeout', '200ms', true)")
         await tx.execute("SELECT set_config('statement_timeout', '500ms', true)")
         result = await work()
+        # Restore and release inside the try, so a failure here also rolls back to the savepoint only.
+        await tx.execute("SELECT set_config('lock_timeout', $1, true)", settings["lock_timeout"])
+        await tx.execute("SELECT set_config('statement_timeout', $1, true)", settings["statement_timeout"])
+        await tx.execute("RELEASE SAVEPOINT ride")
     except StoreUnavailable:
         raise
     except Exception as exc:  # noqa: BLE001  (a ride SQL failure must not undo required row work)
@@ -37,9 +41,6 @@ async def optional[T](tx: Tx, work: Callable[[], Awaitable[T]], *, inbox: InboxI
         await tx.execute("RELEASE SAVEPOINT ride")
         log.warning("ride database failed for %s: %s", inbox, type(exc).__name__)
         return None
-    await tx.execute("RELEASE SAVEPOINT ride")
-    await tx.execute("SELECT set_config('lock_timeout', $1, true)", settings["lock_timeout"])
-    await tx.execute("SELECT set_config('statement_timeout', $1, true)", settings["statement_timeout"])
     return result
 
 

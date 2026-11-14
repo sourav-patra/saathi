@@ -108,9 +108,10 @@ async def test_worker_uses_only_row_transactions_after_required_sql(worker_spy, 
         assert "SELECT set_config('lock_timeout', '200ms', true)" in sql
         assert "SELECT set_config('statement_timeout', '500ms', true)" in sql
         assert not any(s.startswith("required") for s in sql[sql.index(ride) + 1 :])
-        assert tx.statements[-2:] == [
+        assert tx.statements[-3:] == [
             ("SELECT set_config('lock_timeout', $1, true)", ("2s",)),
             ("SELECT set_config('statement_timeout', $1, true)", ("3s",)),
+            ("RELEASE SAVEPOINT ride", ()),
         ]
 
 
@@ -323,3 +324,26 @@ async def test_savepoint_restores_settings_before_later_required_statement(pg_db
             assert (await tx.fetch("SHOW lock_timeout"))[0]["lock_timeout"] == "2s"
             assert (await tx.fetch("SHOW statement_timeout"))[0]["statement_timeout"] == "3s"
             await tx.execute("SELECT pg_sleep(0.65)")  # needs the caller's restored timeout
+
+
+async def test_a_failed_release_rolls_back_to_the_savepoint_only(caplog):
+    """RELEASE and the settings restore run inside the guard, so their failure cannot undo required row work."""
+
+    class FailingRelease(RecordingTx):
+        failed = False
+
+        async def execute(self, sql, *args):
+            if sql == "RELEASE SAVEPOINT ride" and not self.failed:
+                self.failed = True
+                await super().execute(sql, *args)
+                raise ValueError("synthetic release failure")
+            return await super().execute(sql, *args)
+
+    tx = FailingRelease(HouseholdId("h1"), NOW)
+
+    async def work():
+        return "done"
+
+    assert await optional(tx, work, inbox=InboxId("m1")) is None
+    assert [sql for sql, _args in tx.statements][-2:] == ["ROLLBACK TO SAVEPOINT ride", "RELEASE SAVEPOINT ride"]
+    assert caplog.messages == ["ride database failed for m1: ValueError"]
