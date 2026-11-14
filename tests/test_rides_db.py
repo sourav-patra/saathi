@@ -304,7 +304,8 @@ async def test_partial_delivery_retry_counts_once_per_inbox(pg_db: PgDb):
         assert lease is not None
         with pytest.raises(ChannelDown):
             await process(lease, deps)
-        assert await ride_count(pg_db, "pl_clinic") == 1
+        assert await ride_count(pg_db, "pl_clinic") == 0  # no settlement yet, so no count
+        assert await rows(pg_db, "SELECT 1 FROM ride_counts") == []
         assert (await process(lease, deps)).inbox_state == "processed"
     assert await ride_count(pg_db, "pl_clinic") == 1
     assert [str(k) for *_rest, k in rig.caregiver.sent if ":ride:" in k] == ["m1:ride:ap1h1", "m1:ride:ap2h1"]
@@ -330,7 +331,7 @@ async def test_failed_counter_rolls_back_but_inbox_completes(pg_db: PgDb, monkey
         assert await ride_count(pg_db, "pl_clinic") == 0
         assert await rows(pg_db, "SELECT 1 FROM ride_counts") == []
         assert [m for m, *_rest in rig.elder.sent] == ["send_text"]
-    assert "ride count failed for m1: RuntimeError" in caplog.text
+    assert "ride database failed for m1: RuntimeError" in caplog.text
     assert "synthetic counter failure" not in caplog.text
     assert await ride_count(pg_db, "pl_clinic") == 0
     assert (await rows(pg_db, "SELECT state FROM inbox WHERE id = 'm1'"))[0]["state"] == "processed"
@@ -358,11 +359,10 @@ async def test_stalled_ride_database_work_still_sends_summary_and_reply(pg_db: P
     rig.caregiver.send_card = card
     rig.elder.send_text = reply
 
-    async def stalled(*_args, **_kwargs):
+    async def stalled(tx, *_args, **_kwargs):
         entered.set()
-        await asyncio.Event().wait()
+        await tx.execute("SELECT pg_sleep(5)")
 
-    monkeypatch.setattr(steps, "RIDE_DB_TIMEOUT_S", 0.02)
     monkeypatch.setattr(PlaceRepo, operation, stalled)
     async with harness(pg_db, rig, ring) as (store, deps, clock):
         lease = await store.scan.lease_next(clock.now(), 60)
@@ -374,8 +374,7 @@ async def test_stalled_ride_database_work_still_sends_summary_and_reply(pg_db: P
     assert rig.caregiver.sent[0][2].title == "New message from the elder"
     assert [m for m, *_rest in rig.elder.sent] == ["send_text"]
     assert await ride_count(pg_db, "pl_clinic") == 0
-    stage = "count" if operation == "count_once" else "step"
-    assert f"ride {stage} failed for m1: TimeoutError" in caplog.text
+    assert "ride database failed for m1: QueryCanceledError" in caplog.text
     assert events[0] == "summary" and events[-1] == "reply"
     assert all(private not in caplog.text for private in ("Clinic A", "Test Road", "Pickup Lane"))
 

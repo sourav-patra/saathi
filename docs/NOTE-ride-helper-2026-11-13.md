@@ -2,9 +2,9 @@
 
 ## Scope
 
-A ride request gives caregivers an extra card after the summary. Saathi books nothing, holds no payment and calls no model. The elder reply stays "I have told your family." Emergency, scam and failed-radar messages get no ride card. Ride errors log only an inbox id and error class. Each ride database operation has a three-second caller deadline, including acquisition and commit. On timeout the worker cancels its separate task; rollback and connection reset continue independently while summaries, replies and alerts proceed. Other database paths keep their existing settings.
+A ride request gives caregivers an extra card after the summary. Saathi books nothing, holds no payment and calls no model. The elder reply stays "I have told your family." Emergency, scam and failed-radar messages run no ride SQL and get no ride card. Ride errors log only an inbox id and error class. The worker fetches places last in the row's radar transaction and counts a delivered ride last in its settlement transaction, only after settlement succeeds. Each operation uses a savepoint with local lock and statement timeouts of 200 ms and 500 ms. A ride error rolls back to that savepoint so required writes can commit. Success restores the caller's settings after releasing the savepoint; rollback restores them on failure. Connection unavailability and cancellation propagate. Ride work opens no separate worker transaction and creates no background task.
 
-Seat decision, 2026-11-14: ride counts are optional ordering data. A failed or timed-out count is logged with inbox id and error class only and is not re-raised. The inbox row completes normally when its required effects succeed. Counts can understate delivered rides after a failure; an in-flight commit may complete after the caller deadline, with the claim preventing a duplicate increment.
+Seat decision, 2026-11-14: ride counts are optional ordering data. A failed or timed-out count is logged with inbox id and error class only and is not re-raised unless the connection is unavailable. The inbox row completes normally when its required effects succeed. Counts can understate delivered rides after a failure. A lost settlement lease creates no claim; a successful retry claims and increments once through the unique inbox claim, in the same transaction as settlement.
 
 ## Data
 
@@ -23,4 +23,4 @@ A known destination shows To, Pickup and Drop with app/map buttons. An explicitl
 - Rapido and Namma Yatri open official Android store pages, not pre-filled rides: packages `com.rapido.passenger` and `in.juspay.nammayatri`, checked 2026-11-13. No Apple store links.
 - No coordinates means no Uber/Map button. Missing pickup coordinates omit the link origin. Exact matching needs aliases for spelling variants. Negation detection uses a bounded phrase list and does not parse intent.
 
-Skipped or not checked: mobile-app link behaviour, the omitted-pickup default on `m.uber.com/looking`, omission of Uber's `client_id` and real network-partition cleanup remain unverified. Stalled cleanup is covered by fake transactions.
+Skipped or not checked: mobile-app link behaviour, the omitted-pickup default on `m.uber.com/looking`, omission of Uber's `client_id` and real network-partition cleanup remain unverified. Regression tests cover savepoint rollback, SQL timeouts, settings restoration and pool reuse; this revision's runtime results belong in its build receipt.

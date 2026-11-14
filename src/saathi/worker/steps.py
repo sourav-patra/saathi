@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Awaitable, Callable, Coroutine, Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal
@@ -52,8 +52,9 @@ from saathi.ports import (
     VoiceStore,
 )
 from saathi.rides.card import choice_card, known_card
+from saathi.rides.place import Place
 from saathi.rides.recognise import recognise
-from saathi.rides.repo import PlaceRepo
+from saathi.rides.repo import PlaceRepo, optional
 from saathi.states import REQUEST, Machine
 from saathi.store import Store
 from saathi.store.keys import KeyRing
@@ -74,34 +75,6 @@ _MEDIA_KINDS = frozenset({MediaKind.AUDIO, MediaKind.IMAGE, MediaKind.VIDEO, Med
 _PHASE_1 = Machine(REQUEST, phase=1)  # R02 is a phase 1 row; the worker takes it now (LLD intake M12)
 AUDIO_CAPTION = "Voice note from the elder"
 CAREGIVER_SEND_TIMEOUT_S = 10.0  # one caregiver send never holds the elder reply longer than this
-RIDE_DB_TIMEOUT_S = 3.0  # bounds each optional ride transaction, including pool acquisition and commit
-_RIDE_TASKS: set[asyncio.Task] = set()  # keep cancelled transactions alive until their cleanup finishes
-
-
-class RideBusy(RuntimeError):
-    """An earlier ride transaction is still cleaning up; skip ride work so it cannot drain the shared pool."""
-
-
-async def _ride_db[T](work: Coroutine[object, object, T]) -> T:
-    """Bound the caller's wait, even when cancellation stalls in rollback or connection reset."""
-    if _RIDE_TASKS:
-        work.close()
-        raise RideBusy
-    task = asyncio.create_task(work)
-    _RIDE_TASKS.add(task)
-
-    def finished(done: asyncio.Task) -> None:
-        _RIDE_TASKS.discard(done)
-        if not done.cancelled():
-            done.exception()  # retrieve a late failure without logging database or place text
-
-    task.add_done_callback(finished)
-    try:
-        async with asyncio.timeout(RIDE_DB_TIMEOUT_S):
-            return await asyncio.shield(task)
-    finally:
-        if not task.done():
-            task.cancel()  # cleanup continues independently; never await it on the elder reply path
 
 
 @dataclass(frozen=True)
@@ -323,7 +296,9 @@ async def process(lease: Lease, deps: WorkerDeps) -> Outcome:
         except Exception as exc:  # noqa: BLE001  (a failed model never blocks the summary)
             log.info("router failed for %s: %s", ctx.inbox, type(exc).__name__)
 
-    # TX-W2: the transcript (sealed), the radar mark, and an alert on a hit.
+    ride_allowed = bool(text and ctx.consent and radar_ok and not hit.emergency and not hit.scam)
+    places: list[Place] | None = None
+    # TX-W2: required transcript, radar mark and alerts precede optional ride SQL.
     async with deps.store.tx(household=ctx.household) as tx:
         await holds(tx, lease)
         if new_transcript is not None:
@@ -337,6 +312,8 @@ async def process(lease: Lease, deps: WorkerDeps) -> Outcome:
             if hit_flag:
                 alert = AlertOpen(kind=kind, origin=_origin(hit), rule_ids=list(hit.rule_ids))  # type: ignore[arg-type]
                 await AlertRepo.open(tx, lease.inbox_id, lease.elder_id, alert, tx.now, None)
+        if ride_allowed:
+            places = await optional(tx, lambda: PlaceRepo.all(tx), inbox=ctx.inbox)
 
     # TX-W3: no triage in Phase 0, so the fixed outcome is a handoff with the summary (R05); a closed gate is R02.
     request_state: str | None = None
@@ -352,13 +329,19 @@ async def process(lease: Lease, deps: WorkerDeps) -> Outcome:
                 await RequestRepo.transition(tx, ctx.request, "received", "router_outcome_c", "handoff", "summary_only")
                 request_state = "handoff"
 
-    ride = await _ride_step(ctx, deps, text, hit, radar_ok)
-    effects = await _send_effects(ctx, deps, run, hit, flag, intent, blob, transcript is not None, lease, ride)
+    ride = _ride_step(ctx, text, places or [])
+    effects, delivered_ride = await _send_effects(ctx, deps, run, hit, flag, intent, blob, transcript is not None, ride)
 
     fault(WORKER_BEFORE_SETTLE)  # test hook: every effect is sent, the row is not settled yet
     state = {"unsupported": "unsupported", "media_lost": "media_lost"}.get(flag, "processed")
     async with deps.store.tx(household=ctx.household) as tx:  # TX-W4: only after every effect was sent
         settled = await InboxRepo.settle(tx, lease, state)
+        if settled and ride_allowed and delivered_ride and ride is not None and ride.place_id is not None:
+            await optional(
+                tx,
+                lambda: PlaceRepo.count_once(tx, ride.place_id, source="inbox", source_id=str(ctx.inbox)),
+                inbox=ctx.inbox,
+            )
     if not settled:
         log.warning("lease lost before settle for %s; the next worker repeats the sends with the same keys", ctx.inbox)
     # audio with no transcript, or a radar that crashed, was not scanned
@@ -378,19 +361,9 @@ class _Ride:
     place_id: str | None
 
 
-async def _ride_step(ctx: _Ctx, deps: WorkerDeps, text: str, hit: RadarResult, radar_ok: bool) -> _Ride | None:
-    """The ride helper (a handoff only): with no emergency or scam, a household that has saved places and a ride word
-    in the words, a card for the caregiver. Any failure here is logged and gives None: the summary and the elder reply
-    never wait on it."""
-    if not (text and ctx.consent and radar_ok) or hit.emergency or hit.scam:
-        return None
-
-    async def fetch_places():
-        async with deps.store.tx(household=ctx.household) as tx:
-            return await PlaceRepo.all(tx)
-
+def _ride_step(ctx: _Ctx, text: str, places: list[Place]) -> _Ride | None:
+    """Build a caregiver handoff from already fetched places, without I/O."""
     try:
-        places = await _ride_db(fetch_places())
         if not places:
             return None
         found = recognise(text, places)
@@ -414,9 +387,8 @@ async def _send_effects(
     intent: str,
     blob: MediaBlob | None,
     transcribed: bool,
-    lease: Lease,
     ride: _Ride | None = None,
-) -> int:
+) -> tuple[int, bool]:
     """The caregiver summary (and the audio when allowed), then the elder reply. The humans are told first, each send
     bounded by a timeout; an error or a cancel in their send does not stop the elder reply, and an error is raised
     afterwards so the row is tried again."""
@@ -455,17 +427,6 @@ async def _send_effects(
                         log.warning("ride card failed for %s: %s", ctx.inbox, type(exc).__name__)
             except Exception as exc:  # noqa: BLE001  (a timeout is one too)
                 failure = failure or exc
-        if ride is not None and ride.place_id is not None and delivered_ride:
-
-            async def count_ride():
-                async with deps.store.tx(household=ctx.household) as tx:
-                    await holds(tx, lease)
-                    await PlaceRepo.count_once(tx, ride.place_id, source="inbox", source_id=str(ctx.inbox))
-
-            try:
-                await _ride_db(count_ride())
-            except Exception as exc:  # noqa: BLE001
-                log.warning("ride count failed for %s: %s", ctx.inbox, type(exc).__name__)
     finally:  # also on a cancel: the elder reply is never skipped because a caregiver send was in flight
         if hit.emergency:
             reply = ReplyKey.EMERGENCY
@@ -494,4 +455,4 @@ async def _send_effects(
             failure = failure or exc
     if failure is not None:
         raise failure
-    return sent
+    return sent, delivered_ride

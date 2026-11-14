@@ -3,13 +3,44 @@ may read `addresses` and change only `ride_count` and `last_ride_at`)."""
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+import logging
+from collections.abc import Awaitable, Callable, Mapping
 from typing import Any, Literal
 
+from saathi.errors import StoreUnavailable
+from saathi.ids import InboxId
 from saathi.ports import Tx
 from saathi.rides.place import Place
 
 _COLUMNS = "id, label, formatted, lat, lng, aliases, is_pickup, ride_count"
+log = logging.getLogger(__name__)
+
+
+async def optional[T](tx: Tx, work: Callable[[], Awaitable[T]], *, inbox: InboxId) -> T | None:
+    """Isolate optional ride SQL in the row's transaction; connection failures and cancellation propagate."""
+    await tx.execute("SAVEPOINT ride")
+    try:
+        settings = (
+            await tx.fetch(
+                "SELECT current_setting('lock_timeout') AS lock_timeout,"
+                " current_setting('statement_timeout') AS statement_timeout"
+            )
+        )[0]
+        await tx.execute("SELECT set_config('lock_timeout', '200ms', true)")
+        await tx.execute("SELECT set_config('statement_timeout', '500ms', true)")
+        result = await work()
+    except StoreUnavailable:
+        raise
+    except Exception as exc:  # noqa: BLE001  (a ride SQL failure must not undo required row work)
+        # ROLLBACK restores the settings as well as the optional writes.
+        await tx.execute("ROLLBACK TO SAVEPOINT ride")
+        await tx.execute("RELEASE SAVEPOINT ride")
+        log.warning("ride database failed for %s: %s", inbox, type(exc).__name__)
+        return None
+    await tx.execute("RELEASE SAVEPOINT ride")
+    await tx.execute("SELECT set_config('lock_timeout', $1, true)", settings["lock_timeout"])
+    await tx.execute("SELECT set_config('statement_timeout', $1, true)", settings["statement_timeout"])
+    return result
 
 
 def _place(row: Mapping[str, Any]) -> Place:
