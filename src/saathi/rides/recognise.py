@@ -3,7 +3,7 @@
 The words are first normalised (Unicode composed, case folded, punctuation dropped; letters, marks and digits are kept,
 so Devanagari and Latin both survive). A ride word from `RIDE_WORDS` must be present, else the text is not a ride.
 Then every place label and alias is tried as a whole word or phrase, longest first. A tie between two places on the
-same longest phrase names no place, so the caregiver chooses. The pickup place is never a drop.
+same longest phrase names no place, so the caregiver chooses. An explicitly named pickup can be the destination.
 """
 
 from __future__ import annotations
@@ -47,6 +47,18 @@ def _padded(text: str) -> str:
 
 
 _RIDE_PHRASES = tuple(_padded(w) for w in RIDE_WORDS)
+_NEGATIONS = tuple(
+    _padded(w) for w in ("no", "not", "never", "dont", "don't", "mat", "nahi", "nahin", "nhi", "नहीं", "नही", "मत")
+)
+_COMMON_NAMES = frozenset(
+    {"the", "and", "for", "get", "book", "cab", "taxi", "auto", "ride", "hai", "chahiye", "और", "है"}
+)
+
+
+def usable_name(name: str) -> bool:
+    """Reject short or common-word place names both at entry and when reading older saved aliases."""
+    phrase = normalise(name)
+    return len(phrase) >= 3 and phrase not in _COMMON_NAMES
 
 
 def _has_ride_word(padded: str) -> bool:
@@ -56,15 +68,13 @@ def _has_ride_word(padded: str) -> bool:
 def recognise(text: str, places: Sequence[Place]) -> RideResult:
     """`RideResult(ride_word, place_id)`. No ride word: `RideResult(False)`, whatever the places."""
     padded = _padded(text)
-    if not _has_ride_word(padded):
+    if not _has_ride_word(padded) or any(negation in padded for negation in _NEGATIONS):
         return RideResult(False)
     candidates: list[tuple[int, str, str]] = []  # (length, phrase, place id)
     for place in places:
-        if place.is_pickup:
-            continue
         for name in (place.label, *place.aliases):
             phrase = normalise(name)
-            if phrase:
+            if usable_name(name):
                 candidates.append((len(phrase), phrase, place.id))
     for _length, phrase, _pid in sorted(candidates, key=lambda c: -c[0]):
         if f" {phrase} " in padded:

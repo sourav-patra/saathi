@@ -33,7 +33,7 @@ from saathi.errors import KeyMissing, ReceiptMissing, SaathiError
 from saathi.householdcfg import HouseholdConfig
 from saathi.ids import ElderId, HouseholdId, PersonRef, RunId, new_id, normalize_e164
 from saathi.ports import Clock, Tx
-from saathi.rides.recognise import normalise
+from saathi.rides.recognise import usable_name
 from saathi.store.db import Role, Store, create_pool
 from saathi.store.keys import KEY_LEN, KeyRing, generate_content_pair, generate_secret, sender_hmac
 from saathi.store.repos import ConfigRepo, ConsentEvent, ConsentRepo, IdentityRepo, SignoffRepo, VoiceRepo
@@ -546,8 +546,8 @@ class Admin:
         if lat is not None and lng is not None and not (-90 <= lat <= 90 and -180 <= lng <= 180):
             raise AdminError("the coordinates are out of range")
         names = [a.strip() for a in aliases]
-        if not normalise(label) or not all(normalise(a) for a in names):
-            raise AdminError("a label and an alias need at least one letter or digit")
+        if not usable_name(label) or not all(usable_name(a) for a in names):
+            raise AdminError("labels and aliases need at least 3 characters and must not be common words")
         place = new_id()
         try:
             async with self._store.tx(household=HouseholdId(household)) as tx:
@@ -580,8 +580,8 @@ class Admin:
 
     async def place_alias_add(self, household: str, place: str, alias: str) -> None:
         alias = alias.strip()
-        if not normalise(alias):
-            raise AdminError("an alias needs at least one letter or digit")
+        if not usable_name(alias):
+            raise AdminError("an alias needs at least 3 characters and must not be a common word")
         async with self._store.tx(household=HouseholdId(household)) as tx:
             await self._need_household(tx)
             place_id = await self._find_place(tx, place)

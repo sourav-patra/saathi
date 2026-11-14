@@ -153,9 +153,7 @@ class PgApproverDirectory:
     """`resolve` is the security-definer function `control.resolve_approver` (a `ScanFns`); `chat_of` reads the approver
     row of each household in `households`, because the port names no household."""
 
-    def __init__(
-        self, scan: Any, store: Store, households: Callable[[], Awaitable[Sequence[HouseholdId]]]
-    ) -> None:
+    def __init__(self, scan: Any, store: Store, households: Callable[[], Awaitable[Sequence[HouseholdId]]]) -> None:
         self._scan = scan
         self._store = store
         self._households = households
@@ -400,7 +398,7 @@ class RideTaps(Protocol):
     """What the router needs of the ride helper: count the ride and give the card to show, or None when the place is
     gone."""
 
-    async def tap(self, household: HouseholdId, place_id: str) -> Card | None: ...
+    async def tap(self, household: HouseholdId, place_id: str, *, update_id: int) -> Card | None: ...
 
 
 Answer = Callable[[ApproverUpdate, str], Awaitable[None]]
@@ -521,7 +519,7 @@ class CallbackRouter:
         if self._rides is None or self._edit is None or up.message_ref is None:
             await self._say(up, SAY_UNKNOWN)
             return
-        card = await self._rides.tap(up.household_id, place_id)
+        card = await self._rides.tap(up.household_id, place_id, update_id=up.update_id)
         if card is None:
             await self._say(up, SAY_RIDE_GONE)
             return

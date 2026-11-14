@@ -66,6 +66,8 @@ def maps_url(pickup: Place | None, drop: Place) -> str | None:
 def known_card(drop: Place, pickup: Place | None) -> Card:
     """The card for a recognised or chosen place: the lines, then Uber (when it has coordinates), Rapido, Namma Yatri
     and Map (when it has coordinates)."""
+    if pickup is not None and pickup.id == drop.id:
+        pickup = None  # a return trip starts at the rider's current location
     lines = [f"To: {drop.label}"]
     if pickup is not None:
         lines.append(f"Pickup: {pickup.formatted}")
@@ -81,8 +83,8 @@ def known_card(drop: Place, pickup: Place | None) -> Card:
 
 
 def choices(places: Sequence[Place]) -> list[Place]:
-    """Up to five drop places, most used first, then by label. The pickup and an id too long for a button go."""
-    usable = [p for p in places if not p.is_pickup and _SAFE_ID.fullmatch(p.id)]
+    """Up to five places, including home, most used first, then by label. Skip ids too long for a button."""
+    usable = [p for p in places if _SAFE_ID.fullmatch(p.id)]
     return sorted(usable, key=lambda p: (-p.ride_count, p.label))[:MAX_CHOICES]
 
 

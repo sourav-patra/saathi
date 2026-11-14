@@ -13,11 +13,16 @@ class PgRideTaps:
     def __init__(self, store: Store) -> None:
         self._store = store
 
-    async def tap(self, household: HouseholdId, place_id: str) -> Card | None:
+    async def tap(self, household: HouseholdId, place_id: str, *, update_id: int) -> Card | None:
         """The card to show instead of the choice card, or None when the place is gone. Counts the ride."""
         async with self._store.tx(household=household) as tx:
+            previous = await PlaceRepo.callback_card(tx, update_id)
+            if previous is not None:
+                return previous
             drop = await PlaceRepo.one(tx, place_id)
-            if drop is None or drop.is_pickup:
+            if drop is None:
                 return None
-            await PlaceRepo.count_ride(tx, place_id)
-            return known_card(drop, await PlaceRepo.pickup(tx))
+            card = known_card(drop, await PlaceRepo.pickup(tx))
+            await PlaceRepo.count_once(tx, place_id, source="callback", source_id=str(update_id), card=card)
+            # A concurrent replay may have claimed this update first. Always edit to the original card.
+            return await PlaceRepo.callback_card(tx, update_id)

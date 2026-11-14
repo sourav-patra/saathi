@@ -622,7 +622,7 @@ async def test_place_add_list_alias_and_remove(pg_db: PgDb, tmp_path: Path):
         out = await dispatch(
             p.parse_args(
                 ["place", "add", "--household", H, "--label", "Clinic A", "--address", "2 Test Road, Sample Town",
-                 "--lat", "0.1", "--lng", "0.2", "--alias", "doctor", "--alias", "dr"]
+                 "--lat", "0.1", "--lng", "0.2", "--alias", "doctor", "--alias", "clinic"]
             ),
             a,
         )  # fmt: skip
@@ -630,7 +630,7 @@ async def test_place_add_list_alias_and_remove(pg_db: PgDb, tmp_path: Path):
         home = await a.place_add(H, label="Home P", address="1 Pickup Lane, Sample Town", pickup=True)
         listing = await dispatch(p.parse_args(["place", "list", "--household", H]), a)
         assert listing.splitlines() == [
-            f"{clinic}  Clinic A  pickup=no  coordinates=yes  rides=0  aliases=doctor, dr",
+            f"{clinic}  Clinic A  pickup=no  coordinates=yes  rides=0  aliases=doctor, clinic",
             f"{home}  Home P  pickup=yes  coordinates=no  rides=0  aliases=-",
         ]
         assert "Test Road" not in listing  # the address itself is not printed
@@ -641,8 +641,8 @@ async def test_place_add_list_alias_and_remove(pg_db: PgDb, tmp_path: Path):
         with pytest.raises(AdminError, match="already has this alias"):
             await a.place_alias_add(H, clinic, "doctor")
         with pytest.raises(AdminError, match="no such place"):
-            await a.place_alias_add(H, "nowhere", "x")
-        with pytest.raises(AdminError, match="letter or digit"):
+            await a.place_alias_add(H, "nowhere", "doctor")
+        with pytest.raises(AdminError, match="at least 3 characters"):
             await a.place_alias_add(H, clinic, "?!")
         removal = p.parse_args(["place", "remove", "--household", H, "--place", "Clinic A"])
         assert await dispatch(removal, a) == "place removed"
@@ -666,7 +666,7 @@ async def test_place_rules(pg_db: PgDb, tmp_path: Path):
             await a.place_add(H, label="Clinic A", address="y", lat=91.0, lng=0.0)
         with pytest.raises(AdminError, match="label and an address"):
             await a.place_add(H, label=" ", address="y")
-        with pytest.raises(AdminError, match="letter or digit"):
+        with pytest.raises(AdminError, match="at least 3 characters"):
             await a.place_add(H, label="Clinic A", address="y", aliases=["..."])
         with pytest.raises(AdminError, match="no such household"):
             await a.place_add("nope", label="Clinic A", address="y")
@@ -682,7 +682,7 @@ async def test_place_commands_audit_codes_only(pg_db: PgDb, tmp_path: Path):
         await onboard(a)
         await a.keys_init(H)
         place = await a.place_add(H, label="Clinic A", address="2 Test Road, Sample Town", aliases=["doctor"])
-        await a.place_alias_add(H, place, "dr")
+        await a.place_alias_add(H, place, "clinic")
         await a.place_remove(H, place)
     rows_ = await su_fetch(pg_db, "SELECT event, actor, subject, detail FROM audit_log WHERE event LIKE 'admin_place%'")
     assert [r["event"] for r in rows_] == ["admin_place_added", "admin_place_alias_added", "admin_place_removed"]
@@ -690,3 +690,21 @@ async def test_place_commands_audit_codes_only(pg_db: PgDb, tmp_path: Path):
     flat = json.dumps([dict(r) for r in rows_], default=str)
     for private in ("Clinic A", "Test Road", "doctor"):
         assert private not in flat  # no label, address or alias in an audit row
+
+
+@pytest.mark.parametrize("name", ["a", "dr", "?!", "THE", "get", "cab", "hai"])
+@pytest.mark.parametrize("field", ["label", "alias", "alias-add"])
+async def test_place_commands_refuse_short_or_common_names(pg_db: PgDb, tmp_path: Path, name, field):
+    async with admin_for(pg_db, tmp_path) as admin:
+        await onboard(admin)
+        place = await admin.place_add(H, label="Clinic A", address="2 Test Road, Sample Town")
+        with pytest.raises(AdminError, match="at least 3 characters.*common word"):
+            if field == "alias-add":
+                await admin.place_alias_add(H, place, name)
+            else:
+                await admin.place_add(
+                    H, label=name if field == "label" else "Temple B", address="x",
+                    aliases=[name] if field == "alias" else [],
+                )  # fmt: skip
+    assert len(await su_fetch(pg_db, "SELECT 1 FROM addresses")) == 1
+    assert (await su_fetch(pg_db, "SELECT aliases FROM addresses"))[0]["aliases"] == []

@@ -67,8 +67,23 @@ def test_punctuation_and_case_are_ignored():
     assert recognise("CAB, to clinic-a!!", PLACES) == RideResult(True, "pl_clinic")
 
 
-def test_the_pickup_place_is_never_a_drop():
-    assert recognise("ghar se cab chahiye", PLACES) == RideResult(True, None)
+@pytest.mark.parametrize("text", ["ghar jaana hai", "cab to Home P"])
+def test_the_pickup_place_can_be_an_explicit_destination(text):
+    assert recognise(text, PLACES) == RideResult(True, HOME.id)
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["do not book a cab to Clinic A", "Clinic A ke liye cab mat bulao", "Clinic A जाने के लिए कैब नहीं चाहिए"],
+)
+def test_negated_requests_are_not_rides(text):
+    assert recognise(text, PLACES) == RideResult(False)
+
+
+@pytest.mark.parametrize("name", ["a", "me", "the", "get", "cab"])
+def test_old_ambiguous_place_names_do_not_match(name):
+    place = Place("p_bad", name, "x", aliases=(name,))
+    assert recognise("get me a cab", [place]) == RideResult(True)
 
 
 def test_normalise_keeps_devanagari_and_latin_and_drops_the_rest():
@@ -139,9 +154,24 @@ def test_choice_card_lists_up_to_five_places_by_ride_count_then_label():
     many = [Place(f"p{i}", f"Place {i}", "x", ride_count=0) for i in range(7)] + [TEMPLE, HOME]
     card = rc.choice_card(many)
     assert card.title == "Ride request: place not recognised"
-    assert [b.text for b in card.buttons] == ["Temple B", "Place 0", "Place 1", "Place 2", "Place 3"]
+    assert [b.text for b in card.buttons] == ["Temple B", "Home P", "Place 0", "Place 1", "Place 2"]
     assert [b.data for b in card.buttons][0] == "ride:pl_temple"
-    assert all(b.url is None for b in card.buttons)  # the pickup is never offered as a drop
+    assert all(b.url is None for b in card.buttons)
+
+
+def test_return_home_card_omits_the_pickup_line_and_link_origin():
+    card = rc.known_card(HOME, HOME)
+    assert card.title == "Ride request"
+    assert card.lines == ["To: Home P", "Drop: 1 Pickup Lane, Sample Town"]
+    assert card.buttons[0].url == (
+        "https://m.uber.com/looking?drop[0]=%7B%22latitude%22%3A0.0%2C%22longitude%22%3A0.0%2C"
+        "%22addressLine1%22%3A%22Home%20P%22%7D"
+    )
+    assert card.buttons[-1].url == ("https://www.google.com/maps/dir/?api=1&destination=0.0%2C0.0&travelmode=driving")
+
+
+def test_choice_card_offers_home():
+    assert ("Home P", "ride:pl_home") in [(b.text, b.data) for b in rc.choice_card(PLACES).buttons]
 
 
 def test_choice_card_skips_an_id_too_long_for_a_button():

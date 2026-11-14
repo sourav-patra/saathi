@@ -6,13 +6,14 @@ test runs as the core role. The admin commands for places are tested in test_adm
 
 from __future__ import annotations
 
+import asyncio
 import json
 from contextlib import asynccontextmanager
 from typing import Any
 
 import asyncpg
 import pytest
-from alert_helpers import make_rig
+from alert_helpers import make_rig, set_approvers
 from conftest import PgDb
 from fakes import FakeAudit, FakeCaregiverChannel, FakeClock
 from worker_helpers import NOW, Rig, Role, add_inbox, open_store, provision, rows
@@ -20,6 +21,7 @@ from worker_helpers import NOW, Rig, Role, add_inbox, open_store, provision, row
 from saathi.channels.telegram import CallbackRouter, RoutedUpdate
 from saathi.errors import ChannelDown
 from saathi.ids import ApproverId, HouseholdId, IdemKey
+from saathi.rides.repo import PlaceRepo
 from saathi.rides.taps import PgRideTaps
 from saathi.worker import WorkerConfig, process, steps
 
@@ -37,7 +39,7 @@ async def seed_places(db: PgDb, h: str = H, *, pickup: bool = True) -> None:
     su = await asyncpg.connect(db.dsn())
     try:
         for pid, label, formatted, lat, lng, aliases, is_pickup, count in (
-            ("pl_home", "Home P", "1 Pickup Lane, Sample Town", 0.0, 0.0, [], pickup, 0),
+            ("pl_home", "Home P", "1 Pickup Lane, Sample Town", 0.0, 0.0, ["ghar"], pickup, 0),
             ("pl_clinic", "Clinic A", "2 Test Road, Sample Town", 0.1, 0.2, ["doctor"], False, 0),
             ("pl_temple", "Temple B", "3 Test Road, Sample Town", 0.3, 0.4, ["mandir"], False, 3),
             ("pl_relative", "Relative C", "4 Test Road, Sample Town", None, None, [], False, 0),
@@ -95,6 +97,9 @@ async def test_core_reads_places_and_changes_only_the_two_counters(pg_db: PgDb):
         await denied(core, "UPDATE addresses SET is_pickup = false")
         await denied(core, "UPDATE addresses SET aliases = '{z}'")
         await denied(core, "DELETE FROM addresses")
+        await denied(
+            core, "INSERT INTO addresses (id, household_id, label, formatted) VALUES ('new', 'h1', 'Clinic Z', 'x')"
+        )
         # another household's row is invisible, so a counter update reaches nothing
         assert await core.execute("UPDATE addresses SET ride_count = 9 WHERE id = 'h2pl_clinic'") == "UPDATE 0"
     finally:
@@ -122,6 +127,31 @@ async def test_owner_rls_denies_another_household(pg_db: PgDb):
     finally:
         await owner.close()
     assert (await rows(pg_db, "SELECT count(*) AS n FROM addresses WHERE household_id = 'h2'"))[0]["n"] == 4
+
+
+async def test_count_claims_are_household_scoped_and_immutable(pg_db: PgDb):
+    for household in ("h1", "h2"):
+        await provision(pg_db, household)
+        await seed_places(pg_db, household)
+    async with open_store(pg_db, Role.CORE) as store:
+        for household, pid in (("h1", "pl_clinic"), ("h2", "h2pl_clinic")):
+            async with store.tx(household=HouseholdId(household)) as tx:
+                assert await PlaceRepo.count_once(tx, pid, source="inbox", source_id="m1")
+                assert not await PlaceRepo.count_once(tx, pid, source="inbox", source_id="m1")
+                assert len(await tx.fetch("SELECT 1 FROM ride_counts")) == 1
+    assert await ride_count(pg_db, "pl_clinic") == await ride_count(pg_db, "h2pl_clinic") == 1
+    core = await asyncpg.connect(pg_db.dsn("saathi_core"))
+    try:
+        await core.execute("SELECT set_config('app.household_id', 'h1', false)")
+        await denied(core, "UPDATE ride_counts SET source_id = 'other'")
+        await denied(core, "DELETE FROM ride_counts")
+        await denied(
+            core,
+            "INSERT INTO ride_counts (household_id, source, source_id, place_id)"
+            " VALUES ('h2', 'inbox', 'other', 'h2pl_clinic')",
+        )
+    finally:
+        await core.close()
 
 
 # --- the worker -------------------------------------------------------------------------------------------------
@@ -163,6 +193,7 @@ async def test_ride_card_follows_the_summary_and_the_reply_is_unchanged(pg_db: P
     assert ride.lines == ["To: Clinic A", "Pickup: 1 Pickup Lane, Sample Town", "Drop: 2 Test Road, Sample Town"]  # type: ignore[attr-defined]
     assert [b.text for b in ride.buttons] == ["Uber (pre-filled)", "Rapido", "Namma Yatri", "Map"]  # type: ignore[attr-defined]
     assert [(m, k) for m, _to, _p, k in rig.elder.sent] == [("send_text", IdemKey("m1:reply:text"))]
+    assert rig.elder.sent[0][2] == "मैंने आपके परिवार को बता दिया है।"
     assert await ride_count(pg_db, "pl_clinic") == 1 and await ride_count(pg_db, "pl_temple") == 3
     stamped = await rows(pg_db, "SELECT last_ride_at FROM addresses WHERE id = 'pl_clinic'")
     assert stamped[0]["last_ride_at"] == NOW
@@ -184,7 +215,7 @@ async def test_ride_word_with_no_known_place_sends_the_choice_card(pg_db: PgDb):
     await run_one(pg_db, rig, ring, pub, "auto chahiye")
     *_summary, (_m, _to, ride, _k) = rig.caregiver.sent
     assert ride.title == "Ride request: place not recognised"  # type: ignore[attr-defined]
-    assert [b.data for b in ride.buttons] == ["ride:pl_temple", "ride:pl_clinic", "ride:pl_relative"]  # type: ignore[attr-defined]
+    assert [b.data for b in ride.buttons] == ["ride:pl_temple", "ride:pl_clinic", "ride:pl_home", "ride:pl_relative"]  # type: ignore[attr-defined]
     assert [await ride_count(pg_db, p) for p in ("pl_clinic", "pl_temple", "pl_relative")] == [0, 3, 0]
 
 
@@ -251,6 +282,127 @@ async def test_a_failed_ride_card_send_is_logged_and_blocks_nothing(pg_db: PgDb,
     assert await ride_count(pg_db, "pl_clinic") == 0  # nothing reached a caregiver, so nothing is counted
 
 
+async def test_partial_delivery_retry_counts_once_per_inbox(pg_db: PgDb):
+    ring, pub = await provision(pg_db, approvers=("ap1", "ap2"))
+    await seed_places(pg_db)
+    await add_inbox(pg_db, ring, pub, H, "m1", text="cab to Clinic A")
+    rig = Rig()
+    real = rig.caregiver.send_card
+    failed = False
+
+    async def flaky(to, card, *, key):
+        nonlocal failed
+        if key == "m1:summary:ap2h1" and not failed:
+            failed = True
+            raise ChannelDown()
+        return await real(to, card, key=key)
+
+    rig.caregiver.send_card = flaky
+    async with harness(pg_db, rig, ring) as (store, deps, clock):
+        lease = await store.scan.lease_next(clock.now(), 60)
+        assert lease is not None
+        with pytest.raises(ChannelDown):
+            await process(lease, deps)
+        assert await ride_count(pg_db, "pl_clinic") == 1
+        assert (await process(lease, deps)).inbox_state == "processed"
+    assert await ride_count(pg_db, "pl_clinic") == 1
+    assert [str(k) for *_rest, k in rig.caregiver.sent if ":ride:" in k] == ["m1:ride:ap1h1", "m1:ride:ap2h1"]
+    assert len(await rows(pg_db, "SELECT 1 FROM ride_counts WHERE source = 'inbox'")) == 1
+
+
+async def test_failed_counter_transaction_rolls_back_and_retries(pg_db: PgDb, monkeypatch):
+    ring, pub = await provision(pg_db)
+    await seed_places(pg_db)
+    await add_inbox(pg_db, ring, pub, H, "m1", text="cab to Clinic A")
+    rig = Rig()
+    real = PlaceRepo.count_ride
+    failed = False
+
+    async def flaky(tx, place_id):
+        nonlocal failed
+        result = await real(tx, place_id)
+        if not failed:
+            failed = True
+            raise RuntimeError("synthetic counter failure")
+        return result
+
+    monkeypatch.setattr(PlaceRepo, "count_ride", flaky)
+    async with harness(pg_db, rig, ring) as (store, deps, clock):
+        lease = await store.scan.lease_next(clock.now(), 60)
+        assert lease is not None
+        with pytest.raises(RuntimeError, match="synthetic counter failure"):
+            await process(lease, deps)
+        assert await ride_count(pg_db, "pl_clinic") == 0
+        assert await rows(pg_db, "SELECT 1 FROM ride_counts") == []
+        assert [m for m, *_rest in rig.elder.sent] == ["send_text"]
+        assert (await process(lease, deps)).inbox_state == "processed"
+    assert await ride_count(pg_db, "pl_clinic") == 1
+    assert len([k for *_rest, k in rig.caregiver.sent if ":ride:" in k]) == 1
+
+
+@pytest.mark.parametrize("operation", ["all", "count_once"])
+async def test_stalled_ride_database_work_still_sends_summary_and_reply(pg_db: PgDb, monkeypatch, caplog, operation):
+    ring, pub = await provision(pg_db)
+    await seed_places(pg_db)
+    await add_inbox(pg_db, ring, pub, H, "m1", text="cab to Clinic A")
+    rig = Rig()
+    entered = asyncio.Event()
+
+    async def stalled(*_args, **_kwargs):
+        entered.set()
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr(steps, "RIDE_DB_TIMEOUT_S", 0.02)
+    monkeypatch.setattr(PlaceRepo, operation, stalled)
+    async with harness(pg_db, rig, ring) as (store, deps, clock):
+        lease = await store.scan.lease_next(clock.now(), 60)
+        assert lease is not None
+        if operation == "count_once":
+            with pytest.raises(TimeoutError):
+                await asyncio.wait_for(process(lease, deps), 2.0)
+        else:
+            assert (await asyncio.wait_for(process(lease, deps), 2.0)).inbox_state == "processed"
+    assert entered.is_set()
+    assert rig.caregiver.sent[0][2].title == "New message from the elder"
+    assert [m for m, *_rest in rig.elder.sent] == ["send_text"]
+    assert await ride_count(pg_db, "pl_clinic") == 0
+    assert "TimeoutError" in caplog.text
+    assert all(private not in caplog.text for private in ("Clinic A", "Test Road", "Pickup Lane"))
+
+
+async def test_failed_radar_suppresses_ride_but_opens_alert_and_replies(pg_db: PgDb, monkeypatch):
+    async def failed(*_args, **_kwargs):
+        raise RuntimeError("synthetic radar failure")
+
+    monkeypatch.setattr(steps.radar, "combine", failed)
+    ring, pub = await provision(pg_db)
+    rig = Rig()
+    await run_one(pg_db, rig, ring, pub, "cab to Clinic A")
+    assert [k for *_rest, k in rig.caregiver.sent] == ["m1:summary:ap1h1"]
+    assert [m for m, *_rest in rig.elder.sent] == ["send_text"]
+    assert [r["kind"] for r in await rows(pg_db, "SELECT kind FROM alert_events")] == ["unscanned"]
+    assert await ride_count(pg_db, "pl_clinic") == 0
+
+
+@pytest.mark.parametrize("text", ["do not book a cab to Clinic A", "Clinic A ke liye cab mat bulao", "कैब नहीं चाहिए"])
+async def test_negated_request_sends_no_ride_card(pg_db: PgDb, text):
+    ring, pub = await provision(pg_db)
+    rig = Rig()
+    await run_one(pg_db, rig, ring, pub, text)
+    assert [k for *_rest, k in rig.caregiver.sent] == ["m1:summary:ap1h1"]
+    assert await ride_count(pg_db, "pl_clinic") == 0
+
+
+async def test_worker_return_home_uses_current_location(pg_db: PgDb):
+    ring, pub = await provision(pg_db)
+    rig = Rig()
+    await run_one(pg_db, rig, ring, pub, "ghar jaana hai")
+    card = rig.caregiver.sent[-1][2]
+    assert card.lines == ["To: Home P", "Drop: 1 Pickup Lane, Sample Town"]
+    assert "pickup=" not in card.buttons[0].url
+    assert await ride_count(pg_db, "pl_home") == 1
+
+
 # --- the tap on a place choice ----------------------------------------------------------------------------------
 async def test_a_tap_edits_the_choice_card_into_the_known_place_card_and_counts(pg_db: PgDb):
     rig = await make_rig(pg_db)
@@ -262,7 +414,6 @@ async def test_a_tap_edits_the_choice_card_into_the_known_place_card_and_counts(
             rides=PgRideTaps(store), edit=out.edit_card,
         )  # fmt: skip
         from saathi.rides.card import choice_card
-        from saathi.rides.repo import PlaceRepo
 
         async with store.tx(household=HouseholdId(H)) as tx:
             card = choice_card(await PlaceRepo.all(tx))
@@ -283,8 +434,11 @@ async def test_a_tap_edits_the_choice_card_into_the_known_place_card_and_counts(
         assert await ride_count(pg_db, "pl_clinic") == 1
         await router.handle(tap(2, "ride:pl_nowhere"))  # a place that is gone: the card is left as it is
         assert out.cards[ref] == edited
-        await router.handle(tap(3, "ride:pl_home"))  # the pickup is not a drop
-        assert out.cards[ref] == edited and await ride_count(pg_db, "pl_home") == 0
+        await router.handle(tap(3, "ride:pl_home"))
+        home_card = out.cards[ref]
+        assert home_card.lines == ["To: Home P", "Drop: 1 Pickup Lane, Sample Town"]
+        assert "pickup=" not in (home_card.buttons[0].url or "")
+        assert await ride_count(pg_db, "pl_home") == 1
 
 
 async def test_a_tap_from_a_chat_that_is_not_an_approver_is_refused(pg_db: PgDb):
@@ -301,3 +455,76 @@ async def test_a_tap_from_a_chat_that_is_not_an_approver_is_refused(pg_db: PgDb)
         )  # fmt: skip
         await router.handle(stranger)
     assert await ride_count(pg_db, "pl_clinic") == 0 and out.cards == {}
+
+
+async def test_failed_edit_replay_uses_saved_card_and_counts_once(pg_db: PgDb):
+    rig = await make_rig(pg_db)
+    await seed_places(pg_db)
+    out = FakeCaregiverChannel()
+    out.fail("edit_card", ChannelDown)
+    update = RoutedUpdate(
+        update_id=9, approver_id=ApproverId(P), kind="callback", data="ride:pl_clinic",
+        household_id=HouseholdId(H), message_ref="card-1",
+    )  # fmt: skip
+    async with open_store(pg_db, Role.CORE, clock=rig.clock) as store:
+
+        def router():
+            return CallbackRouter(
+                store, rig.service(store), rig.ring, FakeAudit(), out, rides=PgRideTaps(store), edit=out.edit_card
+            )
+
+        with pytest.raises(ChannelDown):
+            await router().handle(update)
+        assert await ride_count(pg_db, "pl_clinic") == 1
+        assert await rows(pg_db, "SELECT 1 FROM tg_updates WHERE update_id = 9") == []
+        saved = await rows(pg_db, "SELECT card FROM ride_counts WHERE source = 'callback' AND source_id = '9'")
+        await rig.sql("DELETE FROM addresses WHERE id = 'pl_clinic'")
+        await router().handle(update)  # a new router, and even a removed place, retain the original card
+        edited = next(iter(out.cards.values()))
+        assert edited.model_dump(mode="json") == json.loads(saved[0]["card"])
+        assert edited.lines == ["To: Clinic A", "Pickup: 1 Pickup Lane, Sample Town", "Drop: 2 Test Road, Sample Town"]
+        assert len(await rows(pg_db, "SELECT 1 FROM ride_counts")) == 1
+
+
+async def test_concurrent_callback_claims_count_once(pg_db: PgDb):
+    rig = await make_rig(pg_db)
+    await seed_places(pg_db)
+    async with open_store(pg_db, Role.CORE, clock=rig.clock) as store:
+        taps = PgRideTaps(store)
+        cards = await asyncio.gather(
+            taps.tap(HouseholdId(H), "pl_home", update_id=10),
+            taps.tap(HouseholdId(H), "pl_home", update_id=10),
+        )
+    assert cards[0] == cards[1] and cards[0] is not None
+    assert await ride_count(pg_db, "pl_home") == 1
+
+
+@pytest.mark.parametrize("who", ["revoked", "other_household"])
+async def test_revoked_or_other_household_ride_tap_is_refused(pg_db: PgDb, who):
+    rig = await make_rig(pg_db)
+    await seed_places(pg_db)
+    await provision(pg_db, "h2")
+    if who == "revoked":
+        su = await asyncpg.connect(pg_db.dsn())
+        try:
+            await set_approvers(su, H, "ap2h1")
+        finally:
+            await su.close()
+    approver = P if who == "revoked" else "ap1h2"
+    async with open_store(pg_db, Role.CORE, clock=rig.clock) as store:
+        out, audit = FakeCaregiverChannel(), FakeAudit()
+        router = CallbackRouter(
+            store, rig.service(store), rig.ring, audit, out, rides=PgRideTaps(store), edit=out.edit_card
+        )
+        await router.handle(
+            RoutedUpdate(
+                update_id=11,
+                approver_id=ApproverId(approver),
+                kind="callback",
+                data="ride:pl_clinic",
+                household_id=HouseholdId(H),
+                message_ref="card-1",
+            )  # fmt: skip
+        )
+    assert out.cards == {} and await ride_count(pg_db, "pl_clinic") == 0
+    assert await rows(pg_db, "SELECT 1 FROM ride_counts") == []

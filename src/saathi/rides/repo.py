@@ -4,8 +4,9 @@ may read `addresses` and change only `ride_count` and `last_ride_at`)."""
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, Literal
 
+from saathi.domain import Card
 from saathi.ports import Tx
 from saathi.rides.place import Place
 
@@ -51,3 +52,31 @@ class PlaceRepo:
             tx.now,
         )
         return bool(rows)
+
+    @staticmethod
+    async def count_once(
+        tx: Tx, place_id: str, *, source: Literal["callback", "inbox"], source_id: str, card: Card | None = None
+    ) -> bool:
+        """Claim and count in the caller's transaction. A failure rolls back both; a retry counts nothing more."""
+        claimed = await tx.fetch(
+            "INSERT INTO ride_counts (household_id, source, source_id, place_id, card)"
+            " SELECT $1, $2, $3, id, $5::jsonb FROM addresses WHERE id = $4"
+            " ON CONFLICT (household_id, source, source_id) DO NOTHING RETURNING place_id",
+            tx.household,
+            source,
+            source_id,
+            place_id,
+            card.model_dump(mode="json") if card is not None else None,
+        )
+        if not claimed:
+            return False
+        if not await PlaceRepo.count_ride(tx, place_id):
+            raise LookupError("ride place removed during count")
+        return True
+
+    @staticmethod
+    async def callback_card(tx: Tx, update_id: int) -> Card | None:
+        rows = await tx.fetch(
+            "SELECT card FROM ride_counts WHERE source = 'callback' AND source_id = $1", str(update_id)
+        )
+        return Card.model_validate(rows[0]["card"]) if rows else None

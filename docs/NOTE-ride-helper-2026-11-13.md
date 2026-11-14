@@ -2,31 +2,23 @@
 
 ## Scope
 
-When an elder asks for a ride and the household has saved places, the caregiver gets one extra card after the summary card. The card links to taxi apps and a map. Saathi books nothing, holds no payment method and calls no model. The elder's reply is unchanged ("I have told your family."). An emergency or scam message never gets a ride card, and a failure in this step is logged and blocks neither the summary nor the elder reply.
+A ride request gives caregivers an extra card after the summary. Saathi books nothing, holds no payment and calls no model. The elder reply stays "I have told your family." Emergency, scam and failed-radar messages get no ride card. Ride errors log only an inbox id and error type. Each ride database transaction has a three-second deadline, including acquisition and commit; summaries, replies and alerts proceed. Failed counting retries with the inbox after the reply.
 
 ## Data
 
-Places are rows of `addresses` (label, formatted address, lat, lng). Migration `008_ride_places.sql` adds `aliases text[]`, `is_pickup boolean` (at most one per household, by a partial unique index), `ride_count integer` and `last_ride_at timestamptz`. Row-level security is the existing household policy. The worker and bot role may read places and change only the two counters; the owner role adds, lists, aliases and removes them with `saathi-admin place add|list|alias-add|remove`. Audit rows hold ids and flags only, never a label or address.
+Places reuse household-scoped `addresses`: label, formatted address, coordinates, aliases, one optional pickup, ride count and last ride time. Migration 008 adds the ride columns and append-only `ride_counts` claims, unique by household, source and source id. Each claim and increment commit together. Inbox claims count once across caregivers and retries. Callback claims count once per update and retain the card for edit retries, even after place removal. Claims use forced household row-level security. The worker and bot use the core role: read addresses, update only counters, insert/read claims; address INSERT is revoked. Owner admin commands add, list, alias and remove places. Audit rows contain ids and flags only.
 
-## Recognition
+## Recognition and cards
 
-`rides/recognise.py` is a pure function. It normalises the words (composed Unicode, case folded, punctuation dropped; Latin and Devanagari kept), requires a ride word from a list in code (English, Hinglish, Hindi), then matches place labels and aliases as whole words, longest first. The pickup place is never a drop. A tie on the same longest phrase names no place. No ride word means not a ride.
+The pure recogniser normalises Unicode, case and punctuation, preserving Latin and Devanagari. It requires a ride phrase and rejects negation words in English, Hinglish and Hindi. Labels and aliases match whole phrases, longest first; ties give caregiver choice. Admin rejects names shorter than three normalised characters or on the common-word stoplist; recognition also ignores old ambiguous names.
 
-## Cards
+A known destination shows To, Pickup and Drop with app/map buttons. An explicitly named pickup label or alias is a valid destination, including "ghar jaana hai". That return card shows To and Drop, omits Pickup and leaves pickup/origin out of the links. Unknown destinations offer up to five saved places, including the pickup, ordered by count then label. An authorised tap edits the choice card into the saved destination card.
 
-A known place gives "Ride request" with the lines To, Pickup and Drop, and buttons Uber (pre-filled), Rapido, Namma Yatri and Map. A ride word with no known place gives "Ride request: place not recognised" with up to five places (most rides first, then label) as buttons `ride:<place id>`. A tap edits the card into the known-place card. A known-place card or a tap adds one to `ride_count` (once per message, however many caregivers).
+## Links and limits
 
-Links, each taken from the provider's own page:
-- Uber universal link `https://m.uber.com/looking` with JSON `pickup` and `drop[0]` (`latitude`, `longitude`, `addressLine1` as the nickname): developer.uber.com/docs/riders/ride-requests/tutorials/deep-links/introduction. The page lists `client_id` in its examples without marking it required, so it is left out.
-- Map: `https://www.google.com/maps/dir/?api=1&origin=..&destination=..&travelmode=driving`, coordinates as `lat%2Clng`: developers.google.com/maps/documentation/urls/get-started.
-- Rapido store page, Android package `com.rapido.passenger`, and Namma Yatri store page, package `in.juspay.nammayatri`, both under `https://play.google.com/store/apps/details?id=`. Both pages were opened on 2026-11-13 and name the apps.
+- [Uber deep links](https://developer.uber.com/docs/riders/ride-requests/tutorials/deep-links/introduction): `/looking` with encoded pickup and drop JSON (latitude, longitude, addressLine1). [Uber's button documentation](https://developer.uber.com/docs/riders/ride-requests/tutorials/button/android#customize-button-parameters), checked 2026-11-14, states that pickup defaults to the user's current location. Return trips therefore omit pickup. The caregiver must verify the rider's actual pickup before booking, especially when opening the link remotely.
+- [Maps URLs](https://developers.google.com/maps/documentation/urls/get-started): directions with `api=1`, optional origin, destination and `travelmode=driving`; coordinate commas are encoded.
+- Rapido and Namma Yatri open official Android store pages, not pre-filled rides: packages `com.rapido.passenger` and `in.juspay.nammayatri`, checked 2026-11-13. No Apple store links.
+- No coordinates means no Uber/Map button. Missing pickup coordinates omit the link origin. Exact matching needs aliases for spelling variants. Negation detection is conservative word matching.
 
-## Limits
-
-- No booking, no fare, no driver contact. The caregiver taps and books in the app.
-- Rapido and Namma Yatri have no documented ride link here, so the buttons open the Android store page, not a pre-filled ride. Apple store pages are not linked.
-- A place without coordinates gets no Uber or Map button. A pickup without coordinates is left out of both links.
-- Matching is by exact words after normalising. Spelling variants need an alias.
-- A caregiver tap whose card edit fails and is retried counts the ride twice.
-
-Skipped or not checked: the Uber link was not opened in the Uber app, and the `client_id` omission was not tested against it.
+Skipped or not checked: mobile-app link behaviour and omission of Uber's `client_id` remain unverified.
