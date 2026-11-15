@@ -125,12 +125,42 @@ def _rejection(phrase: str) -> str:
     return rf" {re.escape(phrase)} (?:{_NOT}){end}| not {re.escape(phrase)}{end}"
 
 
+# The refusal check released on main, kept unchanged as a first gate: the stricter rules below may only refuse more,
+# so no exception (a rejected place, Hindi unavailability, an allowed phrase) can give a card where this refuses.
+_BASE_NEGATIONS = tuple(
+    _padded(f"{negation} {verb}")
+    for negation, verbs in (
+        ("do not", ("book", "call", "need", "want")),
+        ("don't", ("book", "call", "need", "want")),
+        ("dont", ("book", "call", "need", "want")),
+        ("never", ("book", "call")),
+        ("mat", ("bulao", "bulana", "mangao", "book karo")),
+        ("nahi", ("chahiye", "bulao", "bulana", "jaana hai", "jana hai")),
+        ("nahin", ("chahiye", "bulao", "bulana", "jaana hai", "jana hai")),
+        ("nhi", ("chahiye", "bulao", "bulana", "jaana hai", "jana hai")),
+        ("नहीं", ("चाहिए", "चाहिये", "बुलाओ", "जाना है")),
+        ("नही", ("चाहिए", "चाहिये", "बुलाओ", "जाना है")),
+        ("मत", ("बुलाओ", "बुलाना", "मंगाओ", "बुक करो")),
+    )
+    for verb in verbs
+)
+
+
+def _base_refuses(padded: str) -> bool:
+    nouns = "|".join(re.escape(normalise(w)) for w in RIDE_WORDS if " " not in normalise(w))
+    return (
+        any(negation in padded for negation in _BASE_NEGATIONS)
+        or bool(re.search(rf" (?:no (?:{nouns})|(?:{nouns}) (?:nahi|nahin|nhi|नहीं|नही)) $", padded))
+        or bool(re.search(rf" (?:no|नहीं|नही) (?:{nouns}) ", padded))
+    )
+
+
 def recognise(text: str, places: Sequence[Place]) -> RideResult:
     """`RideResult(ride_word, place_id)`. No ride word, or any refusal marker left after the exceptions:
     `RideResult(False)`, whatever the places. A rejected place ("Clinic A nahi,", "not Clinic A,") is never the
     destination, and its rejection is forgiven only when the message also names a different place it does not reject."""
     padded = _padded(text)
-    if not _has_ride_word(padded):
+    if not _has_ride_word(padded) or _base_refuses(padded):
         return RideResult(False)
     marked = _marked(text)
     names = [(place.id, normalise(n)) for place in places for n in (place.label, *place.aliases) if usable_name(n)]

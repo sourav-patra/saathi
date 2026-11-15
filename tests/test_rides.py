@@ -470,3 +470,10 @@ def test_a_rejected_place_followed_by_another_place_picks_the_other():
 )
 def test_english_unavailability_refuses_as_on_main(text):
     assert recognise(text, PLACES) == RideResult(False)
+
+
+def test_a_place_name_that_overlaps_a_refusal_cannot_undo_it():
+    taxi = Place("pl_taxi", "City Taxi", "5 Test Road, Sample Town", 0.5, 0.6)
+    centre = Place("pl_centre", "Call Centre", "6 Test Road, Sample Town", 0.7, 0.8)
+    assert recognise("Clinic A jaana hai, City Taxi nahi", [*PLACES, taxi]) == RideResult(False)
+    assert recognise("Do not call centre, cab to Clinic A", [*PLACES, centre]) == RideResult(False)
