@@ -314,3 +314,31 @@ async def test_a_routed_tap_carries_the_card_it_came_from():
 @pytest.mark.parametrize("word", ["पर", "कब", "सब", "अब", "तक", "जब", "हम"])
 def test_common_two_letter_devanagari_words_are_not_place_names(word):
     assert not usable_name(word)
+
+
+@pytest.mark.parametrize(
+    ("text", "want"),
+    [
+        ("My answer is no cab please", False),
+        ("The answer is no taxi to Clinic A", False),
+        ("No cab, coming on foot to Clinic A", False),
+        ("Don't send a cab", False),
+        ("please cancel my cab", False),
+        ("uber nahi chahiye; ola bulao", False),
+        ("कैब। मत भेजो", False),
+        ("No cab is available, get an auto to Clinic A", "pl_clinic"),
+        ("No taxi has arrived; auto to Clinic A", "pl_clinic"),
+        ("कैब नहीं आ रही, मंदिर जाना है", "pl_temple"),
+        ("cab to Clinic A, not mandir", "pl_clinic"),
+        ("cab to Clinic A not far from home", "pl_clinic"),
+        ("is it not far, cab to Clinic A", "pl_clinic"),
+        ("No hurry, cab to Clinic A", "pl_clinic"),
+        ("cab please cancel my appointment", None),
+        ("cancel my appointment, cab to Clinic A", "pl_clinic"),
+        ("Don't send medicine; cab to Clinic A", "pl_clinic"),
+    ],
+)
+def test_refusal_and_unavailability_are_bound_to_the_ride(text, want):
+    """False: no card. A place id or None: a card for that place, or the caregiver's choice."""
+    found = recognise(text, PLACES)
+    assert (found.place_id if found.ride_word else False) == want

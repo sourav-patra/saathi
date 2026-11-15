@@ -49,14 +49,11 @@ def _padded(text: str) -> str:
 
 _RIDE_PHRASES = tuple(_padded(w) for w in RIDE_WORDS)
 # Refusals are read across the whole message: any refusal bound to a ride gives no card (the caregiver still gets the
-# summary). Only "do not want/need" is bound to a ride word a few words later, so "do not want to walk" stays a request.
+# summary). The English refusals must reach a ride word through a few fixed filler words, so "do not want to walk" and
+# "don't send medicine" stay requests.
 _NEGATIONS = tuple(
     _padded(f"{negation} {verb}")
     for negation, verbs in (
-        ("do not", ("book", "call", "send")),
-        ("don't", ("book", "call", "send")),
-        ("dont", ("book", "call", "send")),
-        ("never", ("book", "call")),
         ("mat", ("bulao", "bulana", "mangao", "book karo", "bhejo", "bhejna", "bhejiye")),
         ("nahi", ("chahiye", "bulao", "bulana", "jaana hai", "jana hai", "bhejo", "bhejna")),
         ("nahin", ("chahiye", "bulao", "bulana", "jaana hai", "jana hai", "bhejo", "bhejna")),
@@ -69,15 +66,18 @@ _NEGATIONS = tuple(
 )
 _RIDE_NOUNS = "|".join(re.escape(normalise(w)) for w in RIDE_WORDS if " " not in normalise(w))
 _NOT = "nahi|nahin|nhi|नहीं|नही"
-_NO_WANT = re.compile(rf" (?:do not|don t|dont) (?:need|want)(?: \S+){{0,3}} (?:{_RIDE_NOUNS}) ")
+_FILLER = r"(?: (?:a|an|the|any|another|me|please|to|book|call|take|get|send)){0,3}"
+_DONT = r"(?:do not|don t|dont|never)"
+_REFUSE = re.compile(rf" {_DONT} (?:book|call|send|need|want){_FILLER} (?:{_RIDE_NOUNS}) ")
 _NO_RIDE = re.compile(rf" (?:no (?:{_RIDE_NOUNS})|(?:{_RIDE_NOUNS}) (?:{_NOT})) $")
-# "no cab" refuses, unless it reports that none is available: "no cab is coming", "there is no auto here"
+# "no cab" refuses, unless it reports that none is available: "there is no auto", "no cab is coming"
 _NO_RIDE_PREFIX = re.compile(
-    rf"(?<! is)(?<! are) (?:no|नहीं|नही) (?:{_RIDE_NOUNS}) (?!(?:is |are )?(?:coming|came|here|available|showing)\b)"
+    rf"(?<! there is)(?<! there are) (?:no|नहीं|नही) (?:{_RIDE_NOUNS})"
+    r" (?!(?:is|are|has) (?:coming|available|here|arrived|showing)\b)"
 )
-_NO_RIDE_END_OF_TEXT = re.compile(rf" (?:no|नहीं|नही) (?:{_RIDE_NOUNS}) $")
+_NO_RIDE_END_OF_TEXT = re.compile(rf"(?<! there is)(?<! there are) (?:no|नहीं|नही) (?:{_RIDE_NOUNS}) $")
 _CANCEL = re.compile(
-    rf" (?:cancel|कैंसल|रद्द)(?: \S+){{0,2}} (?:{_RIDE_NOUNS}) | (?:{_RIDE_NOUNS})(?: \S+)? (?:cancel|कैंसल|रद्द) "
+    rf" (?:cancel|कैंसल|रद्द)(?: (?:a|an|the|my|this|that))? (?:{_RIDE_NOUNS}) | (?:{_RIDE_NOUNS}) (?:cancel|कैंसल|रद्द) "
 )
 _COMMON_NAMES = frozenset(
     {
@@ -125,7 +125,7 @@ def _has_ride_word(padded: str) -> bool:
 def _refused(padded: str) -> bool:
     return (
         any(negation in padded for negation in _NEGATIONS)
-        or bool(_NO_WANT.search(padded) or _NO_RIDE.search(padded))
+        or bool(_REFUSE.search(padded) or _NO_RIDE.search(padded))
         or bool(_NO_RIDE_PREFIX.search(padded) or _NO_RIDE_END_OF_TEXT.search(padded) or _CANCEL.search(padded))
     )
 
@@ -151,4 +151,4 @@ def recognise(text: str, places: Sequence[Place]) -> RideResult:
 
 
 def _rejected(padded: str, phrase: str) -> bool:
-    return bool(re.search(rf" {re.escape(phrase)} (?:{_NOT}|not) | (?:not|no) {re.escape(phrase)} ", padded))
+    return bool(re.search(rf" {re.escape(phrase)} (?:{_NOT}) | not {re.escape(phrase)} ", padded))
