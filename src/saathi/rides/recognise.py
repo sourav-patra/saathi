@@ -56,7 +56,9 @@ _MARKERS = re.compile(
     r" (?:do not|don t|dont|does not|doesn t|doesnt|did not|didn t|didnt|never|won t|wont|will not|cannot|can t|cant"
     r"|shouldn t|shouldnt|should not|wouldn t|wouldnt|would not|isn t|isnt|cancel|cancelled|canceled|no need"
     r"|no longer|no more|not|mat|मत|nahi|nahin|nahii|nhi|nehi|na|न|नहीं|नही|नहि|mana|मना|rehne do|रहने दो"
-    r"|कैंसल|कैंसिल|रद्द)(?= )"
+    r"|कैंसल|कैंसिल|रद्द|radd|nai|nahee|skip|skipped|stop|stopped|hold off|forget|call off|called off|against"
+    r"|unnecessary|no thanks|no thank you|pass on|refuse|refused|rehne de|rehne dena|rehne dijiye"
+    r"|रहने दे|रहने देना|रहने दीजिए)(?= )"
     rf"| no (?:{_RIDE_NOUNS})(?= )"
 )
 _NOT = "nahi|nahin|nhi|नहीं|नही"
@@ -116,7 +118,9 @@ def _rejected(padded: str, phrase: str) -> bool:
 
 
 def _rejection(phrase: str) -> str:
-    return rf" {re.escape(phrase)} (?:{_NOT})(?= )| not {re.escape(phrase)}(?= )"
+    # "Clinic A nahi chahiye" refuses the ride; only a bare "Clinic A nahi" rejects the place
+    refusal = "chahiye|chahie|चाहिए|चाहिये|bulao|bhejo|बुलाओ|भेजो"
+    return rf" {re.escape(phrase)} (?:{_NOT})(?! (?:{refusal}) )(?= )| not {re.escape(phrase)}(?= )"
 
 
 def recognise(text: str, places: Sequence[Place]) -> RideResult:

@@ -396,3 +396,38 @@ def test_common_two_letter_devanagari_words_are_not_place_names(word):
 )
 def test_contractions_spellings_and_abused_exceptions_still_refuse(text):
     assert recognise(text, PLACES) == RideResult(False)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Please skip the cab today",
+        "Please stop booking a cab",
+        "Please hold off booking a taxi",
+        "Forget the cab booking please",
+        "Please call off the cab",
+        "I have decided against taking a cab",
+        "The taxi is unnecessary now",
+        "We have called off the cab to Clinic A",
+        "Cab? No, thank you",
+        "No thanks, I will pass on the taxi",
+        "No more rides please",
+        "cab rehne dijiye",
+        "auto rehne dena",
+        "cab ki zarurat nai hai",
+        "cab ki zaroorat nahee hai",
+        "taxi radd kar do",
+        "कैब रहने दीजिए",
+        "ऑटो रहने देना",
+        "टैक्सी कैंसिल कर दीजिए",
+        "Please cancel the taxi booking",
+        "Do not send the auto today",
+        "I cannot manage a cab today",
+        "Please stop the cab booking to Clinic A",
+        "No, I refuse the cab to Clinic A",
+        "Clinic A nahi chahiye cab, Temple B ka number do",  # main refuses this; the place rule must not undo it
+        "Cab to Clinic A? No, thank you",
+    ],
+)
+def test_everyday_refusal_wording_refuses(text):
+    assert recognise(text, PLACES) == RideResult(False)
