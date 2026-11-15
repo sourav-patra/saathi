@@ -49,8 +49,8 @@ def _padded(text: str) -> str:
 
 _RIDE_PHRASES = tuple(_padded(w) for w in RIDE_WORDS)
 # Refusals fail closed: a ride word plus any refusal marker anywhere gives no card (the caregiver still reads the
-# summary). Only three narrow exceptions remove their own words before the markers are looked for: unavailability
-# ("there is no auto", "cab nahi mil rahi"), a rejected place when another place is named, and a few fixed phrases.
+# summary). Only three narrow exceptions remove their own words before the markers are looked for: Hindi
+# unavailability ("cab nahi mil rahi"), a rejected place when another place is named, and a few fixed phrases.
 _RIDE_NOUNS = "|".join(re.escape(normalise(w)) for w in RIDE_WORDS if " " not in normalise(w))
 _MARKERS = re.compile(
     r" (?:do not|don t|dont|does not|doesn t|doesnt|did not|didn t|didnt|never|won t|wont|will not|cannot|can t|cant"
@@ -64,12 +64,8 @@ _MARKERS = re.compile(
 _NOT = "nahi|nahin|nhi|नहीं|नही"
 # Fixed phrases that are not about the ride, forgiven only when punctuation ends them in the raw text
 _ALLOWED_RAW = re.compile(r"(?:\b(?:der|deri) mat karo|देर मत करो|\bnot (?:feeling )?well)\s*[,.;!?।]", re.IGNORECASE)
-# English unavailability is forgiven only when another ride word remains ("no cab is coming, book an auto"), so "no
-# cab is coming, I will walk" stays a refusal. Hindi unavailability keeps its ride word ("cab nahi mil rahi, bulao").
-_UNAVAILABLE_EN = re.compile(
-    rf" there (?:is|are) no (?:{_RIDE_NOUNS})(?= )"
-    rf"| no (?:{_RIDE_NOUNS}) (?:is|are|has) (?:coming|available|here|arrived|showing)(?= )"
-)
+# Hindi unavailability keeps its ride word ("cab nahi mil rahi, bulao" is a request, as on main). English "no cab is
+# coming" always refuses: no exception may turn a message main refuses into a card.
 _UNAVAILABLE_HI = re.compile(
     rf"( (?:{_RIDE_NOUNS})) (?:nahi|नहीं) (?:mil rahi|mil raha|mil rhi|mila|mili|aa rahi|aa raha|aayi|aai|aaya"
     r"|मिल रही|मिल रहा|मिली|मिला|आ रही|आ रहा|आई|आया)(?= )"
@@ -142,10 +138,7 @@ def recognise(text: str, places: Sequence[Place]) -> RideResult:
     candidates = [(len(phrase), phrase, pid) for pid, phrase in names if pid not in rejected_ids]
     named = [c for c in candidates if f" {c[1]} " in padded]
     rest = _marked(_ALLOWED_RAW.sub(" , ", text))
-    without = _UNAVAILABLE_EN.sub(" ", rest)
-    if without != rest and not _has_ride_word(without):
-        return RideResult(False)
-    rest = _UNAVAILABLE_HI.sub(r"\1", without)
+    rest = _UNAVAILABLE_HI.sub(r"\1", rest)
     if named:
         for pid, phrase in names:
             if pid in rejected_ids:

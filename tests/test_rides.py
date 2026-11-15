@@ -114,11 +114,6 @@ def test_unrelated_negation_does_not_suppress_a_ride(text):
 @pytest.mark.parametrize(
     ("text", "place"),
     [
-        ("No cab is coming, please book an auto to Clinic A", "pl_clinic"),
-        ("No cab is coming please book an auto to Clinic A", "pl_clinic"),
-        ("there is no auto here, get a cab to Clinic A", "pl_clinic"),
-        ("No cab is available, get an auto to Clinic A", "pl_clinic"),
-        ("No taxi has arrived; auto to Clinic A", "pl_clinic"),
         ("कैब नहीं आ रही, मंदिर जाना है", "pl_temple"),
         ("cab to Clinic A nahi, mandir jaana hai", "pl_temple"),
         ("Clinic A nahi, cab to mandir", "pl_temple"),
@@ -454,3 +449,24 @@ def test_exceptions_never_turn_a_refusal_on_main_into_a_card(text):
 
 def test_a_rejected_place_followed_by_another_place_picks_the_other():
     assert recognise("cab not Clinic A, Temple B", PLACES) == RideResult(True, "pl_temple")
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # English "no cab is coming" always refuses, as on main; a missed card is accepted
+        "No cab is coming, please book an auto to Clinic A",
+        "No cab is coming please book an auto to Clinic A",
+        "there is no auto here, get a cab to Clinic A",
+        "No cab is available, get an auto to Clinic A",
+        "No taxi has arrived; auto to Clinic A",
+        "No cab is coming; I will walk to Clinic A and save the taxi fare",
+        "There is no auto; I will walk to Clinic A instead of waiting for a cab",
+        "No cab is coming; book a taxi to Clinic A",
+        "cab do zqbrk not book",
+        "Cab?! No...thank you!!!",
+        "cab not Clinic A today; Temple B",
+    ],
+)
+def test_english_unavailability_refuses_as_on_main(text):
+    assert recognise(text, PLACES) == RideResult(False)
