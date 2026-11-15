@@ -111,6 +111,91 @@ def test_unrelated_negation_does_not_suppress_a_ride(text):
     assert recognise(text, PLACES).ride_word
 
 
+@pytest.mark.parametrize(
+    ("text", "place"),
+    [
+        ("कैब नहीं आ रही, मंदिर जाना है", "pl_temple"),
+        ("cab to Clinic A nahi, mandir jaana hai", "pl_temple"),
+        ("Clinic A nahi, cab to mandir", "pl_temple"),
+        ("not Clinic A, cab to mandir", "pl_temple"),
+        ("cab to Clinic A, not mandir", "pl_clinic"),
+        ("Cab to Clinic A, not Temple B", "pl_clinic"),
+        ("Cab to Clinic A nahi, Temple B", "pl_temple"),
+    ],
+)
+def test_unavailability_and_rejected_places_still_give_a_ride(text, place):
+    assert recognise(text, PLACES) == RideResult(True, place)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # refusals fail closed: any refusal marker left after the narrow exceptions gives no card
+        "cab mat bhejo",
+        "Clinic A ke liye auto mat bhejna",
+        "cab cancel karo",
+        "please cancel the cab to Clinic A",
+        "कैब मत भेजो",
+        "do not want a cab",
+        "don't need any taxi to Clinic A",
+        "Don't book, please, a cab to Clinic A",
+        "cab, mat bulao",
+        "ऑटो। मत बुलाओ",
+        "I don't need to book a cab",
+        "I don't want another cab",
+        "ola nahi chahiye, uber bulao",
+        "My answer is no cab please",
+        "The answer is no taxi to Clinic A",
+        "No cab, coming on foot to Clinic A",
+        "Don't send a cab",
+        "please cancel my cab",
+        "कैब। मत भेजो",
+        "Don't book my cab to Clinic A",
+        "Don't send us a taxi to Clinic A",
+        "Do not need a wheelchair taxi to Clinic A",
+        "I don't want you to book a cab to Clinic A",
+        "Don't need to book me a cab to Clinic A",
+        "Never call me a cab to Clinic A",
+        "Cancel our cab to Clinic A",
+        "Cancel the booked cab to Clinic A",
+        "Cab please cancel it, Clinic A",
+        "No cab is available; don't send one to Clinic A",
+        "There is no cab available; do not book one to Clinic A",
+        "Don't book any more cab to Clinic A",
+        "Please cancel tomorrow's cab to Clinic A",
+        "cab book mat karo",
+        "auto mat bulaiye",
+        "cab mat mangwao",
+        "gaadi nahi bhejiye",
+        "cab ki zaroorat nahi hai",
+        "cab rehne do",
+        "No need for a cab to Clinic A",
+        "I won't need a cab",
+        "cab not needed",
+        "Taxi not now",
+        # accepted cost: these mention a ride but also a negation about something else; the summary still reaches
+        # the caregiver
+        "do not want to walk, book a cab to Clinic A",
+        "do not want to walk book a cab to Clinic A",
+        "Book a cab to Clinic A so I can cancel my appointment",
+        "cab bulao Clinic A jana hai bus se nahi",
+        "मंदिर के लिए ऑटो चाहिए बस से नहीं",
+        "cab please cancel my appointment",
+        "cancel my appointment, cab to Clinic A",
+        "Don't send medicine; cab to Clinic A",
+        "cab to Clinic A not far from home",
+        "is it not far, cab to Clinic A",
+    ],
+)
+def test_refusals_fail_closed(text):
+    assert recognise(text, PLACES) == RideResult(False)
+
+
+@pytest.mark.parametrize("text", ["No hurry, cab to Clinic A", "No one is home, please book a cab to Clinic A"])
+def test_a_plain_no_is_not_a_refusal(text):
+    assert recognise(text, PLACES) == RideResult(True, "pl_clinic")
+
+
 def test_two_devanagari_letters_allow_a_home_alias():
     home = Place("pl_home", "Home P", "x", aliases=("घर",), is_pickup=True)
     assert recognise("घर जाना है", [home]) == RideResult(True, home.id)
@@ -263,3 +348,146 @@ async def test_a_routed_tap_carries_the_card_it_came_from():
 @pytest.mark.parametrize("word", ["पर", "कब", "सब", "अब", "तक", "जब", "हम"])
 def test_common_two_letter_devanagari_words_are_not_place_names(word):
     assert not usable_name(word)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "There is no cab, do not book",
+        "cab nahi milegi to mat bulao",
+        "not feeling like a cab",
+        "not feeling up to a taxi",
+        "not well enough to take a cab",
+        "cab nahi aana chahiye",
+        "cab nahi aaj chahiye",
+        "कैब नहीं आनी चाहिए",
+        "कैब नहीं मिलनी चाहिए",
+        "I can’t take a cab",
+        "I cannot take a taxi",
+        "I shouldn’t book a cab",
+        "I wouldn’t want a cab",
+        "I didnt want a cab",
+        "She doesnt need a cab",
+        "cab na bulao",
+        "cab nehi chahiye",
+        "cab nahii chahiye",
+        "कैब न बुलाओ",
+        "कैब कैंसिल करो",
+        "cab please cancel",
+        "never again a cab",
+        "taxi will not be needed",
+        "Don't arrange transport, cab",
+        "Doesn’t want a cab",
+        "Didn’t request a cab",
+        "not Clinic A, cab to Temple B; do not book",
+        "Clinic A nahi, cab to Temple B; mat bhejo",
+        "der mat karo, cab mat bulao",
+        "not feeling well, cab do not book",
+        "there is no cab, not needed",
+        "no taxi is available, cancel it",
+        "Doctor se baat karao, cab to Clinic A nahi chahiye",  # "doctor" is Clinic A's own alias
+        "cab not Clinic A, doctor",
+    ],
+)
+def test_contractions_spellings_and_abused_exceptions_still_refuse(text):
+    assert recognise(text, PLACES) == RideResult(False)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Please skip the cab today",
+        "Please stop booking a cab",
+        "Please hold off booking a taxi",
+        "Forget the cab booking please",
+        "Please call off the cab",
+        "I have decided against taking a cab",
+        "The taxi is unnecessary now",
+        "We have called off the cab to Clinic A",
+        "Cab? No, thank you",
+        "No thanks, I will pass on the taxi",
+        "No more cab rides please",
+        "cab rehne dijiye",
+        "auto rehne dena",
+        "cab ki zarurat nai hai",
+        "cab ki zaroorat nahee hai",
+        "taxi radd kar do",
+        "कैब रहने दीजिए",
+        "ऑटो रहने देना",
+        "टैक्सी कैंसिल कर दीजिए",
+        "Please cancel the taxi booking",
+        "Do not send the auto today",
+        "I cannot manage a cab today",
+        "Please stop the cab booking to Clinic A",
+        "No, I refuse the cab to Clinic A",
+        "Clinic A nahi chahiye cab, Temple B ka number do",  # main refuses this; the place rule must not undo it
+        "Cab to Clinic A? No, thank you",
+    ],
+)
+def test_everyday_refusal_wording_refuses(text):
+    assert recognise(text, PLACES) == RideResult(False)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "No cab is coming",
+        "No cab is available",
+        "There is no cab",
+        "No cab is coming; I will walk to Clinic A",
+        "There is no auto, I will walk",
+        "Clinic A nahi jaana hai, Temple B ka number do",
+        "Clinic A nahi jana hai, Temple B ka number do",
+        "Clinic A nahin jaana hai, Temple B ka number do",
+        "cab not Clinic A",
+        "cab not Clinic A, doctor",
+    ],
+)
+def test_exceptions_never_turn_a_refusal_on_main_into_a_card(text):
+    assert recognise(text, PLACES) == RideResult(False)
+
+
+def test_a_rejected_place_followed_by_another_place_picks_the_other():
+    assert recognise("cab not Clinic A, Temple B", PLACES) == RideResult(True, "pl_temple")
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # English "no cab is coming" always refuses, as on main; a missed card is accepted
+        "No cab is coming, please book an auto to Clinic A",
+        "No cab is coming please book an auto to Clinic A",
+        "there is no auto here, get a cab to Clinic A",
+        "No cab is available, get an auto to Clinic A",
+        "No taxi has arrived; auto to Clinic A",
+        "No cab is coming; I will walk to Clinic A and save the taxi fare",
+        "There is no auto; I will walk to Clinic A instead of waiting for a cab",
+        "No cab is coming; book a taxi to Clinic A",
+        "cab do zqbrk not book",
+        "Cab?! No...thank you!!!",
+        "cab not Clinic A today; Temple B",
+    ],
+)
+def test_english_unavailability_refuses_as_on_main(text):
+    assert recognise(text, PLACES) == RideResult(False)
+
+
+def test_a_place_name_that_overlaps_a_refusal_cannot_undo_it():
+    taxi = Place("pl_taxi", "City Taxi", "5 Test Road, Sample Town", 0.5, 0.6)
+    centre = Place("pl_centre", "Call Centre", "6 Test Road, Sample Town", 0.7, 0.8)
+    assert recognise("Clinic A jaana hai, City Taxi nahi", [*PLACES, taxi]) == RideResult(False)
+    assert recognise("Do not call centre, cab to Clinic A", [*PLACES, centre]) == RideResult(False)
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["cab not Family Doctor Clinic, bua", "bua, cab not Family Doctor Clinic", "Family Doctor Clinic nahi, cab to bua"],
+)
+def test_an_alias_inside_a_rejected_name_is_not_a_destination(text):
+    family = Place("pl_family", "Family Doctor Clinic", "7 Test Road, Sample Town", 0.9, 0.9)
+    assert recognise(text, [*PLACES, family]) == RideResult(True, "pl_relative")
+
+
+def test_a_typed_word_is_never_read_as_punctuation():
+    family = Place("pl_family", "Family Doctor Clinic", "7 Test Road, Sample Town", 0.9, 0.9)
+    assert recognise("cab to Family zqbrk Doctor Clinic", [*PLACES, family]) == RideResult(True, "pl_clinic")
