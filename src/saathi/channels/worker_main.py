@@ -39,6 +39,7 @@ from saathi.llm.ledger import PgLedger, SpendNotices, store_approvers
 from saathi.media import LocalMediaStore
 from saathi.perception.asr import LocalAsrClient
 from saathi.ports import Clock, ElderChannel
+from saathi.rides.taps import PgRideTaps
 from saathi.store import Role, Store, create_pool
 from saathi.store.keys import KeyRing
 from saathi.store.repos import SignoffRepo
@@ -215,7 +216,10 @@ async def build_bot(s: Settings) -> BotParts:
         voice = PgVoiceStore(store, Path(s.media_dir).parent / "clips")
         alerts = build_alert_service(s, store, channel, elder, voice, audit, clock)
         trace = build_exporter(s.trace_dir, clock)
-        router = CallbackRouter(store, alerts, keys, audit, channel, answer=channel.answer, trace=trace)
+        router = CallbackRouter(
+            store, alerts, keys, audit, channel, answer=channel.answer, trace=trace,
+            rides=PgRideTaps(store), edit=channel.edit_card,
+        )  # fmt: skip
         return BotParts(store, channel, router, alerts)
     except BaseException:
         await store.close()

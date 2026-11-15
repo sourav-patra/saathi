@@ -88,6 +88,10 @@ The edge answers `GET /health` with `ok` only while the core heartbeat is fresh 
 
 Create the household, its elder, its approvers, the elder's channel identity and the household keys with `saathi-admin` (run as the owner role, on your own machine). The elder's number and the approvers' Telegram ids go into those rows, never into `.env`. Messages from a sender with no registered identity get no reply and are counted in the weekly digest.
 
+### Ride places (optional)
+
+To let a caregiver get a ready ride card, save the household's places with `saathi-admin place add --household H --label L --address A --lat X --lng Y [--alias NAME] [--pickup]`. Mark one place as the pickup. `place list`, `place alias-add` and `place remove` manage them. With no places saved, no ride card is sent. Saathi books nothing: the card only links to the apps (see [the design note](NOTE-ride-helper-2026-11-13.md)).
+
 ## 3. Channels
 
 ### Caregiver bot (Telegram)

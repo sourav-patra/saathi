@@ -24,7 +24,7 @@ SELECT c.oid, n.nspname, c.relname, c.relrowsecurity, c.relforcerowsecurity,
 """
 
 
-APPEND_ONLY = {"audit_log", "consent_events"}  # select and insert policies only (LLD data rule 2)
+APPEND_ONLY = {"audit_log", "consent_events", "ride_counts"}  # select and insert policies only (LLD data rule 2)
 # The only policies a household table may carry besides its tenant policies: the scan and owner reads (LLD grants 2).
 ALLOWED_ROLE_POLICIES = {
     ("households", "scan_hh"), ("households", "owner_hh"),

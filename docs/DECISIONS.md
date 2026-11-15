@@ -43,4 +43,6 @@ Where an ADR conflicts with a RECORD decision, the RECORD wins. ADR-003 (a custo
 - Order of preference: official MCP or API, then a documented deep link, then the Android phone agent (minitap mobile-use + uiautomator2, both Apache/MIT) through a Raspberry Pi ADB bridge.
 - Note: DroidRun's Portal APK is AGPL, so it is not used.
 
+ADR-006 (2026-11-13): the ride helper is a caregiver handoff only; Saathi books nothing and calls no model, and the card links to the apps ([note](NOTE-ride-helper-2026-11-13.md)).
+
 Skipped or not checked: the ADRs below were not compared with every RECORD decision, only ADR-003 against D-70.

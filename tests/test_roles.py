@@ -32,17 +32,27 @@ async def seed(db: PgDb) -> None:
             await su.execute("INSERT INTO elders (id, household_id, display_name) VALUES ($1, $2, 'Elder')", "e" + h, h)
             await su.execute(
                 "INSERT INTO approvers (id, household_id, name, telegram_user_id) VALUES ($1, $2, 'Approver', $3)",
-                "a" + h, h, 1000 + int(h[1]),
+                "a" + h,
+                h,
+                1000 + int(h[1]),
             )
             await su.execute(
                 "INSERT INTO elder_identities (id, household_id, elder_id, channel, sender_hmac, person_ref,"
                 " person_ref_enc, key_id) VALUES ($1, $2, $3, 'whatsapp', $4, $5, '\\x00', 'k1')",
-                "i" + h, h, "e" + h, "hmac-" + h, "ref-" + h,
+                "i" + h,
+                h,
+                "e" + h,
+                "hmac-" + h,
+                "ref-" + h,
             )
             await su.execute(
                 "INSERT INTO inbox (id, household_id, provider_message_id, source, sender_hmac, elder_id, kind,"
                 " payload_sha256) VALUES ($1, $2, $3, 'whatsapp', $4, $5, 'text', 'sha')",
-                "m" + h, h, "wa:" + h, "hmac-" + h, "e" + h,
+                "m" + h,
+                h,
+                "wa:" + h,
+                "hmac-" + h,
+                "e" + h,
             )
     finally:
         await su.close()
@@ -62,8 +72,11 @@ async def test_core_cannot_update_or_delete_audit_log(pg_db: PgDb):
         await denied(core, "UPDATE audit_log SET event = 'x'")
         await denied(core, "DELETE FROM audit_log")
         await denied(core, "TRUNCATE audit_log")
-        await denied(core, "INSERT INTO audit_log (household_id, run_id, actor, event, key_id)"
-                           " VALUES ('h1', 'r', 'system:x', 'e', 'k')")  # only the function appends
+        await denied(
+            core,
+            "INSERT INTO audit_log (household_id, run_id, actor, event, key_id)"
+            " VALUES ('h1', 'r', 'system:x', 'e', 'k')",
+        )  # only the function appends
         await denied(core, "SELECT count(*) FROM audit_log")  # append only, and not readable by the core either
     finally:
         await core.close()
@@ -85,11 +98,17 @@ async def test_model_cannot_write_approvals_or_control(pg_db: PgDb):
     await seed(pg_db)
     model = await connect(pg_db, MODEL, "h1")
     try:
-        await denied(model, "INSERT INTO approvals (quote_id, approver_id, decision, household_id)"
-                            " VALUES ('q', 'ah1', 'approve', 'h1')")
+        await denied(
+            model,
+            "INSERT INTO approvals (quote_id, approver_id, decision, household_id)"
+            " VALUES ('q', 'ah1', 'approve', 'h1')",
+        )
         await denied(model, "UPDATE approvals SET decision = 'reject'")
-        await denied(model, "INSERT INTO control.signoffs (household_id, scope, granter, expires_at)"
-                            " VALUES ('h1', 'SO-1', 'x', now() + interval '1 day')")
+        await denied(
+            model,
+            "INSERT INTO control.signoffs (household_id, scope, granter, expires_at)"
+            " VALUES ('h1', 'SO-1', 'x', now() + interval '1 day')",
+        )
         await denied(model, "SELECT * FROM control.household_config")
         await denied(model, "SELECT * FROM control.household_keys")
         await denied(model, "UPDATE runtime_flags SET paused = false")
@@ -97,8 +116,10 @@ async def test_model_cannot_write_approvals_or_control(pg_db: PgDb):
         await denied(model, "SELECT control.audit_append('r', 'system:x', 'e', NULL, NULL, 'k', '{}')")
         # what it may do: its own ledger tables
         await model.execute("INSERT INTO llm_spend (tier, model, cost_inr, household_id) VALUES ('t', 'm', 1, 'h1')")
-        await model.execute("INSERT INTO llm_reservations (household_id, run_id, tier, reserved_inr, month)"
-                            " VALUES ('h1', 'r', 't', 1, '2026-11')")
+        await model.execute(
+            "INSERT INTO llm_reservations (household_id, run_id, tier, reserved_inr, month)"
+            " VALUES ('h1', 'r', 't', 1, '2026-11')"
+        )
         await model.execute("UPDATE llm_reservations SET state = 'settled', settled_inr = 1")
         await denied(model, "UPDATE llm_reservations SET reserved_inr = 0")
     finally:
@@ -119,31 +140,46 @@ async def test_edge_inserts_only_its_tables(pg_db: PgDb):
         )
         assert {r["relname"] for r in rows} == EDGE_INSERT_TABLES
         for priv in ("UPDATE", "DELETE", "TRUNCATE"):
-            assert await conn.fetch(
-                f"""SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+            assert (
+                await conn.fetch(
+                    f"""SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
                      WHERE c.relkind IN ('r', 'p') AND n.nspname IN {SCHEMAS}
                        AND has_table_privilege('{EDGE}', c.oid, '{priv}')"""
-            ) == [], priv
+                )
+                == []
+            ), priv
     finally:
         await conn.close()
     edge = await connect(pg_db, EDGE, "h1")
     try:
         await edge.execute(
             "INSERT INTO inbox (id, household_id, provider_message_id, source, sender_hmac, elder_id, kind,"
-            " payload_sha256) VALUES ('m2', 'h1', 'wa:2', 'whatsapp', 'hmac-h1', 'eh1', 'text', 'sha')")
-        await edge.execute("INSERT INTO raw_text (inbox_id, household_id, part, body_sealed, key_id, expires_at)"
-                           " VALUES ('m2', 'h1', 'text', '\\x01', 'k1', now() + interval '30 days')")
-        await edge.execute("INSERT INTO alert_events (id, household_id, elder_id, inbox_id, kind, origin, t0)"
-                           " VALUES ('al1', 'h1', 'eh1', 'm2', 'emergency', 'radar_edge', now())")
+            " payload_sha256) VALUES ('m2', 'h1', 'wa:2', 'whatsapp', 'hmac-h1', 'eh1', 'text', 'sha')"
+        )
+        await edge.execute(
+            "INSERT INTO raw_text (inbox_id, household_id, part, body_sealed, key_id, expires_at)"
+            " VALUES ('m2', 'h1', 'text', '\\x01', 'k1', now() + interval '30 days')"
+        )
+        await edge.execute(
+            "INSERT INTO alert_events (id, household_id, elder_id, inbox_id, kind, origin, t0)"
+            " VALUES ('al1', 'h1', 'eh1', 'm2', 'emergency', 'radar_edge', now())"
+        )
         await edge.execute("INSERT INTO rejected_inbound (sender_hmac, reason) VALUES ('unknown', 'no_identity')")
         # a duplicate shows as the tag INSERT 0 0 with no SELECT grant (LLD data rule 3)
-        assert await edge.execute(
-            "INSERT INTO inbox (id, household_id, provider_message_id, source, sender_hmac, elder_id, kind,"
-            " payload_sha256) VALUES ('m3', 'h1', 'wa:2', 'whatsapp', 'hmac-h1', 'eh1', 'text', 'sha')"
-            " ON CONFLICT DO NOTHING") == "INSERT 0 0"
+        assert (
+            await edge.execute(
+                "INSERT INTO inbox (id, household_id, provider_message_id, source, sender_hmac, elder_id, kind,"
+                " payload_sha256) VALUES ('m3', 'h1', 'wa:2', 'whatsapp', 'hmac-h1', 'eh1', 'text', 'sha')"
+                " ON CONFLICT DO NOTHING"
+            )
+            == "INSERT 0 0"
+        )
         await denied(edge, "INSERT INTO requests (id, household_id, channel, kind) VALUES ('r', 'h1', 'c', 'k')")
-        await denied(edge, "INSERT INTO audit_log (household_id, run_id, actor, event, key_id)"
-                           " VALUES ('h1', 'r', 'system:x', 'e', 'k')")
+        await denied(
+            edge,
+            "INSERT INTO audit_log (household_id, run_id, actor, event, key_id)"
+            " VALUES ('h1', 'r', 'system:x', 'e', 'k')",
+        )
         await denied(edge, "UPDATE inbox SET state = 'dead'")
         await denied(edge, "DELETE FROM inbox")
     finally:
@@ -154,8 +190,15 @@ async def test_edge_cannot_read_raw_text(pg_db: PgDb):
     await seed(pg_db)
     edge = await connect(pg_db, EDGE, "h1")
     try:
-        for table in ("raw_text", "inbox", "elder_identities", "elders", "households", "rejected_inbound",
-                      "alert_events"):
+        for table in (
+            "raw_text",
+            "inbox",
+            "elder_identities",
+            "elders",
+            "households",
+            "rejected_inbound",
+            "alert_events",
+        ):
             await denied(edge, f"SELECT * FROM {table}")
         # the only column it may read: the public half of the content key and its metadata
         await edge.execute("SELECT household_id, purpose, key_id, public_key, retired_at FROM control.household_keys")
@@ -169,8 +212,10 @@ async def test_only_readonly_has_bypassrls(pg_db: PgDb):
     try:
         rows = await conn.fetch("SELECT rolname FROM pg_roles WHERE rolbypassrls AND rolname LIKE 'saathi\\_%'")
         assert [r["rolname"] for r in rows] == [READONLY]
-        assert await conn.fetch(
-            "SELECT 1 FROM pg_roles WHERE (rolsuper OR rolcreaterole) AND rolname LIKE 'saathi\\_%'") == []
+        assert (
+            await conn.fetch("SELECT 1 FROM pg_roles WHERE (rolsuper OR rolcreaterole) AND rolname LIKE 'saathi\\_%'")
+            == []
+        )
     finally:
         await conn.close()
     await seed(pg_db)
@@ -226,14 +271,24 @@ async def test_every_bigserial_sequence_usable_by_its_inserting_role(pg_db: PgDb
         )
         got = {r["seq"].split(".", 1)[1] if r["seq"].startswith("public.") else r["seq"] for r in rows}
         assert got == {
-            "rejected_inbound_id_seq", "alert_attempts_id_seq", "approvals_id_seq", "commits_id_seq",
-            "profile_facts_id_seq", "llm_spend_id_seq", "llm_reservations_id_seq",
-            "control.signoffs_id_seq", "control.consent_events_id_seq",
+            "rejected_inbound_id_seq",
+            "alert_attempts_id_seq",
+            "approvals_id_seq",
+            "commits_id_seq",
+            "profile_facts_id_seq",
+            "llm_spend_id_seq",
+            "llm_reservations_id_seq",
+            "control.signoffs_id_seq",
+            "control.consent_events_id_seq",
         }
         # audit_log.seq is an identity column: owned by identity, not serial, and no role needs a grant
-        assert await conn.fetchval(
-            "SELECT count(*) FROM pg_class s JOIN pg_depend d ON d.objid = s.oid AND d.deptype = 'i'"
-            " WHERE s.relkind = 'S' AND d.refobjid = 'audit_log'::regclass") == 1
+        assert (
+            await conn.fetchval(
+                "SELECT count(*) FROM pg_class s JOIN pg_depend d ON d.objid = s.oid AND d.deptype = 'i'"
+                " WHERE s.relkind = 'S' AND d.refobjid = 'audit_log'::regclass"
+            )
+            == 1
+        )
         inserters = 0
         for r in rows:
             for role in RUNTIME:
@@ -256,12 +311,15 @@ async def test_every_bigserial_sequence_usable_by_its_inserting_role(pg_db: PgDb
         await edge.close()
     owner = await connect(pg_db, OWNER, "h1")
     try:
-        await owner.execute("INSERT INTO control.signoffs (household_id, scope, granter, expires_at)"
-                            " VALUES ('h1', 'SO-1', 'x', now() + interval '1 day')")
+        await owner.execute(
+            "INSERT INTO control.signoffs (household_id, scope, granter, expires_at)"
+            " VALUES ('h1', 'SO-1', 'x', now() + interval '1 day')"
+        )
         await owner.execute(
             "INSERT INTO control.consent_events (household_id, subject, use, recipient, event, capacity, language,"
             " how, notice_text_sha256, recorded_by) VALUES ('h1', 'elder', 'u', 'r', 'grant', 'self', 'en',"
-            " 'spoken', 'sha', 'x')")
+            " 'spoken', 'sha', 'x')"
+        )
     finally:
         await owner.close()
     core = await connect(pg_db, CORE, "h1")
@@ -336,14 +394,21 @@ async def test_edge_can_call_only_resolve_sender_rate_state_beat(pg_db: PgDb):
         assert {r["proname"] for r in rows if r["ok"]} == EDGE_FUNCTIONS
         assert {r["proname"] for r in rows} >= EDGE_FUNCTIONS | {"lease_next", "audit_append", "due_alerts"}
         # readonly calls none of them; model calls only the global ledger total (006)
-        assert {r["proname"] for r in await conn.fetch(
-            f"""SELECT p.proname FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-                 WHERE n.nspname = 'control' AND has_function_privilege('{MODEL}', p.oid, 'EXECUTE')""")
+        assert {
+            r["proname"]
+            for r in await conn.fetch(
+                f"""SELECT p.proname FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+                 WHERE n.nspname = 'control' AND has_function_privilege('{MODEL}', p.oid, 'EXECUTE')"""
+            )
         } == {"ledger_month_total"}
         for role in (READONLY,):
-            assert [r for r in await conn.fetch(
-                f"""SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-                     WHERE n.nspname = 'control' AND has_function_privilege('{role}', p.oid, 'EXECUTE')""")] == [], role
+            assert [
+                r
+                for r in await conn.fetch(
+                    f"""SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+                     WHERE n.nspname = 'control' AND has_function_privilege('{role}', p.oid, 'EXECUTE')"""
+                )
+            ] == [], role
     finally:
         await conn.close()
     edge = await connect(pg_db, EDGE, "h1")
@@ -375,18 +440,23 @@ async def test_owner_can_create_household_elder_approver_identity(pg_db: PgDb):
     try:
         await owner.execute("INSERT INTO households (id, name) VALUES ('h7', 'Household h7')")
         await owner.execute("INSERT INTO elders (id, household_id, display_name) VALUES ('e7', 'h7', 'Elder')")
-        await owner.execute("INSERT INTO approvers (id, household_id, name, telegram_user_id)"
-                            " VALUES ('a7', 'h7', 'Approver', 7007)")
+        await owner.execute(
+            "INSERT INTO approvers (id, household_id, name, telegram_user_id) VALUES ('a7', 'h7', 'Approver', 7007)"
+        )
         await owner.execute(
             "INSERT INTO elder_identities (id, household_id, elder_id, channel, sender_hmac, person_ref,"
-            " person_ref_enc, key_id) VALUES ('i7', 'h7', 'e7', 'whatsapp', 'hmac-7', 'ref-7', '\\x00', 'k1')")
-        await owner.execute("INSERT INTO control.household_config (household_id, version, values, created_by)"
-                            " VALUES ('h7', 1, '{}', 'owner')")
-        await owner.execute("INSERT INTO control.household_keys (household_id, purpose, key_id, wrapped_key)"
-                            " VALUES ('h7', 'audit', 'k1', '\\x00')")
+            " person_ref_enc, key_id) VALUES ('i7', 'h7', 'e7', 'whatsapp', 'hmac-7', 'ref-7', '\\x00', 'k1')"
+        )
+        await owner.execute(
+            "INSERT INTO control.household_config (household_id, version, values, created_by)"
+            " VALUES ('h7', 1, '{}', 'owner')"
+        )
+        await owner.execute(
+            "INSERT INTO control.household_keys (household_id, purpose, key_id, wrapped_key)"
+            " VALUES ('h7', 'audit', 'k1', '\\x00')"
+        )
         assert await owner.execute("UPDATE elder_identities SET active = false") == "UPDATE 1"
-        assert await owner.execute(
-            "UPDATE control.household_keys SET retired_at = now()") == "UPDATE 1"
+        assert await owner.execute("UPDATE control.household_keys SET retired_at = now()") == "UPDATE 1"
         # the owner has no more than that
         await denied(owner, "DELETE FROM households")
         await denied(owner, "UPDATE elders SET display_name = 'x'")
@@ -406,7 +476,8 @@ async def test_owner_can_audit_append(pg_db: PgDb):
     owner = await connect(pg_db, OWNER, "h1")
     try:
         s1 = await owner.fetchval(
-            "SELECT control.audit_append('r1', 'system:admin', 'household.create', 'h1', NULL, 'k1', '{}')")
+            "SELECT control.audit_append('r1', 'system:admin', 'household.create', 'h1', NULL, 'k1', '{}')"
+        )
         s2 = await owner.fetchval("SELECT control.audit_append('r1', 'approver:a1', 'ev', NULL, NULL, 'k1', NULL)")
         assert s2 > s1
         with pytest.raises(asyncpg.CheckViolationError):
@@ -425,7 +496,9 @@ async def test_owner_can_audit_append(pg_db: PgDb):
     try:
         rows = await su.fetch("SELECT household_id, actor, detail::text AS detail FROM audit_log ORDER BY seq")
         assert [(r["household_id"], r["actor"], r["detail"]) for r in rows] == [
-            ("h1", "system:admin", "{}"), ("h1", "approver:a1", "{}")]
+            ("h1", "system:admin", "{}"),
+            ("h1", "approver:a1", "{}"),
+        ]
     finally:
         await su.close()
 
@@ -434,14 +507,20 @@ async def test_signoffs_core_reads_only_and_owner_revokes_only(pg_db: PgDb):
     await seed(pg_db)
     owner = await connect(pg_db, OWNER, "h1")
     try:
-        await owner.execute("INSERT INTO control.signoffs (household_id, scope, granter, expires_at)"
-                            " VALUES ('h1', 'SO-1', 'x', now() + interval '1 day')")
+        await owner.execute(
+            "INSERT INTO control.signoffs (household_id, scope, granter, expires_at)"
+            " VALUES ('h1', 'SO-1', 'x', now() + interval '1 day')"
+        )
         with pytest.raises(asyncpg.CheckViolationError):
-            await owner.execute("INSERT INTO control.signoffs (household_id, scope, granter, expires_at)"
-                                " VALUES ('h1', 'SO-9', 'x', now() + interval '1 day')")
+            await owner.execute(
+                "INSERT INTO control.signoffs (household_id, scope, granter, expires_at)"
+                " VALUES ('h1', 'SO-9', 'x', now() + interval '1 day')"
+            )
         with pytest.raises(asyncpg.CheckViolationError):
-            await owner.execute("INSERT INTO control.signoffs (household_id, scope, granter, expires_at)"
-                                " VALUES ('h1', 'SO-1', 'x', now() - interval '1 day')")
+            await owner.execute(
+                "INSERT INTO control.signoffs (household_id, scope, granter, expires_at)"
+                " VALUES ('h1', 'SO-1', 'x', now() - interval '1 day')"
+            )
         await denied(owner, "UPDATE control.signoffs SET expires_at = now() + interval '900 days'")
         await denied(owner, "DELETE FROM control.signoffs")
         assert await owner.execute("UPDATE control.signoffs SET revoked_at = now()") == "UPDATE 1"
@@ -450,8 +529,11 @@ async def test_signoffs_core_reads_only_and_owner_revokes_only(pg_db: PgDb):
     core = await connect(pg_db, CORE, "h1")
     try:
         assert await core.fetchval("SELECT count(*) FROM control.signoffs") == 1
-        await denied(core, "INSERT INTO control.signoffs (household_id, scope, granter, expires_at)"
-                           " VALUES ('h1', 'SO-1', 'x', now() + interval '1 day')")
+        await denied(
+            core,
+            "INSERT INTO control.signoffs (household_id, scope, granter, expires_at)"
+            " VALUES ('h1', 'SO-1', 'x', now() + interval '1 day')",
+        )
         await denied(core, "UPDATE control.signoffs SET revoked_at = NULL")
         await denied(core, "DELETE FROM control.signoffs")
     finally:
@@ -468,7 +550,8 @@ async def test_migrator_is_not_superuser(pg_db: PgDb):
     try:
         row = await conn.fetchrow(
             "SELECT rolsuper, rolcreaterole, rolcreatedb, rolbypassrls, rolreplication FROM pg_roles"
-            " WHERE rolname = current_user")
+            " WHERE rolname = current_user"
+        )
         assert not any(row.values())
         with pytest.raises(asyncpg.InsufficientPrivilegeError):
             await conn.execute("CREATE ROLE saathi_rogue")
@@ -482,56 +565,89 @@ async def test_migrator_is_not_superuser(pg_db: PgDb):
 
 # --- the whole grant matrix, typed from LLD grants parts 2 to 5 (not read from the database) --------------------
 
-_REQUEST_COLS = ("state state_reason questions_asked urgent expires_at superseded_by slots quote_id plan_step intent"
-                 " confidence tier_used radar trace_id").split()
-_ALERT_COLS = ("state stage next_due_at acked_by acked_at false_alarm blocked_reason followup_due_at"
-               " last_elder_clip_at").split()
-_HOUSEHOLD_ADMIN = ("households elders approvers elder_identities control.household_config control.consent_events"
-                    " control.household_keys control.signoffs").split()
+_REQUEST_COLS = (
+    "state state_reason questions_asked urgent expires_at superseded_by slots quote_id plan_step intent"
+    " confidence tier_used radar trace_id"
+).split()
+_ALERT_COLS = (
+    "state stage next_due_at acked_by acked_at false_alarm blocked_reason followup_due_at last_elder_clip_at"
+).split()
+_HOUSEHOLD_ADMIN = (
+    "households elders approvers elder_identities control.household_config control.consent_events"
+    " control.household_keys control.signoffs"
+).split()
 # Every table of schemas public and control when 004 granted "ALL TABLES" to readonly, and the four 005 added.
 _EVERY_TABLE = (
     "households elders approvers elder_identities inbox raw_text rejected_inbound alert_events alert_attempts"
     " tg_updates requests quotes commits approvals addresses profile_facts runtime_flags audit_log schema_migrations"
     " llm_spend llm_reservations voice_clips control.heartbeats control.signoffs control.consent_events"
-    " control.household_config control.household_keys"
+    " control.household_config control.household_keys ride_counts"
 ).split()
 
 # role -> {"table": {obj: {privileges}}, "column": {"table.col": {privileges}}, "seq": {...}, "fn": {...}}
 EXPECTED: dict[str, dict[str, dict[str, set[str]]]] = {
     "saathi_edge": {
         "table": {t: {"INSERT"} for t in ("inbox", "raw_text", "rejected_inbound", "alert_events")},
-        "column": {f"control.household_keys.{c}": {"SELECT"}
-                   for c in ("household_id", "purpose", "key_id", "public_key", "retired_at")},
+        "column": {
+            f"control.household_keys.{c}": {"SELECT"}
+            for c in ("household_id", "purpose", "key_id", "public_key", "retired_at")
+        },
         "seq": {"rejected_inbound_id_seq": {"USAGE"}},
-        "fn": {"control.resolve_sender(text)": {"EXECUTE"}, "control.rate_state(timestamp with time zone,text)":
-               {"EXECUTE"}, "control.beat(text,timestamp with time zone,text)": {"EXECUTE"}},
+        "fn": {
+            "control.resolve_sender(text)": {"EXECUTE"},
+            "control.rate_state(timestamp with time zone,text)": {"EXECUTE"},
+            "control.beat(text,timestamp with time zone,text)": {"EXECUTE"},
+        },
     },
     "saathi_core": {
         "table": {
-            **{t: {"SELECT"} for t in (
-                "households elders approvers elder_identities inbox raw_text alert_events alert_attempts tg_updates"
-                " requests quotes commits approvals addresses profile_facts runtime_flags control.signoffs"
-                " control.consent_events control.household_config control.household_keys voice_clips").split()},
-            **{t: {"SELECT", "INSERT"} for t in (
-                "raw_text alert_events alert_attempts tg_updates requests quotes commits approvals addresses"
-                " profile_facts runtime_flags").split()},
+            **{
+                t: {"SELECT"}
+                for t in (
+                    "households elders approvers elder_identities inbox raw_text alert_events alert_attempts tg_updates"
+                    " requests quotes commits approvals addresses profile_facts runtime_flags control.signoffs"
+                    " control.consent_events control.household_config control.household_keys voice_clips"
+                ).split()
+            },
+            **{
+                t: {"SELECT", "INSERT"}
+                for t in (
+                    "raw_text alert_events alert_attempts tg_updates requests quotes commits approvals"
+                    " profile_facts runtime_flags ride_counts"
+                ).split()
+            },
         },
         "column": {
-            **{f"inbox.{c}": {"UPDATE"} for c in
-               "state attempts lease_until lease_token acked_at radar_at not_before".split()},
+            **{
+                f"inbox.{c}": {"UPDATE"}
+                for c in "state attempts lease_until lease_token acked_at radar_at not_before".split()
+            },
             **{f"alert_events.{c}": {"UPDATE"} for c in _ALERT_COLS},
             **{f"alert_attempts.{c}": {"UPDATE"} for c in ("status", "sent_at", "provider_ref_hmac")},
             **{f"requests.{c}": {"UPDATE"} for c in _REQUEST_COLS},
             **{f"runtime_flags.{c}": {"UPDATE"} for c in ("paused", "paused_by", "reason", "updated_at")},
+            **{f"addresses.{c}": {"UPDATE"} for c in ("ride_count", "last_ride_at")},  # 008: the ride counters only
         },
-        "seq": {s: {"USAGE"} for s in
-                ("alert_attempts_id_seq", "approvals_id_seq", "commits_id_seq", "profile_facts_id_seq")},
-        "fn": {f"control.{f}": {"EXECUTE"} for f in (
-            "resolve_sender(text)", "resolve_approver(bigint)", "lease_next(timestamp with time zone,integer)",
-            "reap_inbox(timestamp with time zone)", "unacked_inbox(timestamp with time zone,integer)",
-            "rate_state(timestamp with time zone,text)", "due_alerts(timestamp with time zone,integer)",
-            "unscanned_audio(timestamp with time zone,integer)", "rejected_digest(timestamp with time zone)",
-            "audit_append(text,text,text,text,text,text,jsonb)", "beat(text,timestamp with time zone,text)")},
+        "seq": {
+            s: {"USAGE"}
+            for s in ("alert_attempts_id_seq", "approvals_id_seq", "commits_id_seq", "profile_facts_id_seq")
+        },
+        "fn": {
+            f"control.{f}": {"EXECUTE"}
+            for f in (
+                "resolve_sender(text)",
+                "resolve_approver(bigint)",
+                "lease_next(timestamp with time zone,integer)",
+                "reap_inbox(timestamp with time zone)",
+                "unacked_inbox(timestamp with time zone,integer)",
+                "rate_state(timestamp with time zone,text)",
+                "due_alerts(timestamp with time zone,integer)",
+                "unscanned_audio(timestamp with time zone,integer)",
+                "rejected_digest(timestamp with time zone)",
+                "audit_append(text,text,text,text,text,text,jsonb)",
+                "beat(text,timestamp with time zone,text)",
+            )
+        },
     },
     "saathi_model": {
         "table": {"llm_spend": {"SELECT", "INSERT"}, "llm_reservations": {"SELECT", "INSERT"}},
@@ -540,42 +656,67 @@ EXPECTED: dict[str, dict[str, dict[str, set[str]]]] = {
         "fn": {"control.ledger_month_total(text)": {"EXECUTE"}},
     },
     "saathi_owner": {
-        "table": {**{t: {"SELECT", "INSERT"} for t in _HOUSEHOLD_ADMIN}, "voice_clips": {"SELECT", "INSERT"}},
+        "table": {
+            **{t: {"SELECT", "INSERT"} for t in _HOUSEHOLD_ADMIN},
+            "voice_clips": {"SELECT", "INSERT"},
+            "addresses": {"SELECT", "INSERT", "DELETE"},  # 008: the admin place commands
+        },
         "column": {
+            "addresses.aliases": {"UPDATE"},
+            "addresses.is_pickup": {"UPDATE"},
             "elder_identities.active": {"UPDATE"},
-            "control.household_keys.retired_at": {"UPDATE"}, "control.household_keys.wrapped_key": {"UPDATE"},
+            "control.household_keys.retired_at": {"UPDATE"},
+            "control.household_keys.wrapped_key": {"UPDATE"},
             "control.signoffs.revoked_at": {"UPDATE"},
-            "voice_clips.reviewed_by": {"UPDATE"}, "voice_clips.reviewed_at": {"UPDATE"},
+            "voice_clips.reviewed_by": {"UPDATE"},
+            "voice_clips.reviewed_at": {"UPDATE"},
             "voice_clips.receipt_ref": {"UPDATE"},
         },
         "seq": {"control.signoffs_id_seq": {"USAGE"}, "control.consent_events_id_seq": {"USAGE"}},
-        "fn": {"control.audit_append(text,text,text,text,text,text,jsonb)": {"EXECUTE"},
-               "control.rejected_digest(timestamp with time zone)": {"EXECUTE"}},
+        "fn": {
+            "control.audit_append(text,text,text,text,text,text,jsonb)": {"EXECUTE"},
+            "control.rejected_digest(timestamp with time zone)": {"EXECUTE"},
+        },
     },
     "saathi_readonly": {
         "table": {t: {"SELECT"} for t in _EVERY_TABLE},
-        "column": {}, "seq": {}, "fn": {},
+        "column": {},
+        "seq": {},
+        "fn": {},
     },
     "saathi_scan": {
         "table": {
-            **{t: {"SELECT"} for t in ("households inbox alert_events raw_text control.household_config"
-                                       " elder_identities approvers rejected_inbound llm_reservations").split()},
+            **{
+                t: {"SELECT"}
+                for t in (
+                    "households inbox alert_events raw_text control.household_config"
+                    " elder_identities approvers rejected_inbound llm_reservations"
+                ).split()
+            },
             "control.heartbeats": {"SELECT", "INSERT", "UPDATE"},
         },
         "column": {f"inbox.{c}": {"UPDATE"} for c in ("state", "attempts", "lease_until", "lease_token")},
-        "seq": {}, "fn": {},
+        "seq": {},
+        "fn": {},
     },
     "saathi_audit": {
         "table": {"audit_log": {"INSERT"}},
         "column": {"audit_log.seq": {"SELECT"}},
-        "seq": {}, "fn": {},
+        "seq": {},
+        "fn": {},
     },
     "saathi_migrator": {"table": {}, "column": {}, "seq": {}, "fn": {}},  # the owner: nothing beyond ownership
 }
 # schema control (LLD grants 2): usage for every role that calls a function or reads a table there; model reaches
 # only control.ledger_month_total (006).
 SCHEMA_USAGE = {
-    "saathi_model", "saathi_edge", "saathi_core", "saathi_owner", "saathi_readonly", "saathi_scan", "saathi_audit",
+    "saathi_model",
+    "saathi_edge",
+    "saathi_core",
+    "saathi_owner",
+    "saathi_readonly",
+    "saathi_scan",
+    "saathi_audit",
 }
 
 _ACL_SQL = {
@@ -628,12 +769,17 @@ async def grant_problems(conn: asyncpg.Connection) -> list[str]:
     problems = [f"{role}: {d}" for role in EXPECTED for d in grant_diff(actual, role)]
     stray = sorted(set(actual) - set(EXPECTED))  # a grantee outside the eight roles, PUBLIC included
     problems += [f"unexpected grantee {who}: {actual[who]}" for who in stray]
-    usage = {r["grantee"] for r in await conn.fetch(
-        "SELECT pg_get_userbyid(a.grantee) AS grantee FROM pg_namespace n, aclexplode(n.nspacl) a"
-        " WHERE n.nspname = 'control' AND a.privilege_type = 'USAGE' AND a.grantee <> n.nspowner")}
+    usage = {
+        r["grantee"]
+        for r in await conn.fetch(
+            "SELECT pg_get_userbyid(a.grantee) AS grantee FROM pg_namespace n, aclexplode(n.nspacl) a"
+            " WHERE n.nspname = 'control' AND a.privilege_type = 'USAGE' AND a.grantee <> n.nspowner"
+        )
+    }
     create = await conn.fetch(
         "SELECT a.grantee FROM pg_namespace n, aclexplode(n.nspacl) a"
-        " WHERE n.nspname = 'control' AND a.privilege_type = 'CREATE' AND a.grantee <> n.nspowner")
+        " WHERE n.nspname = 'control' AND a.privilege_type = 'CREATE' AND a.grantee <> n.nspowner"
+    )
     if usage != SCHEMA_USAGE:
         problems.append(f"schema control USAGE: {sorted(usage ^ SCHEMA_USAGE)}")
     if create:
@@ -647,6 +793,19 @@ async def test_grant_matrix_matches_the_lld(pg_db: PgDb):
         assert await grant_problems(conn) == []
         # the matrix is not vacuous: it covers every kind for several roles
         assert sum(len(EXPECTED[r][k]) for r in EXPECTED for k in _ACL_SQL) > 150
+    finally:
+        await conn.close()
+
+
+async def test_core_cannot_insert_addresses(pg_db: PgDb):
+    await seed(pg_db)
+    conn = await connect(pg_db, CORE, "h1")
+    try:
+        assert not await conn.fetchval("SELECT has_table_privilege(current_user, 'addresses', 'INSERT')")
+        with pytest.raises(asyncpg.InsufficientPrivilegeError):
+            await conn.execute(
+                "INSERT INTO addresses (id, household_id, label, formatted) VALUES ('new', 'h1', 'Clinic A', 'x')"
+            )
     finally:
         await conn.close()
 
@@ -679,8 +838,18 @@ async def test_planted_grant_fails(pg_db: PgDb, name: str):
 # --- every control function is SECURITY DEFINER with a pinned search_path ---------------------------------------------
 
 DEFINER_FUNCTIONS = {
-    "resolve_sender", "resolve_approver", "rejected_digest", "rate_state", "audit_append", "lease_next", "reap_inbox",
-    "unacked_inbox", "due_alerts", "unscanned_audio", "beat", "ledger_month_total",
+    "resolve_sender",
+    "resolve_approver",
+    "rejected_digest",
+    "rate_state",
+    "audit_append",
+    "lease_next",
+    "reap_inbox",
+    "unacked_inbox",
+    "due_alerts",
+    "unscanned_audio",
+    "beat",
+    "ledger_month_total",
 }
 PINNED = ["search_path=pg_catalog, public"]
 
@@ -688,7 +857,8 @@ PINNED = ["search_path=pg_catalog, public"]
 async def function_attribute_problems(conn: asyncpg.Connection) -> list[str]:
     rows = await conn.fetch(
         "SELECT p.proname, p.prosecdef, p.proconfig FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace"
-        " WHERE n.nspname = 'control' AND p.proname <> 'apply_tenant_rls' ORDER BY 1")
+        " WHERE n.nspname = 'control' AND p.proname <> 'apply_tenant_rls' ORDER BY 1"
+    )
     problems = [f"{r['proname']}: not SECURITY DEFINER" for r in rows if not r["prosecdef"]]
     problems += [f"{r['proname']}: proconfig {r['proconfig']}" for r in rows if r["proconfig"] != PINNED]
     names = {r["proname"] for r in rows}
@@ -709,9 +879,9 @@ PLANTED_ATTRIBUTES = {
     "security_invoker": "ALTER FUNCTION control.resolve_sender(text) SECURITY INVOKER",
     "search_path_dropped": "ALTER FUNCTION control.lease_next(timestamptz, int) RESET search_path",
     "public_first": "ALTER FUNCTION control.audit_append(text, text, text, text, text, text, jsonb)"
-                    " SET search_path = public, pg_catalog",
+    " SET search_path = public, pg_catalog",
     "search_path_with_extra_schema": "ALTER FUNCTION control.beat(text, timestamptz, text)"
-                                     " SET search_path = pg_catalog, public, control",
+    " SET search_path = pg_catalog, public, control",
 }
 
 
@@ -789,7 +959,8 @@ async def test_lease_next_without_its_early_return_restore_fails(pg_db: PgDb):
         body = await su.fetchval("SELECT pg_get_functiondef(p.oid) FROM pg_proc p WHERE p.proname = 'lease_next'")
         early = body.replace(
             "PERFORM set_config('app.household_id', coalesce(saved, ''), true);\n        RETURN NEXT; RETURN;",
-            "RETURN NEXT; RETURN;")
+            "RETURN NEXT; RETURN;",
+        )
         assert early != body
         await su.execute(early)
     finally:

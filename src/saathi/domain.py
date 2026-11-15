@@ -15,7 +15,7 @@ from enum import IntEnum, StrEnum
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
 
 from saathi.clock import SystemClock
 from saathi.ids import (
@@ -179,8 +179,17 @@ class SendReceipt(_Frozen):
 
 
 class Button(_Frozen):
+    """One card button: a callback (`data`) or a link (`url`), never both and never neither."""
+
     text: str
-    data: str
+    data: str | None = None
+    url: str | None = None
+
+    @model_validator(mode="after")
+    def _one_target(self) -> Button:
+        if (self.data is None) == (self.url is None):
+            raise ValueError("a button has exactly one of data and url")
+        return self
 
 
 class Card(_Frozen):

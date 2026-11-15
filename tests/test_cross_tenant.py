@@ -84,6 +84,9 @@ def seed_sql(h: str, tag: str = "") -> list[tuple[str, str, tuple]]:
          "INSERT INTO control.household_keys (household_id, purpose, key_id, wrapped_key)"
          " VALUES ($1, $2, 'k', '\\x00')",
          (h, "totp" if k else "audit")),
+        ("ride_counts",
+         "INSERT INTO ride_counts (household_id, source, source_id, place_id) VALUES ($1, 'inbox', $2, 'pl')",
+         (h, "m" + h + k)),
         ("llm_spend", "INSERT INTO llm_spend (tier, model, cost_inr, household_id) VALUES ('t', 'm', 1, $1)", (h,)),
         ("llm_reservations",
          "INSERT INTO llm_reservations (household_id, run_id, tier, reserved_inr, month)"
