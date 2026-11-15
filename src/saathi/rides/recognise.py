@@ -64,12 +64,17 @@ _MARKERS = re.compile(
 _NOT = "nahi|nahin|nhi|नहीं|नही"
 # Fixed phrases that are not about the ride, forgiven only when punctuation ends them in the raw text
 _ALLOWED_RAW = re.compile(r"(?:\b(?:der|deri) mat karo|देर मत करो|\bnot (?:feeling )?well)\s*[,.;!?।]", re.IGNORECASE)
-_UNAVAILABLE = re.compile(
+# English unavailability is forgiven only when another ride word remains ("no cab is coming, book an auto"), so "no
+# cab is coming, I will walk" stays a refusal. Hindi unavailability keeps its ride word ("cab nahi mil rahi, bulao").
+_UNAVAILABLE_EN = re.compile(
     rf" there (?:is|are) no (?:{_RIDE_NOUNS})(?= )"
     rf"| no (?:{_RIDE_NOUNS}) (?:is|are|has) (?:coming|available|here|arrived|showing)(?= )"
-    rf"| (?:{_RIDE_NOUNS}) (?:nahi|नहीं) (?:mil rahi|mil raha|mil rhi|mila|mili|aa rahi|aa raha|aayi|aai|aaya"
+)
+_UNAVAILABLE_HI = re.compile(
+    rf"( (?:{_RIDE_NOUNS})) (?:nahi|नहीं) (?:mil rahi|mil raha|mil rhi|mila|mili|aa rahi|aa raha|aayi|aai|aaya"
     r"|मिल रही|मिल रहा|मिली|मिला|आ रही|आ रहा|आई|आया)(?= )"
 )
+_BREAK = "zqbrk"  # stands for punctuation in the raw text, so a place rejection can be bound to its clause end
 _COMMON_NAMES = frozenset(
     {
         "the",
@@ -113,32 +118,39 @@ def _has_ride_word(padded: str) -> bool:
     return any(p in padded for p in _RIDE_PHRASES)
 
 
-def _rejected(padded: str, phrase: str) -> bool:
-    return bool(re.search(_rejection(phrase), padded))
+def _marked(text: str) -> str:
+    return _padded(re.sub(r"[,.;:!?\u0964\u2026]+", f" {_BREAK} ", text))
 
 
 def _rejection(phrase: str) -> str:
-    # "Clinic A nahi chahiye" refuses the ride; only a bare "Clinic A nahi" rejects the place
-    refusal = "chahiye|chahie|चाहिए|चाहिये|bulao|bhejo|बुलाओ|भेजो"
-    return rf" {re.escape(phrase)} (?:{_NOT})(?! (?:{refusal}) )(?= )| not {re.escape(phrase)}(?= )"
+    # Only a bare "Clinic A nahi," or "not Clinic A," before punctuation or the end rejects the place; any other form
+    # ("Clinic A nahi jaana hai") stays a refusal of the ride.
+    end = rf"(?= {_BREAK} | $)"
+    return rf" {re.escape(phrase)} (?:{_NOT}){end}| not {re.escape(phrase)}{end}"
 
 
 def recognise(text: str, places: Sequence[Place]) -> RideResult:
     """`RideResult(ride_word, place_id)`. No ride word, or any refusal marker left after the exceptions:
-    `RideResult(False)`, whatever the places. A rejected place ("Clinic A nahi", "not Clinic A") is never the
+    `RideResult(False)`, whatever the places. A rejected place ("Clinic A nahi,", "not Clinic A,") is never the
     destination, and its rejection is forgiven only when the message also names a different place it does not reject."""
     padded = _padded(text)
     if not _has_ride_word(padded):
         return RideResult(False)
+    marked = _marked(text)
     names = [(place.id, normalise(n)) for place in places for n in (place.label, *place.aliases) if usable_name(n)]
-    rejected_ids = {pid for pid, phrase in names if _rejected(padded, phrase)}
+    rejected_ids = {pid for pid, phrase in names if re.search(_rejection(phrase), marked)}
     candidates = [(len(phrase), phrase, pid) for pid, phrase in names if pid not in rejected_ids]
     named = [c for c in candidates if f" {c[1]} " in padded]
-    rest = _UNAVAILABLE.sub(" ", _padded(_ALLOWED_RAW.sub(" , ", text)))
+    rest = _marked(_ALLOWED_RAW.sub(" , ", text))
+    without = _UNAVAILABLE_EN.sub(" ", rest)
+    if without != rest and not _has_ride_word(without):
+        return RideResult(False)
+    rest = _UNAVAILABLE_HI.sub(r"\1", without)
     if named:
         for pid, phrase in names:
             if pid in rejected_ids:
                 rest = re.sub(_rejection(phrase), " ", rest)
+    rest = " ".join(w for w in rest.split() if w != _BREAK).join("  ")  # "No, thank you" reads as one phrase
     if _MARKERS.search(rest):
         return RideResult(False)
     for _length, phrase, _pid in sorted(named, key=lambda c: -c[0]):

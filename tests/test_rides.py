@@ -411,7 +411,7 @@ def test_contractions_spellings_and_abused_exceptions_still_refuse(text):
         "We have called off the cab to Clinic A",
         "Cab? No, thank you",
         "No thanks, I will pass on the taxi",
-        "No more rides please",
+        "No more cab rides please",
         "cab rehne dijiye",
         "auto rehne dena",
         "cab ki zarurat nai hai",
@@ -431,3 +431,26 @@ def test_contractions_spellings_and_abused_exceptions_still_refuse(text):
 )
 def test_everyday_refusal_wording_refuses(text):
     assert recognise(text, PLACES) == RideResult(False)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "No cab is coming",
+        "No cab is available",
+        "There is no cab",
+        "No cab is coming; I will walk to Clinic A",
+        "There is no auto, I will walk",
+        "Clinic A nahi jaana hai, Temple B ka number do",
+        "Clinic A nahi jana hai, Temple B ka number do",
+        "Clinic A nahin jaana hai, Temple B ka number do",
+        "cab not Clinic A",
+        "cab not Clinic A, doctor",
+    ],
+)
+def test_exceptions_never_turn_a_refusal_on_main_into_a_card(text):
+    assert recognise(text, PLACES) == RideResult(False)
+
+
+def test_a_rejected_place_followed_by_another_place_picks_the_other():
+    assert recognise("cab not Clinic A, Temple B", PLACES) == RideResult(True, "pl_temple")
