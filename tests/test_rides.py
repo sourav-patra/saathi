@@ -111,6 +111,39 @@ def test_unrelated_negation_does_not_suppress_a_ride(text):
     assert recognise(text, PLACES).ride_word
 
 
+@pytest.mark.parametrize(
+    ("text", "place"),
+    [
+        ("No cab is coming, please book an auto to Clinic A", "pl_clinic"),
+        ("No cab is coming please book an auto to Clinic A", "pl_clinic"),
+        ("there is no auto here, get a cab to Clinic A", "pl_clinic"),
+        ("do not want to walk, book a cab to Clinic A", "pl_clinic"),
+        ("do not want to walk book a cab to Clinic A", "pl_clinic"),
+        ("ola nahi chahiye, uber bulao", None),
+        ("I have to go to Clinic A, please book a cab", "pl_clinic"),
+        ("cab to Clinic A nahi, mandir jaana hai", "pl_temple"),
+    ],
+)
+def test_a_negated_clause_does_not_cancel_another_request(text, place):
+    assert recognise(text, PLACES) == RideResult(True, place)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "cab mat bhejo",
+        "Clinic A ke liye auto mat bhejna",
+        "cab cancel karo",
+        "please cancel the cab to Clinic A",
+        "कैब मत भेजो",
+        "do not want a cab",
+        "don't need any taxi to Clinic A",
+    ],
+)
+def test_more_negated_requests_are_not_rides(text):
+    assert recognise(text, PLACES) == RideResult(False)
+
+
 def test_two_devanagari_letters_allow_a_home_alias():
     home = Place("pl_home", "Home P", "x", aliases=("घर",), is_pickup=True)
     assert recognise("घर जाना है", [home]) == RideResult(True, home.id)

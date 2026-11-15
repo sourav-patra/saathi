@@ -48,26 +48,31 @@ def _padded(text: str) -> str:
 
 
 _RIDE_PHRASES = tuple(_padded(w) for w in RIDE_WORDS)
+# A message is read clause by clause, so "no cab is coming, please book an auto" is still a request.
+_CLAUSE_BREAK = re.compile(r"[,.;:!?।\n]+|\s(?:please|but|lekin|magar|kripya|कृपया|लेकिन|मगर)\s", re.IGNORECASE)
 _NEGATIONS = tuple(
     _padded(f"{negation} {verb}")
     for negation, verbs in (
-        ("do not", ("book", "call", "need", "want")),
-        ("don't", ("book", "call", "need", "want")),
-        ("dont", ("book", "call", "need", "want")),
+        ("do not", ("book", "call", "send")),
+        ("don't", ("book", "call", "send")),
+        ("dont", ("book", "call", "send")),
         ("never", ("book", "call")),
-        ("mat", ("bulao", "bulana", "mangao", "book karo")),
-        ("nahi", ("chahiye", "bulao", "bulana", "jaana hai", "jana hai")),
-        ("nahin", ("chahiye", "bulao", "bulana", "jaana hai", "jana hai")),
-        ("nhi", ("chahiye", "bulao", "bulana", "jaana hai", "jana hai")),
-        ("नहीं", ("चाहिए", "चाहिये", "बुलाओ", "जाना है")),
-        ("नही", ("चाहिए", "चाहिये", "बुलाओ", "जाना है")),
-        ("मत", ("बुलाओ", "बुलाना", "मंगाओ", "बुक करो")),
+        ("mat", ("bulao", "bulana", "mangao", "book karo", "bhejo", "bhejna", "bhejiye")),
+        ("nahi", ("chahiye", "bulao", "bulana", "jaana hai", "jana hai", "bhejo", "bhejna")),
+        ("nahin", ("chahiye", "bulao", "bulana", "jaana hai", "jana hai", "bhejo", "bhejna")),
+        ("nhi", ("chahiye", "bulao", "bulana", "jaana hai", "jana hai", "bhejo", "bhejna")),
+        ("नहीं", ("चाहिए", "चाहिये", "बुलाओ", "जाना है", "भेजो")),
+        ("नही", ("चाहिए", "चाहिये", "बुलाओ", "जाना है", "भेजो")),
+        ("मत", ("बुलाओ", "बुलाना", "मंगाओ", "बुक करो", "भेजो", "भेजना")),
     )
     for verb in verbs
 )
 _RIDE_NOUNS = "|".join(re.escape(normalise(w)) for w in RIDE_WORDS if " " not in normalise(w))
-_NO_RIDE = re.compile(rf" (?:no (?:{_RIDE_NOUNS})|(?:{_RIDE_NOUNS}) (?:nahi|nahin|nhi|नहीं|नही)) $")
-_NO_RIDE_PREFIX = re.compile(rf" (?:no|नहीं|नही) (?:{_RIDE_NOUNS}) ")
+_NOT_WORDS = "nahi|nahin|nhi|नहीं|नही"
+_NO_WANT = re.compile(rf" (?:do not|don t|dont) (?:need|want) (?:(?:a|an|the|any) )?(?:{_RIDE_NOUNS}) ")
+_NO_RIDE_END = re.compile(rf" (?:{_NOT_WORDS}) $")  # "cab to Clinic A nahi"
+_NO_RIDE_PREFIX = re.compile(rf" (?:no|नहीं|नही) (?:{_RIDE_NOUNS}) ")  # "no cab is coming"
+_CANCEL = re.compile(r" (?:cancel|कैंसल|रद्द) ")
 _COMMON_NAMES = frozenset(
     {
         "the",
@@ -111,15 +116,22 @@ def _has_ride_word(padded: str) -> bool:
     return any(p in padded for p in _RIDE_PHRASES)
 
 
+def _negated(clause: str) -> bool:
+    """A clause whose ride word is negated or cancelled ("cab mat bhejo", "no cab is coming", "cancel the cab")."""
+    return (
+        any(negation in clause for negation in _NEGATIONS)
+        or bool(_NO_WANT.search(clause) or _NO_RIDE_END.search(clause))
+        or bool(_NO_RIDE_PREFIX.search(clause) or _CANCEL.search(clause))
+    )
+
+
 def recognise(text: str, places: Sequence[Place]) -> RideResult:
-    """`RideResult(ride_word, place_id)`. No ride word: `RideResult(False)`, whatever the places."""
-    padded = _padded(text)
-    if (
-        not _has_ride_word(padded)
-        or any(negation in padded for negation in _NEGATIONS)
-        or _NO_RIDE.search(padded)
-        or _NO_RIDE_PREFIX.search(padded)
-    ):
+    """`RideResult(ride_word, place_id)`. No ride word in a clause that is not negated: `RideResult(False)`.
+
+    Places are looked for in every clause that is not negated, so the place may sit in a clause of its own."""
+    clauses = [c for c in (_padded(part) for part in _CLAUSE_BREAK.split(text)) if c.strip()]
+    kept = [c for c in clauses if not (_has_ride_word(c) and _negated(c))]
+    if not any(_has_ride_word(c) for c in kept):
         return RideResult(False)
     candidates: list[tuple[int, str, str]] = []  # (length, phrase, place id)
     for place in places:
@@ -128,7 +140,7 @@ def recognise(text: str, places: Sequence[Place]) -> RideResult:
             if usable_name(name):
                 candidates.append((len(phrase), phrase, place.id))
     for _length, phrase, _pid in sorted(candidates, key=lambda c: -c[0]):
-        if f" {phrase} " in padded:
+        if any(f" {phrase} " in clause for clause in kept):
             owners = {pid for _l, ph, pid in candidates if ph == phrase}
             return RideResult(True, next(iter(owners)) if len(owners) == 1 else None)
     return RideResult(True)
