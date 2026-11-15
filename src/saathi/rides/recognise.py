@@ -166,7 +166,13 @@ def recognise(text: str, places: Sequence[Place]) -> RideResult:
     names = [(place.id, normalise(n)) for place in places for n in (place.label, *place.aliases) if usable_name(n)]
     rejected_ids = {pid for pid, phrase in names if re.search(_rejection(phrase), marked)}
     candidates = [(len(phrase), phrase, pid) for pid, phrase in names if pid not in rejected_ids]
-    named = [c for c in candidates if f" {c[1]} " in padded]
+    # Look for destinations only outside the rejected spans: "not Family Doctor Clinic" must not name a "doctor" alias
+    unrejected = marked
+    for pid, phrase in sorted(names, key=lambda n: -len(n[1])):
+        if pid in rejected_ids:
+            unrejected = re.sub(_rejection(phrase), " ", unrejected)
+    unrejected = " ".join(w for w in unrejected.split() if w != _BREAK).join("  ")
+    named = [c for c in candidates if f" {c[1]} " in unrejected]
     rest = _marked(_ALLOWED_RAW.sub(" , ", text))
     rest = _UNAVAILABLE_HI.sub(r"\1", rest)
     if named:

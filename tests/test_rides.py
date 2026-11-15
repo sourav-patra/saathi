@@ -477,3 +477,12 @@ def test_a_place_name_that_overlaps_a_refusal_cannot_undo_it():
     centre = Place("pl_centre", "Call Centre", "6 Test Road, Sample Town", 0.7, 0.8)
     assert recognise("Clinic A jaana hai, City Taxi nahi", [*PLACES, taxi]) == RideResult(False)
     assert recognise("Do not call centre, cab to Clinic A", [*PLACES, centre]) == RideResult(False)
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["cab not Family Doctor Clinic, bua", "bua, cab not Family Doctor Clinic", "Family Doctor Clinic nahi, cab to bua"],
+)
+def test_an_alias_inside_a_rejected_name_is_not_a_destination(text):
+    family = Place("pl_family", "Family Doctor Clinic", "7 Test Road, Sample Town", 0.9, 0.9)
+    assert recognise(text, [*PLACES, family]) == RideResult(True, "pl_relative")
