@@ -353,3 +353,46 @@ async def test_a_routed_tap_carries_the_card_it_came_from():
 @pytest.mark.parametrize("word", ["पर", "कब", "सब", "अब", "तक", "जब", "हम"])
 def test_common_two_letter_devanagari_words_are_not_place_names(word):
     assert not usable_name(word)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "There is no cab, do not book",
+        "cab nahi milegi to mat bulao",
+        "not feeling like a cab",
+        "not feeling up to a taxi",
+        "not well enough to take a cab",
+        "cab nahi aana chahiye",
+        "cab nahi aaj chahiye",
+        "कैब नहीं आनी चाहिए",
+        "कैब नहीं मिलनी चाहिए",
+        "I can’t take a cab",
+        "I cannot take a taxi",
+        "I shouldn’t book a cab",
+        "I wouldn’t want a cab",
+        "I didnt want a cab",
+        "She doesnt need a cab",
+        "cab na bulao",
+        "cab nehi chahiye",
+        "cab nahii chahiye",
+        "कैब न बुलाओ",
+        "कैब कैंसिल करो",
+        "cab please cancel",
+        "never again a cab",
+        "taxi will not be needed",
+        "Don't arrange transport, cab",
+        "Doesn’t want a cab",
+        "Didn’t request a cab",
+        "not Clinic A, cab to Temple B; do not book",
+        "Clinic A nahi, cab to Temple B; mat bhejo",
+        "der mat karo, cab mat bulao",
+        "not feeling well, cab do not book",
+        "there is no cab, not needed",
+        "no taxi is available, cancel it",
+        "Doctor se baat karao, cab to Clinic A nahi chahiye",  # "doctor" is Clinic A's own alias
+        "cab not Clinic A, doctor",
+    ],
+)
+def test_contractions_spellings_and_abused_exceptions_still_refuse(text):
+    assert recognise(text, PLACES) == RideResult(False)
