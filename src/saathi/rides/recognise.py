@@ -48,36 +48,21 @@ def _padded(text: str) -> str:
 
 
 _RIDE_PHRASES = tuple(_padded(w) for w in RIDE_WORDS)
-# Refusals are read across the whole message: any refusal bound to a ride gives no card (the caregiver still gets the
-# summary). The English refusals must reach a ride word through a few fixed filler words, so "do not want to walk" and
-# "don't send medicine" stay requests.
-_NEGATIONS = tuple(
-    _padded(f"{negation} {verb}")
-    for negation, verbs in (
-        ("mat", ("bulao", "bulana", "mangao", "book karo", "bhejo", "bhejna", "bhejiye")),
-        ("nahi", ("chahiye", "bulao", "bulana", "jaana hai", "jana hai", "bhejo", "bhejna")),
-        ("nahin", ("chahiye", "bulao", "bulana", "jaana hai", "jana hai", "bhejo", "bhejna")),
-        ("nhi", ("chahiye", "bulao", "bulana", "jaana hai", "jana hai", "bhejo", "bhejna")),
-        ("नहीं", ("चाहिए", "चाहिये", "बुलाओ", "जाना है", "भेजो")),
-        ("नही", ("चाहिए", "चाहिये", "बुलाओ", "जाना है", "भेजो")),
-        ("मत", ("बुलाओ", "बुलाना", "मंगाओ", "बुक करो", "भेजो", "भेजना")),
-    )
-    for verb in verbs
-)
+# Refusals fail closed: a ride word plus any refusal marker anywhere gives no card (the caregiver still reads the
+# summary). Only three narrow exceptions remove their own words before the markers are looked for: unavailability
+# ("there is no auto", "cab nahi mil rahi"), a rejected place when another place is named, and a few fixed phrases.
 _RIDE_NOUNS = "|".join(re.escape(normalise(w)) for w in RIDE_WORDS if " " not in normalise(w))
-_NOT = "nahi|nahin|nhi|नहीं|नही"
-_FILLER = r"(?: (?:a|an|the|any|another|me|please|to|book|call|take|get|send)){0,3}"
-_DONT = r"(?:do not|don t|dont|never)"
-_REFUSE = re.compile(rf" {_DONT} (?:book|call|send|need|want){_FILLER} (?:{_RIDE_NOUNS}) ")
-_NO_RIDE = re.compile(rf" (?:no (?:{_RIDE_NOUNS})|(?:{_RIDE_NOUNS}) (?:{_NOT})) $")
-# "no cab" refuses, unless it reports that none is available: "there is no auto", "no cab is coming"
-_NO_RIDE_PREFIX = re.compile(
-    rf"(?<! there is)(?<! there are) (?:no|नहीं|नही) (?:{_RIDE_NOUNS})"
-    r" (?!(?:is|are|has) (?:coming|available|here|arrived|showing)\b)"
+_MARKERS = re.compile(
+    r" (?:do not|don t|dont|does not|doesn t|did not|didn t|never|won t|wont|will not|cancel|cancelled|canceled"
+    r"|no need|no longer|no more|not|mat|मत|nahi|nahin|nhi|नहीं|नही|rehne do|रहने दो|कैंसल|रद्द)(?= )"
+    rf"| no (?:{_RIDE_NOUNS})(?= )"
 )
-_NO_RIDE_END_OF_TEXT = re.compile(rf"(?<! there is)(?<! there are) (?:no|नहीं|नही) (?:{_RIDE_NOUNS}) $")
-_CANCEL = re.compile(
-    rf" (?:cancel|कैंसल|रद्द)(?: (?:a|an|the|my|this|that))? (?:{_RIDE_NOUNS}) | (?:{_RIDE_NOUNS}) (?:cancel|कैंसल|रद्द) "
+_NOT = "nahi|nahin|nhi|नहीं|नही"
+_ALLOWED = re.compile(r" (?:der mat karo|deri mat karo|देर मत करो|not feeling|not well)(?= )")
+_UNAVAILABLE = re.compile(
+    rf" there (?:is|are) no (?:{_RIDE_NOUNS})(?= )"
+    rf"| no (?:{_RIDE_NOUNS}) (?:is|are|has) (?:coming|available|here|arrived|showing)(?= )"
+    rf"| (?:{_RIDE_NOUNS}) (?:nahi|नहीं) (?=(?:mil|aa|मिल|आ)\S* )"
 )
 _COMMON_NAMES = frozenset(
     {
@@ -122,33 +107,40 @@ def _has_ride_word(padded: str) -> bool:
     return any(p in padded for p in _RIDE_PHRASES)
 
 
-def _refused(padded: str) -> bool:
-    return (
-        any(negation in padded for negation in _NEGATIONS)
-        or bool(_REFUSE.search(padded) or _NO_RIDE.search(padded))
-        or bool(_NO_RIDE_PREFIX.search(padded) or _NO_RIDE_END_OF_TEXT.search(padded) or _CANCEL.search(padded))
-    )
+def _rejected(padded: str, phrase: str) -> bool:
+    return bool(re.search(_rejection(phrase), padded))
+
+
+def _rejection(phrase: str) -> str:
+    return rf" {re.escape(phrase)} (?:{_NOT})(?= )| not {re.escape(phrase)}(?= )"
 
 
 def recognise(text: str, places: Sequence[Place]) -> RideResult:
-    """`RideResult(ride_word, place_id)`. No ride word, or a refused ride: `RideResult(False)`, whatever the places.
-
-    A place the words reject ("Clinic A nahi", "not Clinic A") is never the destination."""
+    """`RideResult(ride_word, place_id)`. No ride word, or any refusal marker left after the exceptions:
+    `RideResult(False)`, whatever the places. A rejected place ("Clinic A nahi", "not Clinic A") is never the
+    destination, and its rejection is forgiven only when the message also names a place it does not reject."""
     padded = _padded(text)
-    if not _has_ride_word(padded) or _refused(padded):
+    if not _has_ride_word(padded):
         return RideResult(False)
     candidates: list[tuple[int, str, str]] = []  # (length, phrase, place id)
+    rejected: list[str] = []
     for place in places:
         for name in (place.label, *place.aliases):
             phrase = normalise(name)
-            if usable_name(name) and not _rejected(padded, phrase):
+            if not usable_name(name):
+                continue
+            if _rejected(padded, phrase):
+                rejected.append(phrase)
+            else:
                 candidates.append((len(phrase), phrase, place.id))
-    for _length, phrase, _pid in sorted(candidates, key=lambda c: -c[0]):
-        if f" {phrase} " in padded:
-            owners = {pid for _l, ph, pid in candidates if ph == phrase}
-            return RideResult(True, next(iter(owners)) if len(owners) == 1 else None)
+    named = [c for c in candidates if f" {c[1]} " in padded]
+    rest = _UNAVAILABLE.sub(" ", _ALLOWED.sub(" ", padded))
+    if named:
+        for phrase in rejected:
+            rest = re.sub(_rejection(phrase), " ", rest)
+    if _MARKERS.search(rest):
+        return RideResult(False)
+    for _length, phrase, _pid in sorted(named, key=lambda c: -c[0]):
+        owners = {pid for _l, ph, pid in candidates if ph == phrase}
+        return RideResult(True, next(iter(owners)) if len(owners) == 1 else None)
     return RideResult(True)
-
-
-def _rejected(padded: str, phrase: str) -> bool:
-    return bool(re.search(rf" {re.escape(phrase)} (?:{_NOT}) | not {re.escape(phrase)} ", padded))
