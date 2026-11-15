@@ -48,8 +48,8 @@ def _padded(text: str) -> str:
 
 
 _RIDE_PHRASES = tuple(_padded(w) for w in RIDE_WORDS)
-# A message is read clause by clause, so "no cab is coming, please book an auto" is still a request.
-_CLAUSE_BREAK = re.compile(r"[,.;:!?।\n]+|\s(?:please|but|lekin|magar|kripya|कृपया|लेकिन|मगर)\s", re.IGNORECASE)
+# Refusals are read across the whole message: any refusal bound to a ride gives no card (the caregiver still gets the
+# summary). Only "do not want/need" is bound to a ride word a few words later, so "do not want to walk" stays a request.
 _NEGATIONS = tuple(
     _padded(f"{negation} {verb}")
     for negation, verbs in (
@@ -68,11 +68,17 @@ _NEGATIONS = tuple(
     for verb in verbs
 )
 _RIDE_NOUNS = "|".join(re.escape(normalise(w)) for w in RIDE_WORDS if " " not in normalise(w))
-_NOT_WORDS = "nahi|nahin|nhi|नहीं|नही"
-_NO_WANT = re.compile(rf" (?:do not|don t|dont) (?:need|want) (?:(?:a|an|the|any) )?(?:{_RIDE_NOUNS}) ")
-_NO_RIDE_END = re.compile(rf" (?:{_NOT_WORDS}) $")  # "cab to Clinic A nahi"
-_NO_RIDE_PREFIX = re.compile(rf" (?:no|नहीं|नही) (?:{_RIDE_NOUNS}) ")  # "no cab is coming"
-_CANCEL = re.compile(r" (?:cancel|कैंसल|रद्द) ")
+_NOT = "nahi|nahin|nhi|नहीं|नही"
+_NO_WANT = re.compile(rf" (?:do not|don t|dont) (?:need|want)(?: \S+){{0,3}} (?:{_RIDE_NOUNS}) ")
+_NO_RIDE = re.compile(rf" (?:no (?:{_RIDE_NOUNS})|(?:{_RIDE_NOUNS}) (?:{_NOT})) $")
+# "no cab" refuses, unless it reports that none is available: "no cab is coming", "there is no auto here"
+_NO_RIDE_PREFIX = re.compile(
+    rf"(?<! is)(?<! are) (?:no|नहीं|नही) (?:{_RIDE_NOUNS}) (?!(?:is |are )?(?:coming|came|here|available|showing)\b)"
+)
+_NO_RIDE_END_OF_TEXT = re.compile(rf" (?:no|नहीं|नही) (?:{_RIDE_NOUNS}) $")
+_CANCEL = re.compile(
+    rf" (?:cancel|कैंसल|रद्द)(?: \S+){{0,2}} (?:{_RIDE_NOUNS}) | (?:{_RIDE_NOUNS})(?: \S+)? (?:cancel|कैंसल|रद्द) "
+)
 _COMMON_NAMES = frozenset(
     {
         "the",
@@ -116,31 +122,33 @@ def _has_ride_word(padded: str) -> bool:
     return any(p in padded for p in _RIDE_PHRASES)
 
 
-def _negated(clause: str) -> bool:
-    """A clause whose ride word is negated or cancelled ("cab mat bhejo", "no cab is coming", "cancel the cab")."""
+def _refused(padded: str) -> bool:
     return (
-        any(negation in clause for negation in _NEGATIONS)
-        or bool(_NO_WANT.search(clause) or _NO_RIDE_END.search(clause))
-        or bool(_NO_RIDE_PREFIX.search(clause) or _CANCEL.search(clause))
+        any(negation in padded for negation in _NEGATIONS)
+        or bool(_NO_WANT.search(padded) or _NO_RIDE.search(padded))
+        or bool(_NO_RIDE_PREFIX.search(padded) or _NO_RIDE_END_OF_TEXT.search(padded) or _CANCEL.search(padded))
     )
 
 
 def recognise(text: str, places: Sequence[Place]) -> RideResult:
-    """`RideResult(ride_word, place_id)`. No ride word in a clause that is not negated: `RideResult(False)`.
+    """`RideResult(ride_word, place_id)`. No ride word, or a refused ride: `RideResult(False)`, whatever the places.
 
-    Places are looked for in every clause that is not negated, so the place may sit in a clause of its own."""
-    clauses = [c for c in (_padded(part) for part in _CLAUSE_BREAK.split(text)) if c.strip()]
-    kept = [c for c in clauses if not (_has_ride_word(c) and _negated(c))]
-    if not any(_has_ride_word(c) for c in kept):
+    A place the words reject ("Clinic A nahi", "not Clinic A") is never the destination."""
+    padded = _padded(text)
+    if not _has_ride_word(padded) or _refused(padded):
         return RideResult(False)
     candidates: list[tuple[int, str, str]] = []  # (length, phrase, place id)
     for place in places:
         for name in (place.label, *place.aliases):
             phrase = normalise(name)
-            if usable_name(name):
+            if usable_name(name) and not _rejected(padded, phrase):
                 candidates.append((len(phrase), phrase, place.id))
     for _length, phrase, _pid in sorted(candidates, key=lambda c: -c[0]):
-        if any(f" {phrase} " in clause for clause in kept):
+        if f" {phrase} " in padded:
             owners = {pid for _l, ph, pid in candidates if ph == phrase}
             return RideResult(True, next(iter(owners)) if len(owners) == 1 else None)
     return RideResult(True)
+
+
+def _rejected(padded: str, phrase: str) -> bool:
+    return bool(re.search(rf" {re.escape(phrase)} (?:{_NOT}|not) | (?:not|no) {re.escape(phrase)} ", padded))
