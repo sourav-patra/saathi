@@ -70,7 +70,7 @@ _UNAVAILABLE_HI = re.compile(
     rf"( (?:{_RIDE_NOUNS})) (?:nahi|नहीं) (?:mil rahi|mil raha|mil rhi|mila|mili|aa rahi|aa raha|aayi|aai|aaya"
     r"|मिल रही|मिल रहा|मिली|मिला|आ रही|आ रहा|आई|आया)(?= )"
 )
-_BREAK = "zqbrk"  # stands for punctuation in the raw text, so a place rejection can be bound to its clause end
+_BREAK = "|"  # stands for punctuation in the raw text; normalised words never contain it
 _COMMON_NAMES = frozenset(
     {
         "the",
@@ -115,13 +115,15 @@ def _has_ride_word(padded: str) -> bool:
 
 
 def _marked(text: str) -> str:
-    return _padded(re.sub(r"[,.;:!?\u0964\u2026]+", f" {_BREAK} ", text))
+    """Each clause normalised on its own, joined by `_BREAK`, so a place rejection can be bound to its clause end."""
+    clauses = (normalise(part) for part in re.split(r"[,.;:!?\u0964\u2026]+", text))
+    return " " + f" {_BREAK} ".join(c for c in clauses if c) + " "
 
 
 def _rejection(phrase: str) -> str:
     # Only a bare "Clinic A nahi," or "not Clinic A," before punctuation or the end rejects the place; any other form
     # ("Clinic A nahi jaana hai") stays a refusal of the ride.
-    end = rf"(?= {_BREAK} | $)"
+    end = rf"(?= {re.escape(_BREAK)} | $)"
     return rf" {re.escape(phrase)} (?:{_NOT}){end}| not {re.escape(phrase)}{end}"
 
 

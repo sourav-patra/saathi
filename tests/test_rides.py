@@ -486,3 +486,8 @@ def test_a_place_name_that_overlaps_a_refusal_cannot_undo_it():
 def test_an_alias_inside_a_rejected_name_is_not_a_destination(text):
     family = Place("pl_family", "Family Doctor Clinic", "7 Test Road, Sample Town", 0.9, 0.9)
     assert recognise(text, [*PLACES, family]) == RideResult(True, "pl_relative")
+
+
+def test_a_typed_word_is_never_read_as_punctuation():
+    family = Place("pl_family", "Family Doctor Clinic", "7 Test Road, Sample Town", 0.9, 0.9)
+    assert recognise("cab to Family zqbrk Doctor Clinic", [*PLACES, family]) == RideResult(True, "pl_clinic")
